@@ -238,8 +238,8 @@ document.addEventListener('DOMContentLoaded', () => {
             await pyodide.loadPackage("micropip");
             const micropip = pyodide.pyimport("micropip");
             
-            headerStatusText.textContent = 'INSTALLING PYPDF...';
-            await micropip.install("pypdf");
+            headerStatusText.textContent = 'INSTALLING DEPENDENCIES...';
+            await micropip.install(["pypdf", "cryptography"]);
 
             // 3. Fetch Local Python Script
             headerStatusText.textContent = 'MOUNTING LOGIC...';
