@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All4One Command Center</title>
+    <!-- Favicon (Inherited from original React build) -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f59e0b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 19.5v.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8.5L18 5.5'/%3E%3Cpath d='m15 5 3 3'/%3E%3Cpath d='m11.5 11.5 3 3L22 4c-.5-.5-1.5-.5-2 0l-8.5 8.5Z'/%3E%3Cpath d='M8 10h.01'/%3E%3Cpath d='M8 14h.01'/%3E%3Cpath d='M8 18h.01'/%3E%3C/svg%3E" />
+    
+    <!-- Tailwind CSS (via CDN for Zero-Build Architecture) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class', // Enables class-based dark mode toggling
+            theme: { extend: {} }
+        }
+    </script>
+
+    <!-- Lucide Icons (via CDN) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Application Logic -->
+    <script src="js/app.js" defer></script>
+    <script src="js/pdf-manager.js" defer></script>
+    <script src="js/trello.js" defer></script>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
+
+    <!-- ========================================== -->
+    <!-- LOGIN VIEW (Hidden if authenticated)         -->
+    <!-- ========================================== -->
+    <div id="login-view" class="min-h-screen flex items-center justify-center p-4">
+        <div class="max-w-md w-full bg-white dark:bg-slate-800 rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700 p-8 text-center transition-colors duration-300">
+            <div class="bg-slate-100 dark:bg-slate-900 rounded-2xl p-6 mb-8 shadow-inner inline-block transition-colors duration-300">
+                <i data-lucide="building-2" class="w-12 h-12 text-amber-500 mx-auto mb-2"></i>
+                <h2 class="text-3xl font-serif text-amber-600 dark:text-amber-500 tracking-wide leading-none mb-1">ALL4ONE</h2>
+                <p class="text-[0.65rem] font-sans text-slate-500 tracking-[0.3em] uppercase">Command Center</p>
+            </div>
+            
+            <h1 class="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">Secure Workspace</h1>
+            <p class="text-slate-500 dark:text-slate-400 text-sm mb-8">
+                Please enter your full name to access unified tools and maintain an audit trail.
+            </p>
+            
+            <form id="login-form" class="space-y-4">
+                <input 
+                    type="text" 
+                    id="username-input"
+                    placeholder="Enter your Full Name" 
+                    required
+                    class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white dark:placeholder-slate-500"
+                />
+                <button 
+                    type="submit"
+                    class="w-full flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-blue-600/20 transition-all active:scale-95"
+                >
+                    <i data-lucide="shield-check" class="w-5 h-5"></i>
+                    <span>Enter Workspace</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MAIN APP VIEW (Hidden until authenticated) -->
+    <!-- ========================================== -->
+    <div id="app-view" class="hidden flex h-screen w-full text-slate-800 dark:text-slate-100 overflow-hidden">
+        
+        <!-- SIDEBAR -->
+        <div class="w-20 shrink-0 flex flex-col items-center py-6 border-r border-slate-200 dark:border-slate-800 bg-slate-900 dark:bg-slate-950 text-slate-400 z-20 transition-colors duration-300">
+            <!-- Logo -->
+            <div class="mb-8 hover:scale-105 transition-transform duration-300 cursor-pointer text-amber-500">
+                <i data-lucide="building-2" class="w-10 h-10"></i>
+            </div>
+            
+            <!-- Navigation -->
+            <nav id="sidebar-nav" class="flex-1 flex flex-col gap-4 w-full px-3">
+                <!-- PDF Manager -->
+                <button data-tab="pdf-manager" class="tab-btn p-3 rounded-xl transition-all flex justify-center w-full text-white bg-slate-800" title="PDF Document Manager">
+                    <i data-lucide="file-signature" class="w-6 h-6"></i>
+                </button>
+
+                <!-- Trello Watcher -->
+                <button data-tab="dashboard" class="tab-btn p-3 rounded-xl transition-all flex justify-center w-full hover:text-white hover:bg-slate-800/50" title="Trello Watcher">
+                    <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
+                </button>
+                
+                <!-- Case Maker -->
+                <button data-tab="casemaker" class="tab-btn p-3 rounded-xl transition-all flex justify-center w-full hover:text-white hover:bg-slate-800/50" title="Case Maker">
+                    <i data-lucide="briefcase" class="w-6 h-6"></i>
+                </button>
+            </nav>
+
+            <!-- Bottom Actions -->
+            <div class="mt-auto flex flex-col gap-4 w-full px-3">
+                <button id="dark-mode-toggle" class="p-3 hover:text-white hover:bg-slate-800/50 rounded-xl transition-all flex justify-center w-full" title="Toggle Dark Mode">
+                    <i data-lucide="moon" id="dark-mode-icon" class="w-6 h-6"></i>
+                </button>
+                
+                <button id="logout-btn" class="p-3 text-rose-400 hover:text-white hover:bg-rose-500/20 rounded-xl transition-all flex justify-center w-full" title="Secure Logout">
+                    <i data-lucide="log-out" class="w-6 h-6"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- MAIN CONTENT AREA -->
+        <div class="flex-1 relative flex flex-col h-full bg-slate-50 dark:bg-slate-900/50 transition-colors duration-300">
+            
+            <!-- Dynamic Header -->
+            <header class="h-16 shrink-0 flex items-center justify-between px-8 border-b border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-950/50 backdrop-blur-md z-10">
+                <h1 id="header-title" class="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                    PDF Document Manager
+                </h1>
+                
+                <div class="flex items-center gap-3">
+                    <!-- Status Badge -->
+                    <div id="header-status-badge" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 transition-all duration-300">
+                        <div id="header-status-dot" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                        <span id="header-status-text" class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">System Online</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Tab Containers -->
+            <main class="flex-1 overflow-hidden relative">
+                
+                <!-- PDF MANAGER TAB -->
+                <div id="tab-pdf-manager" class="tab-content block h-full w-full overflow-y-auto p-6 lg:p-8">
+                    <div class="max-w-6xl mx-auto space-y-6 pb-20">
+                        
+                        <!-- Top Controls / Settings -->
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors duration-300">
+                            <div>
+                                <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100">Holding Bay</h2>
+                                <p class="text-sm text-slate-500 dark:text-slate-400">Manage, sort, and process your PDF documents locally.</p>
+                            </div>
+                            <div class="flex items-center gap-3 w-full sm:w-auto">
+                                <div class="flex flex-col w-full sm:w-56">
+                                    <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Document Type Profile</label>
+                                    <select id="pdf-doc-type" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 outline-none transition-colors duration-300">
+                                        <option value="generic">Auto-Detect / Generic</option>
+                                        <option value="bank">Bank Statements (Standard Bank)</option>
+                                        <option value="payslip">Payslips</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Drag & Drop Zone -->
+                        <div id="pdf-dropzone" class="w-full border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-blue-500 dark:hover:border-blue-500 rounded-2xl p-10 text-center cursor-pointer transition-colors duration-300 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col items-center justify-center min-h-[200px] group">
+                            <i data-lucide="upload-cloud" class="w-12 h-12 text-slate-400 group-hover:text-blue-500 transition-colors mb-4"></i>
+                            <p class="text-slate-600 dark:text-slate-300 font-medium mb-1">Drag & Drop PDF files here</p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">or click to browse from your computer</p>
+                            <input type="file" id="pdf-file-input" multiple accept=".pdf" class="hidden">
+                            <button class="px-6 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-sm font-medium rounded-lg transition-colors shadow-sm pointer-events-none">
+                                Browse Files
+                            </button>
+                        </div>
+
+                        <!-- Action Toolbar -->
+                        <div class="flex flex-col xl:flex-row flex-wrap gap-4 bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors duration-300">
+                            
+                            <!-- Passwords & Unlock -->
+                            <div class="flex items-center gap-2 mr-auto w-full xl:w-auto">
+                                <input type="text" id="pdf-password-input" placeholder="Passwords (comma separated)" class="w-full xl:w-64 px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 dark:text-slate-200 transition-colors duration-300" title="Passwords to try for unlocking">
+                                <button id="btn-unlock-pdf" class="flex items-center justify-center shrink-0 gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg shadow-sm shadow-amber-500/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <i data-lucide="unlock" class="w-4 h-4"></i>
+                                    <span class="hidden sm:inline">Unlock</span>
+                                </button>
+                            </div>
+                            
+                            <div class="flex items-center gap-3 w-full xl:w-auto">
+                                <button id="btn-scan-pdf" class="flex-1 xl:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg shadow-sm shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <i data-lucide="calendar-search" class="w-4 h-4"></i>
+                                    <span>Scan Dates & Sort</span>
+                                </button>
+
+                                <button id="btn-merge-pdf" class="flex-1 xl:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg shadow-sm shadow-emerald-600/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <i data-lucide="layers" class="w-4 h-4"></i>
+                                    <span>Merge Selected</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- File List / Review Table -->
+                        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden transition-colors duration-300">
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-sm text-slate-600 dark:text-slate-300">
+                                    <thead class="bg-slate-50 dark:bg-slate-900/50 text-xs uppercase text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+                                        <tr>
+                                            <th scope="col" class="px-4 py-4 w-12 text-center">
+                                                <input type="checkbox" id="pdf-select-all" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 bg-slate-50 dark:bg-slate-800 dark:border-slate-600 cursor-pointer" disabled>
+                                            </th>
+                                            <th scope="col" class="px-4 py-4">Filename</th>
+                                            <th scope="col" class="px-4 py-4 w-32">Status</th>
+                                            <th scope="col" class="px-4 py-4 w-48">Detected Date</th>
+                                            <th scope="col" class="px-4 py-4 w-16 text-center">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="pdf-file-list" class="divide-y divide-slate-200 dark:divide-slate-700 transition-colors duration-300">
+                                        <!-- Empty State Stub -->
+                                        <tr id="pdf-empty-state">
+                                            <td colspan="5" class="px-4 py-12 text-center text-slate-400 dark:text-slate-500">
+                                                <i data-lucide="file-box" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
+                                                <p>No files in the Holding Bay.</p>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center text-xs text-slate-500 dark:text-slate-400 transition-colors duration-300">
+                                <span id="pdf-stats-count">0 files tracked</span>
+                                <button id="btn-clear-bay" class="text-rose-500 hover:text-rose-600 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>Clear Bay</button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- TRELLO WATCHER TAB -->
+                <div id="tab-dashboard" class="tab-content hidden h-full w-full overflow-y-auto p-6 lg:p-8">
+                    <div class="max-w-6xl mx-auto space-y-6 pb-20">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors duration-300">
+                            <div>
+                                <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100">Trello Watcher</h2>
+                                <p class="text-sm text-slate-500 dark:text-slate-400">Background polling and alarm system off the main thread.</p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <button id="btn-trello-start" class="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg shadow-sm transition-all active:scale-95">
+                                    <i data-lucide="play" class="w-4 h-4"></i> Start Worker
+                                </button>
+                                <button id="btn-trello-stop" class="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-50" disabled>
+                                    <i data-lucide="square" class="w-4 h-4"></i> Stop
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <!-- Config Panel -->
+                            <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors duration-300 space-y-4">
+                                <h3 class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                                    <i data-lucide="settings-2" class="w-5 h-5 text-slate-400"></i> Configuration
+                                </h3>
+                                <div>
+                                    <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 block">Trello API Key</label>
+                                    <input type="password" id="trello-api-key" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none transition-colors duration-300">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 block">Trello Token</label>
+                                    <input type="password" id="trello-token" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none transition-colors duration-300">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 block">Target Lists (JSON Array)</label>
+                                    <textarea id="trello-targets" rows="4" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-mono text-xs rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none transition-colors duration-300" placeholder='[{"id":"...", "name":"..."}]'></textarea>
+                                </div>
+                            </div>
+                            
+                            <!-- Logs Panel -->
+                            <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors duration-300 flex flex-col">
+                                <h3 class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-4">
+                                    <i data-lucide="terminal" class="w-5 h-5 text-slate-400"></i> Worker Console
+                                </h3>
+                                <div id="trello-log-container" class="flex-1 bg-slate-950 text-emerald-400 p-4 rounded-xl font-mono text-xs overflow-y-auto h-64 whitespace-pre-wrap border border-slate-900 shadow-inner"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CASE MAKER TAB -->
+                <div id="tab-casemaker" class="tab-content hidden h-full w-full">
+                    <iframe 
+                        src="https://script.google.com/macros/s/AKfycbxDKB-wWAd-BDOdfqe-sr6RRgrakIM5qhqfQy-2mvF9hQ7-xJAk8NhZcdPSPeHFFfGZ/exec"
+                        class="w-full h-full border-0"
+                        title="RyanGPT Case Maker"
+                        allow="clipboard-write"
+                        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads"
+                    ></iframe>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- Initialize Icons immediately -->
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
