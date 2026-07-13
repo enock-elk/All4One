@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnUnlock = document.getElementById('btn-unlock-pdf');
     const btnScan = document.getElementById('btn-scan-pdf');
     const btnMerge = document.getElementById('btn-merge-pdf');
+    const btnExtractExcel = document.getElementById('btn-extract-excel');
 
     // --- State Management ---
     // This acts as our localized RAM before passing to the Python engine
@@ -55,7 +56,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Render each file
         holdingBay.forEach((fileObj, index) => {
             const tr = document.createElement('tr');
-            tr.className = 'hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors duration-150';
+            tr.className = 'hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors duration-150 cursor-move';
+            tr.setAttribute('draggable', 'true');
+            tr.setAttribute('data-index', index);
             
             // Status Badge Logic
             let statusBadge = '';
@@ -81,9 +84,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     <input type="text" class="w-full bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-blue-500 outline-none text-sm px-1 py-0.5 transition-colors" value="${fileObj.detectedDate || ''}" placeholder="Scan to detect..." data-index="${index}">
                 </td>
                 <td class="px-4 py-3 whitespace-nowrap text-center">
-                    <button class="delete-btn text-slate-400 hover:text-rose-500 transition-colors" data-index="${index}" title="Remove File">
-                        <i data-lucide="trash-2" class="w-4 h-4 mx-auto"></i>
-                    </button>
+                    <div class="flex items-center justify-center gap-2">
+                        <button class="download-btn text-slate-400 hover:text-blue-500 transition-colors ${fileObj.status === 'error' ? 'hidden' : ''}" data-index="${index}" title="Download File">
+                            <i data-lucide="download" class="w-4 h-4"></i>
+                        </button>
+                        <button class="delete-btn text-slate-400 hover:text-rose-500 transition-colors" data-index="${index}" title="Remove File">
+                            <i data-lucide="trash-2" class="w-4 h-4 mx-auto"></i>
+                        </button>
+                    </div>
                 </td>
             `;
 
@@ -103,6 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btnUnlock.disabled = !enable;
         btnScan.disabled = !enable;
         btnMerge.disabled = !enable;
+        if (btnExtractExcel) btnExtractExcel.disabled = !enable;
     }
 
     function attachRowListeners() {
@@ -115,12 +124,95 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
+        // Date Inputs (Save manual edits)
+        document.querySelectorAll('input[placeholder="Scan to detect..."]').forEach(input => {
+            input.addEventListener('change', (e) => {
+                const idx = e.target.getAttribute('data-index');
+                holdingBay[idx].detectedDate = e.target.value.trim();
+            });
+        });
+
+        // Download Buttons
+        document.querySelectorAll('.download-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const idx = e.currentTarget.getAttribute('data-index');
+                const fileObj = holdingBay[idx];
+                
+                try {
+                    const arrayBuffer = await fileObj.file.arrayBuffer();
+                    const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = fileObj.file.name;
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } catch (err) {
+                    console.error("Download failed:", err);
+                    alert("Could not download the file.");
+                }
+            });
+        });
+
         // Delete Buttons
         document.querySelectorAll('.delete-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const idx = e.currentTarget.getAttribute('data-index');
                 holdingBay.splice(idx, 1);
                 renderTable();
+            });
+        });
+
+        // --- Drag and Drop Reordering Logic ---
+        let draggedIndex = null;
+        const rows = document.querySelectorAll('#pdf-file-list tr:not(#pdf-empty-state)');
+        
+        rows.forEach(row => {
+            row.addEventListener('dragstart', (e) => {
+                draggedIndex = parseInt(row.getAttribute('data-index'));
+                row.classList.add('opacity-50', 'bg-blue-50', 'dark:bg-blue-900/20');
+                e.dataTransfer.effectAllowed = 'move';
+                // Necessary for Firefox support
+                e.dataTransfer.setData('text/plain', draggedIndex);
+            });
+
+            row.addEventListener('dragend', () => {
+                row.classList.remove('opacity-50', 'bg-blue-50', 'dark:bg-blue-900/20');
+                draggedIndex = null;
+            });
+
+            row.addEventListener('dragover', (e) => {
+                e.preventDefault(); // Necessary to allow dropping
+                e.dataTransfer.dropEffect = 'move';
+                
+                const dropIndex = parseInt(row.getAttribute('data-index'));
+                if (draggedIndex !== null && draggedIndex !== dropIndex) {
+                    row.classList.add('border-t-2', 'border-blue-500');
+                }
+            });
+
+            row.addEventListener('dragleave', () => {
+                row.classList.remove('border-t-2', 'border-blue-500');
+            });
+
+            row.addEventListener('drop', (e) => {
+                e.preventDefault();
+                row.classList.remove('border-t-2', 'border-blue-500');
+                
+                const dropIndex = parseInt(row.getAttribute('data-index'));
+                if (draggedIndex !== null && draggedIndex !== dropIndex) {
+                    // 1. Remove the dragged item from its original position
+                    const [draggedItem] = holdingBay.splice(draggedIndex, 1);
+                    // 2. Insert it at the new drop index
+                    holdingBay.splice(dropIndex, 0, draggedItem);
+                    
+                    // 3. Re-render the table to lock in the new order visually and programmatically
+                    renderTable();
+                }
             });
         });
     }
@@ -401,6 +493,71 @@ document.addEventListener('DOMContentLoaded', () => {
         btnMerge.disabled = false;
         renderTable();
     });
+
+    // --- Document AI Extraction Groundwork ---
+    
+    // Utility: Convert raw ArrayBuffer to Base64 for Google Cloud API payloads
+    function arrayBufferToBase64(buffer) {
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return window.btoa(binary);
+    }
+
+    if (btnExtractExcel) {
+        btnExtractExcel.addEventListener('click', async () => {
+            const selectedFiles = holdingBay.filter(f => f.included);
+            if (selectedFiles.length === 0) return alert("No files selected for extraction.");
+            
+            btnExtractExcel.disabled = true;
+            const originalText = btnExtractExcel.innerHTML;
+            btnExtractExcel.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Preparing AI Payload...</span>';
+            if (window.lucide) lucide.createIcons();
+            
+            try {
+                console.log(`GUARDIAN EVENT: Initiating AI Extraction for ${selectedFiles.length} files...`);
+                
+                for (const fileObj of selectedFiles) {
+                    // 1. Get raw bytes securely from local RAM
+                    const arrayBuffer = await fileObj.file.arrayBuffer();
+                    
+                    // 2. Convert to Base64 (Required format for GCP Document AI)
+                    const base64Data = arrayBufferToBase64(arrayBuffer);
+                    
+                    console.log(`[Document AI Stub] Payload prepared for: ${fileObj.file.name}`);
+                    console.log(`[Document AI Stub] Base64 String Length: ${base64Data.length} characters`);
+                    
+                    // 3. FUTURE FIREBASE FUNCTION CALL (Placeholder)
+                    /*
+                    const response = await fetch('https://us-central1-[YOUR-PROJECT].cloudfunctions.net/extractBankData', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            filename: fileObj.file.name, 
+                            documentType: document.getElementById('pdf-doc-type').value,
+                            documentBase64: base64Data 
+                        })
+                    });
+                    const data = await response.json();
+                    // Process resulting CSV/XLSX data here...
+                    */
+                }
+
+                alert("AI Extraction framework triggered! Check the browser console. The Base64 payloads are formatted and ready for Firebase wiring in the next upgrade.");
+            } catch (err) {
+                console.error("Extraction preparation failed:", err);
+                alert("A critical error occurred while preparing files for AI extraction.");
+            } finally {
+                // Restore button state
+                btnExtractExcel.innerHTML = originalText;
+                btnExtractExcel.disabled = false;
+                if (window.lucide) lucide.createIcons();
+            }
+        });
+    }
 
     // --- Initial Render ---
     renderTable();
