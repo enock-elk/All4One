@@ -530,9 +530,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.log(`[Document AI Stub] Payload prepared for: ${fileObj.file.name}`);
                     console.log(`[Document AI Stub] Base64 String Length: ${base64Data.length} characters`);
                     
-                    // 3. FUTURE FIREBASE FUNCTION CALL (Placeholder)
-                    /*
-                    const response = await fetch('https://us-central1-[YOUR-PROJECT].cloudfunctions.net/extractBankData', {
+                    // 3. LIVE FIREBASE FUNCTION CALL
+                    const response = await fetch('https://extractbankdata-lrg33w5mda-uc.a.run.app', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
@@ -541,17 +540,33 @@ document.addEventListener('DOMContentLoaded', () => {
                             documentBase64: base64Data 
                         })
                     });
+
                     const data = await response.json();
-                    // Process resulting CSV/XLSX data here...
-                    */
+
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Unknown error occurred during AI extraction.');
+                    }
+
+                    console.log(`[Document AI Bridge] Extraction Success: Found ${data.tableCount} tables.`);
+
+                    // 4. Construct and Download the CSV File
+                    const csvBlob = new Blob([data.csvData], { type: 'text/csv;charset=utf-8;' });
+                    const csvUrl = URL.createObjectURL(csvBlob);
+                    
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = csvUrl;
+                    downloadLink.setAttribute('download', `Extracted_${fileObj.file.name.replace('.pdf', '')}.csv`);
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    document.body.removeChild(downloadLink);
+                    URL.revokeObjectURL(csvUrl);
                 }
 
-                alert("AI Extraction framework triggered! Check the browser console. The Base64 payloads are formatted and ready for Firebase wiring in the next upgrade.");
+                alert("AI Extraction Complete! Your structured data files have been downloaded.");
             } catch (err) {
                 console.error("Extraction preparation failed:", err);
-                alert("A critical error occurred while preparing files for AI extraction.");
+                alert(`A critical error occurred during AI extraction: ${err.message}`);
             } finally {
-                // Restore button state
                 btnExtractExcel.innerHTML = originalText;
                 btnExtractExcel.disabled = false;
                 if (window.lucide) lucide.createIcons();
