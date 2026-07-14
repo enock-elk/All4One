@@ -3,6 +3,44 @@
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
+    // --- GUARDIAN: FIREBASE INITIALIZATION ---
+    // ⚠️ ACTION REQUIRED: Replace the apiKey and appId with your actual Firebase Project Settings
+    const firebaseConfig = {
+        apiKey: "AIzaSyD6RMjL3S2fSWRwzwWMYjeg53Hdh0GbtA4", 
+        authDomain: "all4one-nexus.firebaseapp.com",
+        projectId: "all4one-nexus",
+        storageBucket: "all4one-nexus.firebasestorage.app",
+        messagingSenderId: "1092267743610",
+        appId: "1:1092267743610:web:f0c6370afcab7cbd559ec3"
+    };
+    
+    // Initialize Firebase only if it hasn't been already
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+    }
+
+    // Expose a global function to get the Firebase ID Token for other modules (like pdf-manager.js)
+    window.getGuardianAuthToken = async () => {
+        const user = firebase.auth().currentUser;
+        if (user) {
+            // Get fresh token
+            return await user.getIdToken();
+        }
+        return null;
+    };
+
+    async function ensureFirebaseAuth() {
+        try {
+            if (!firebase.auth().currentUser) {
+                await firebase.auth().signInAnonymously();
+                console.log("GUARDIAN: Silent Firebase Authentication successful.");
+            }
+        } catch (error) {
+            console.error("GUARDIAN: Firebase Auth Failed. Did you enable Anonymous Auth in the Firebase Console?", error);
+        }
+    }
+    // --- END GUARDIAN INJECTION ---
+
     // --- DOM Elements ---
     const loginView = document.getElementById('login-view');
     const appView = document.getElementById('app-view');
@@ -36,69 +74,91 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateDarkModeIcon() {
-        const isDark = document.documentElement.classList.contains('dark');
-        // Lucide converts <i> to <svg>, so we replace the entire inner HTML to swap icons properly
-        darkModeToggle.innerHTML = isDark 
-            ? '<i data-lucide="sun" class="w-6 h-6"></i>' 
-            : '<i data-lucide="moon" class="w-6 h-6"></i>';
-        
-        // Re-initialize only the new icon
-        if (window.lucide) {
-            lucide.createIcons();
+        const icon = document.getElementById('dark-mode-icon');
+        if (document.documentElement.classList.contains('dark')) {
+            icon.setAttribute('data-lucide', 'sun');
+        } else {
+            icon.setAttribute('data-lucide', 'moon');
         }
+        if (window.lucide) lucide.createIcons();
     }
 
     darkModeToggle.addEventListener('click', () => {
-        const isCurrentlyDark = document.documentElement.classList.contains('dark');
-        if (isCurrentlyDark) {
-            document.documentElement.classList.remove('dark');
-            localStorage.setItem('darkMode', 'false');
-        } else {
-            document.documentElement.classList.add('dark');
-            localStorage.setItem('darkMode', 'true');
-        }
+        document.documentElement.classList.toggle('dark');
+        const isDark = document.documentElement.classList.contains('dark');
+        localStorage.setItem('darkMode', isDark);
         updateDarkModeIcon();
     });
 
-    // --- Authentication State ---
-    function checkAuth() {
-        const currentUser = localStorage.getItem('currentUser');
-        if (currentUser) {
-            // Hide login, show app
-            loginView.classList.add('hidden');
-            appView.classList.remove('hidden');
-            appView.classList.add('flex'); 
-            
-            // Default to PDF manager tab upon login
-            activateTab('pdf-manager');
+    // --- Auth / Login Logic ---
+    async function checkLoginState() {
+        const savedUser = localStorage.getItem('username');
+        if (savedUser) {
+            // GUARDIAN: Ensure Firebase session is active before showing app
+            await ensureFirebaseAuth();
+            showApp();
         } else {
-            // Hide app, show login
-            loginView.classList.remove('hidden');
-            appView.classList.add('hidden');
-            appView.classList.remove('flex');
+            showLogin();
         }
     }
 
-    // 1. Login Event
-    loginForm.addEventListener('submit', (e) => {
+    function showApp() {
+        loginView.classList.add('hidden');
+        appView.classList.remove('hidden');
+        // Default tab
+        activateTab('pdf-manager');
+    }
+
+    function showLogin() {
+        loginView.classList.remove('hidden');
+        appView.classList.add('hidden');
+    }
+
+    loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const name = usernameInput.value.trim();
-        if (name.length >= 2) {
-            localStorage.setItem('currentUser', name);
-            checkAuth();
+        if (name.length > 2) {
+            
+            // GUARDIAN: UI Feedback during background authentication
+            const submitBtn = loginForm.querySelector('button[type="submit"]');
+            const originalHtml = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i><span>Securing Connection...</span>';
+            submitBtn.disabled = true;
+            if (window.lucide) lucide.createIcons();
+
+            // Establish secure connection
+            await ensureFirebaseAuth();
+            
+            localStorage.setItem('username', name);
+            
+            // Restore UI
+            submitBtn.innerHTML = originalHtml;
+            submitBtn.disabled = false;
+            if (window.lucide) lucide.createIcons();
+            
+            showApp();
         }
     });
 
-    // 2. Logout Event
-    logoutBtn.addEventListener('click', () => {
-        localStorage.removeItem('currentUser');
-        usernameInput.value = '';
-        checkAuth();
+    logoutBtn.addEventListener('click', async () => {
+        if (confirm("Are you sure you want to lock the workspace?")) {
+            localStorage.removeItem('username');
+            usernameInput.value = '';
+            
+            // Sign out of Firebase to destroy the token
+            try {
+                await firebase.auth().signOut();
+            } catch (err) {
+                console.error("Firebase signout error", err);
+            }
+
+            showLogin();
+        }
     });
 
-    // --- Tab Switching Logic ---
+    // --- Tab Navigation Logic ---
     function activateTab(targetTabId) {
-        // Hide all tab contents and reset button active states
+        // Hide all contents and reset button active states
         tabContents.forEach(content => {
             content.classList.add('hidden');
             content.classList.remove('block');
@@ -137,7 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // --- Boot Sequence ---
+    // --- Initialization ---
     initDarkMode();
-    checkAuth();
+    checkLoginState();
 });

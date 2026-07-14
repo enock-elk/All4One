@@ -530,10 +530,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.log(`[Document AI Stub] Payload prepared for: ${fileObj.file.name}`);
                     console.log(`[Document AI Stub] Base64 String Length: ${base64Data.length} characters`);
                     
-                    // 3. LIVE FIREBASE FUNCTION CALL
+                    // --- GUARDIAN SECURITY UPGRADE ---
+                    // Request the active session token from our Firebase Auth implementation in app.js
+                    const authToken = await window.getGuardianAuthToken();
+                    if (!authToken) {
+                        throw new Error("Authentication Token missing. Please lock and unlock the workspace to establish a secure session.");
+                    }
+                    
+                    // 3. LIVE FIREBASE FUNCTION CALL (NOW SECURED)
                     const response = await fetch('https://extractbankdata-lrg33w5mda-uc.a.run.app', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${authToken}` 
+                        },
                         body: JSON.stringify({ 
                             filename: fileObj.file.name, 
                             documentType: document.getElementById('pdf-doc-type').value,
