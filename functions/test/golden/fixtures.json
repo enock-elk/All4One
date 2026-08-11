@@ -1,0 +1,92 @@
+{
+  "description": "Golden spot-checks for SA bank statement extraction. Used by npm test in functions/.",
+  "fixtures": [
+    {
+      "id": "capitec_1date",
+      "sampleFile": "Capitec 1 Date.pdf",
+      "detectText": "Capitec Bank Fee Summary Money Out Summary Digital Payments",
+      "expectProfile": { "bankId": "capitec", "layoutId": "1date" },
+      "amountCases": [
+        { "raw": "-R1 700.00", "expect": -1700 },
+        { "raw": "Digital -1 700.00", "expect": -1700 },
+        { "raw": "R12 000.00", "expect": 12000 }
+      ],
+      "goldRows": [
+        { "note": "salary-like credit should be positive", "amountSign": "positive" },
+        { "note": "cellphone fee typically -15.5 style", "amountSign": "negative" }
+      ]
+    },
+    {
+      "id": "capitec_2date",
+      "sampleFile": "Capitec 2 Date.pdf",
+      "detectText": "Capitec PostingDate TransactionDate Money In(R) Money Out(R) Balance(R)",
+      "expectProfile": { "bankId": "capitec", "layoutId": "2date" },
+      "amountCases": [
+        { "raw": "12 000.00", "expect": 12000 },
+        { "raw": "-1 000.00", "expect": -1000 }
+      ]
+    },
+    {
+      "id": "standard_left",
+      "sampleFile": "Standard Bank Left-column Date.pdf",
+      "detectText": "Standard Bank Transaction details Payments Deposits Balance VOD PREPAID PRE-PAID PAYMENT TO",
+      "expectProfile": { "bankId": "standard", "layoutId": "left_date" }
+    },
+    {
+      "id": "standard_mid",
+      "sampleFile": "Standard Bank Mid-column Date & 2 row descriptions.pdf",
+      "detectText": "Standard Bank Service Fee Debits Credits Date Balance BALANCE BROUGHT FORWARD IMMEDIATE PAYMENT",
+      "expectProfile": { "bankId": "standard", "layoutId": "mid_date" },
+      "amountCases": [
+        { "raw": "1,000.00-", "expect": -1000 }
+      ]
+    },
+    {
+      "id": "absa_3row",
+      "sampleFile": "Absa Weird 3 row description old type.pdf",
+      "detectText": "Absa Classic Business Acc Pos Purchase Settlement Card No. Effective",
+      "expectProfile": { "bankId": "absa", "layoutId": "3row" },
+      "amountCases": [
+        { "raw": "6 896,75", "expect": 6896.75 }
+      ],
+      "grouping": {
+        "lines": [
+          "4 / 01 / 2025 Pos Purchase Settlement4.40 T 535.92 6 360.83",
+          "Card No. 5523 Superspar Saveways Gaute",
+          "(Effective 02/01/2025)",
+          "5 / 01 / 2025 Notific Fee SmsNotifyme22.20 T 6 315.83"
+        ],
+        "minBlocks": 2
+      }
+    },
+    {
+      "id": "fnb_crdr",
+      "sampleFile": "FNB 3 column description.pdf",
+      "detectText": "FNB Private Clients Funds Received (Credits) Funds Used (Debits) 14,343.06 Cr",
+      "expectProfile": { "bankId": "fnb", "layoutId": "3col_crdr" },
+      "amountCases": [
+        { "raw": "14,343.06 Cr", "expect": 14343.06 },
+        { "raw": "962.25 Dr", "expect": -962.25 }
+      ]
+    },
+    {
+      "id": "nedbank_list",
+      "sampleFile": "Nedbank with Tran list no .pdf",
+      "detectText": "Nedbank Account summary Current account Total funds received/credits",
+      "expectProfile": { "bankId": "nedbank", "layoutId": "tran_list" }
+    },
+    {
+      "id": "tymebank_scan",
+      "sampleFile": "TymeBank Blurry scan.pdf",
+      "detectText": "TymeBank [SCAN_HEAVY_SPARSE_OCR]",
+      "expectProfile": { "bankId": "tymebank", "layoutId": "scan" }
+    },
+    {
+      "id": "nedbank_scan",
+      "sampleFile": "Nedbank Blurry Scan - normal layout.pdf",
+      "detectText": "Nedbank [SCAN_HEAVY_SPARSE_OCR]",
+      "filename": "Nedbank Blurry Scan - normal layout.pdf",
+      "expectProfile": { "bankId": "nedbank", "layoutId": "scan" }
+    }
+  ]
+}

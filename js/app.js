@@ -19,26 +19,29 @@ document.addEventListener('DOMContentLoaded', () => {
         firebase.initializeApp(firebaseConfig);
     }
 
-    // Expose a global function to get the Firebase ID Token for other modules (like pdf-manager.js)
-    window.getGuardianAuthToken = async () => {
-        const user = firebase.auth().currentUser;
-        if (user) {
-            // Get fresh token
-            return await user.getIdToken();
-        }
-        return null;
-    };
-
     async function ensureFirebaseAuth() {
         try {
             if (!firebase.auth().currentUser) {
                 await firebase.auth().signInAnonymously();
                 console.log("GUARDIAN: Silent Firebase Authentication successful.");
             }
+            return firebase.auth().currentUser;
         } catch (error) {
             console.error("GUARDIAN: Firebase Auth Failed. Did you enable Anonymous Auth in the Firebase Console?", error);
+            return null;
         }
     }
+
+    // Expose a global function to get the Firebase ID Token for other modules (like pdf-manager.js)
+    // Retries anonymous sign-in if the session was lost, instead of silently returning null.
+    window.getGuardianAuthToken = async () => {
+        let user = firebase.auth().currentUser;
+        if (!user) {
+            user = await ensureFirebaseAuth();
+        }
+        if (!user) return null;
+        return await user.getIdToken(true);
+    };
     // --- END GUARDIAN INJECTION ---
 
     // --- DOM Elements ---

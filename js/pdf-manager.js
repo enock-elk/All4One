@@ -22,6 +22,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // This acts as our localized RAM before passing to the Python engine
     let holdingBay = []; 
 
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     // --- Core Functions ---
 
     /**
@@ -74,14 +83,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td class="px-4 py-3 whitespace-nowrap text-center">
                     <input type="checkbox" class="file-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500 bg-slate-50 dark:bg-slate-800 dark:border-slate-600 cursor-pointer" data-index="${index}" ${fileObj.included ? 'checked' : ''}>
                 </td>
-                <td class="px-4 py-3 text-sm font-medium text-slate-900 dark:text-slate-100 truncate max-w-xs" title="${fileObj.file.name}">
-                    ${fileObj.file.name}
+                <td class="px-4 py-3 text-sm font-medium text-slate-900 dark:text-slate-100 truncate max-w-xs" title="${escapeHtml(fileObj.file.name)}">
+                    ${escapeHtml(fileObj.file.name)}
                 </td>
                 <td class="px-4 py-3 whitespace-nowrap">
                     ${statusBadge}
                 </td>
                 <td class="px-4 py-3 whitespace-nowrap">
-                    <input type="text" class="w-full bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-blue-500 outline-none text-sm px-1 py-0.5 transition-colors" value="${fileObj.detectedDate || ''}" placeholder="Scan to detect..." data-index="${index}">
+                    <input type="text" class="w-full bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-blue-500 outline-none text-sm px-1 py-0.5 transition-colors" value="${escapeHtml(fileObj.detectedDate || '')}" placeholder="Scan to detect..." data-index="${index}">
                 </td>
                 <td class="px-4 py-3 whitespace-nowrap text-center">
                     <div class="flex items-center justify-center gap-2">
@@ -109,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function toggleActionButtons(enable) {
         btnUnlock.disabled = !enable;
-        btnScan.disabled = !enable;
+        if (btnScan) btnScan.disabled = !enable;
         btnMerge.disabled = !enable;
         if (btnExtractExcel) btnExtractExcel.disabled = !enable;
     }
@@ -205,12 +214,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const dropIndex = parseInt(row.getAttribute('data-index'));
                 if (draggedIndex !== null && draggedIndex !== dropIndex) {
-                    // 1. Remove the dragged item from its original position
                     const [draggedItem] = holdingBay.splice(draggedIndex, 1);
-                    // 2. Insert it at the new drop index
-                    holdingBay.splice(dropIndex, 0, draggedItem);
-                    
-                    // 3. Re-render the table to lock in the new order visually and programmatically
+                    // After removal, indices above the source shift down by 1
+                    const insertIndex = draggedIndex < dropIndex ? dropIndex - 1 : dropIndex;
+                    holdingBay.splice(insertIndex, 0, draggedItem);
                     renderTable();
                 }
             });
@@ -335,7 +342,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 3. Fetch Local Python Script
             headerStatusText.textContent = 'MOUNTING LOGIC...';
-            const response = await fetch('python/document_engine.py');
+            const response = await fetch('/python/document_engine.py');
             if (!response.ok) throw new Error("Could not load document_engine.py");
             const pyCode = await response.text();
             
@@ -401,52 +408,54 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTable();
     });
 
-    btnScan.addEventListener('click', async () => {
-        if (!pyodideInstance) return alert("Engine is still loading. Please wait.");
-        const docType = document.getElementById('pdf-doc-type').value;
+    if (btnScan) {
+        btnScan.addEventListener('click', async () => {
+            if (!pyodideInstance) return alert("Engine is still loading. Please wait.");
+            const docType = document.getElementById('pdf-doc-type').value;
 
-        btnScan.disabled = true;
-        btnScan.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Scanning...</span>';
-        if (window.lucide) lucide.createIcons();
+            btnScan.disabled = true;
+            btnScan.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Scanning...</span>';
+            if (window.lucide) lucide.createIcons();
 
-        try {
-            for (let i = 0; i < holdingBay.length; i++) {
-                const fileObj = holdingBay[i];
-                if (!fileObj.included) continue;
+            try {
+                for (let i = 0; i < holdingBay.length; i++) {
+                    const fileObj = holdingBay[i];
+                    if (!fileObj.included) continue;
 
-                const arrayBuffer = await fileObj.file.arrayBuffer();
-                const pyScan = pyodideInstance.globals.get('scan_pdf_date');
-                
-                const resultProxy = pyScan(arrayBuffer, docType);
-                const result = resultProxy.toJs({ dict_converter: Object.fromEntries });
-                resultProxy.destroy();
+                    const arrayBuffer = await fileObj.file.arrayBuffer();
+                    const pyScan = pyodideInstance.globals.get('scan_pdf_date');
+                    
+                    const resultProxy = pyScan(arrayBuffer, docType);
+                    const result = resultProxy.toJs({ dict_converter: Object.fromEntries });
+                    resultProxy.destroy();
 
-                if (result.success) {
-                    fileObj.detectedDate = result.date;
-                    // Reset error status if it succeeded
-                    if (fileObj.status === 'error') fileObj.status = 'pending';
-                } else {
-                    fileObj.status = 'error';
-                    fileObj.detectedDate = result.error;
+                    if (result.success) {
+                        fileObj.detectedDate = result.date;
+                        // Reset error status if it succeeded
+                        if (fileObj.status === 'error') fileObj.status = 'pending';
+                    } else {
+                        fileObj.status = 'error';
+                        fileObj.detectedDate = result.error;
+                    }
                 }
+            } catch (e) {
+                console.error(e);
+                alert("A critical error occurred during scanning.");
             }
-        } catch (e) {
-            console.error(e);
-            alert("A critical error occurred during scanning.");
-        }
 
-        btnScan.innerHTML = '<i data-lucide="calendar-search" class="w-4 h-4"></i><span>Scan Dates & Sort</span>';
-        btnScan.disabled = false;
-        
-        // Auto-sort chronologically (Basic string sort handles YYYY/MM/DD well)
-        holdingBay.sort((a, b) => {
-            if (!a.detectedDate) return 1;
-            if (!b.detectedDate) return -1;
-            return a.detectedDate.localeCompare(b.detectedDate);
+            btnScan.innerHTML = '<i data-lucide="calendar-search" class="w-4 h-4"></i><span>Scan Dates & Sort</span>';
+            btnScan.disabled = false;
+            
+            // Auto-sort chronologically (Basic string sort handles YYYY/MM/DD well)
+            holdingBay.sort((a, b) => {
+                if (!a.detectedDate) return 1;
+                if (!b.detectedDate) return -1;
+                return a.detectedDate.localeCompare(b.detectedDate);
+            });
+
+            renderTable();
         });
-
-        renderTable();
-    });
+    }
 
     btnMerge.addEventListener('click', async () => {
         if (!pyodideInstance) return alert("Engine is still loading. Please wait.");
@@ -514,31 +523,46 @@ document.addEventListener('DOMContentLoaded', () => {
             
             btnExtractExcel.disabled = true;
             const originalText = btnExtractExcel.innerHTML;
-            btnExtractExcel.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Preparing AI Payload...</span>';
+            btnExtractExcel.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Initializing Assembly Line...</span>';
             if (window.lucide) lucide.createIcons();
+
+            // Open placeholder tabs synchronously while we still have a user gesture (avoids popup blockers)
+            const placeholderTabs = selectedFiles.map(() => {
+                try {
+                    return window.open('about:blank', '_blank');
+                } catch (_) {
+                    return null;
+                }
+            });
+            const openedSheetUrls = [];
+            const lastExtractStats = [];
             
             try {
-                console.log(`GUARDIAN EVENT: Initiating AI Extraction for ${selectedFiles.length} files...`);
+                console.log(`GUARDIAN EVENT: Initiating Cloud Assembly Line for ${selectedFiles.length} files...`);
                 
-                for (const fileObj of selectedFiles) {
+                for (let i = 0; i < selectedFiles.length; i++) {
+                    const fileObj = selectedFiles[i];
+                    
+                    // Update UI to show progress for multi-file batches
+                    btnExtractExcel.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Processing File ${i + 1} of ${selectedFiles.length}...</span>`;
+                    if (window.lucide) lucide.createIcons();
+
                     // 1. Get raw bytes securely from local RAM
                     const arrayBuffer = await fileObj.file.arrayBuffer();
                     
                     // 2. Convert to Base64 (Required format for GCP Document AI)
                     const base64Data = arrayBufferToBase64(arrayBuffer);
                     
-                    console.log(`[Document AI Stub] Payload prepared for: ${fileObj.file.name}`);
-                    console.log(`[Document AI Stub] Base64 String Length: ${base64Data.length} characters`);
+                    console.log(`[Assembly Line] Payload prepared for: ${fileObj.file.name}`);
                     
                     // --- GUARDIAN SECURITY UPGRADE ---
-                    // Request the active session token from our Firebase Auth implementation in app.js
                     const authToken = await window.getGuardianAuthToken();
                     if (!authToken) {
                         throw new Error("Authentication Token missing. Please lock and unlock the workspace to establish a secure session.");
                     }
                     
-                    // 3. LIVE FIREBASE FUNCTION CALL (NOW SECURED)
-                    const response = await fetch('https://extractbankdata-lrg33w5mda-uc.a.run.app', {
+                    // 3. LIVE FIREBASE FUNCTION CALL (NOW SECURED & PIPELINED)
+                    const response = await fetch('https://us-central1-all4one-nexus.cloudfunctions.net/extractBankData', { 
                         method: 'POST',
                         headers: { 
                             'Content-Type': 'application/json',
@@ -551,30 +575,85 @@ document.addEventListener('DOMContentLoaded', () => {
                         })
                     });
 
-                    const data = await response.json();
+                    let data;
+                    try {
+                        data = await response.json();
+                    } catch (_) {
+                        throw new Error(`Server returned a non-JSON response (HTTP ${response.status}). The function may be down or misconfigured.`);
+                    }
 
                     if (!response.ok) {
                         throw new Error(data.error || 'Unknown error occurred during AI extraction.');
                     }
 
-                    console.log(`[Document AI Bridge] Extraction Success: Found ${data.tableCount} tables.`);
+                    console.log(`[Assembly Line] Processing Success for ${fileObj.file.name}.`);
 
-                    // 4. Construct and Download the CSV File
-                    const csvBlob = new Blob([data.csvData], { type: 'text/csv;charset=utf-8;' });
-                    const csvUrl = URL.createObjectURL(csvBlob);
-                    
-                    const downloadLink = document.createElement('a');
-                    downloadLink.href = csvUrl;
-                    downloadLink.setAttribute('download', `Extracted_${fileObj.file.name.replace('.pdf', '')}.csv`);
-                    document.body.appendChild(downloadLink);
-                    downloadLink.click();
-                    document.body.removeChild(downloadLink);
-                    URL.revokeObjectURL(csvUrl);
+                    const tab = placeholderTabs[i];
+
+                    if (data.sheetUrl) {
+                        openedSheetUrls.push(data.sheetUrl);
+                        if (tab && !tab.closed) {
+                            tab.location.href = data.sheetUrl;
+                        }
+                    } else if (data.csvData) {
+                        // Sheets API unavailable — download CSV instead
+                        try { if (tab && !tab.closed) tab.close(); } catch (_) {}
+                        const blob = new Blob([data.csvData], { type: 'text/csv;charset=utf-8;' });
+                        const csvUrl = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = csvUrl;
+                        a.download = `Extracted_${fileObj.file.name.replace(/\.pdf$/i, '')}.csv`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(csvUrl);
+                    } else {
+                        throw new Error("Backend did not return a Google Sheets URL or CSV data.");
+                    }
+
+                    if (data.warning) {
+                        console.warn(data.warning);
+                    }
+
+                    const mismatch = data.flaggedCount || 0;
+                    const profileLabel = data.bankId ? `${data.bankId}/${data.layoutId || '?'}` : 'unknown';
+                    console.log(`[Assembly Line] Profile=${profileLabel} rows=${data.tableCount} mismatches=${mismatch}`);
+                    lastExtractStats.push({
+                        file: fileObj.file.name,
+                        rows: data.tableCount || 0,
+                        mismatches: mismatch,
+                        profile: profileLabel,
+                        mode: data.outputMode || 'unknown'
+                    });
                 }
 
-                alert("AI Extraction Complete! Your structured data files have been downloaded.");
+                const sheetCount = openedSheetUrls.length;
+                const csvNote = sheetCount < selectedFiles.length
+                    ? `\n\n${selectedFiles.length - sheetCount} file(s) downloaded as CSV (Sheets unavailable).`
+                    : '';
+
+                const statsNote = lastExtractStats.length
+                    ? '\n\n' + lastExtractStats.map((s) =>
+                        `${s.file}: ${s.rows} rows, ${s.mismatches} MATH MISMATCH, profile ${s.profile} (${s.mode})`
+                    ).join('\n')
+                    : '';
+
+                const blocked = openedSheetUrls.filter((_, idx) => {
+                    const tab = placeholderTabs[idx];
+                    return !tab || tab.closed;
+                });
+
+                if (blocked.length > 0) {
+                    alert(`Assembly Line Complete! ${sheetCount} sheet(s) ready.${csvNote}${statsNote}\n\nSome tabs were blocked — open manually:\n${blocked.join('\n')}`);
+                } else {
+                    alert(`Assembly Line Complete! Processed ${selectedFiles.length} file(s).${csvNote}${statsNote}`);
+                }
             } catch (err) {
-                console.error("Extraction preparation failed:", err);
+                // Close any leftover blank placeholders on failure
+                placeholderTabs.forEach(tab => {
+                    try { if (tab && !tab.closed && tab.location.href === 'about:blank') tab.close(); } catch (_) {}
+                });
+                console.error("Extraction pipeline failed:", err);
                 alert(`A critical error occurred during AI extraction: ${err.message}`);
             } finally {
                 btnExtractExcel.innerHTML = originalText;

@@ -41,7 +41,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (type === 'alarm') colorClass = 'text-amber-400 font-bold bg-amber-500/10 p-1 rounded';
         
         div.className = `mb-1 ${colorClass}`;
-        div.innerHTML = `<span class="opacity-50 text-slate-500">[${time}]</span> ${msg}`;
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'opacity-50 text-slate-500';
+        timeSpan.textContent = `[${time}] `;
+        const msgSpan = document.createElement('span');
+        msgSpan.textContent = msg;
+        div.appendChild(timeSpan);
+        div.appendChild(msgSpan);
         
         logContainer.appendChild(div);
         
@@ -140,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!worker) {
             // Note: worker.js must exist in the 'workers/' folder as per instructions
             try {
-                worker = new Worker('workers/trello-worker.js');
+                worker = new Worker('/workers/trello-worker.js');
                 worker.onmessage = handleWorkerMessage;
             } catch (err) {
                 return addLog(`Worker initialization failed: ${err.message}`, "error");

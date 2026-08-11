@@ -5,6 +5,9 @@ from datetime import datetime
 
 # ============================================================================
 # ALL4ONE - BROWSER-SAFE PDF ENGINE (Pyodide Compatible)
+# GUARDIAN V3: PRE-FLIGHT only in browser RAM (Pyodide).
+# Responsibilities: AES unlock, date sniff for UI sort, merge.
+# Deep multi-bank extraction is Cloud Function Assembly Line (bank profiles + Document AI + Gemini).
 # ============================================================================
 
 def safe_extract_text(reader):
@@ -80,7 +83,9 @@ def parse_date_generic(text):
     
     return "Date not found"
 
-# --- CORE EXPORTED FUNCTIONS FOR JAVASCRIPT ---
+# ============================================================================
+# CORE EXPORTED FUNCTIONS FOR JAVASCRIPT
+# ============================================================================
 
 def unlock_pdf(file_bytes, passwords_str):
     """
@@ -117,6 +122,7 @@ def unlock_pdf(file_bytes, passwords_str):
 def scan_pdf_date(file_bytes, doc_type):
     """
     Extracts text from the first page and runs regex to find the document date.
+    Used purely for organizing files in the UI before cloud extraction.
     """
     try:
         pdf_stream = io.BytesIO(file_bytes.to_py())
