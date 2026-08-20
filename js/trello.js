@@ -546,41 +546,40 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function startPoller(payload) {
-        const moduleUrl = new URL('./trello-worker.js', import.meta.url);
-        const classicUrls = [
-            new URL('workers/trello-worker.js', document.baseURI),
-            new URL('public/workers/trello-worker.js', document.baseURI),
+        const candidates = [
+            { url: new URL('js/trello-worker.js', document.baseURI), module: true },
+            { url: new URL('workers/trello-worker.js', document.baseURI), module: false },
+            { url: new URL('public/workers/trello-worker.js', document.baseURI), module: false },
         ];
 
-        try {
-            worker = new Worker(moduleUrl, { type: 'module' });
-            worker.onmessage = (e) => onWatcherEvent(e.data);
-            worker.onerror = () => {
-                stopPoller();
-                tryClassic();
-            };
-            worker.postMessage({ cmd: 'start', payload });
-            return;
-        } catch (_) {
-            worker = null;
-        }
-
-        function tryClassic() {
-            for (const url of classicUrls) {
-                try {
-                    worker = new Worker(url);
-                    worker.onmessage = (e) => onWatcherEvent(e.data);
-                    worker.postMessage({ cmd: 'start', payload });
-                    addLog(`Classic worker started (${url.pathname}).`);
-                    return;
-                } catch (_) {
-                    worker = null;
-                }
+        const tryNext = (index) => {
+            if (index >= candidates.length) {
+                startWorkerFallback(payload);
+                return;
             }
-            startWorkerFallback(payload);
-        }
+            const { url, module } = candidates[index];
+            try {
+                const instance = module ? new Worker(url, { type: 'module' }) : new Worker(url);
+                let gotMessage = false;
+                instance.onmessage = (e) => {
+                    gotMessage = true;
+                    onWatcherEvent(e.data);
+                };
+                instance.onerror = () => {
+                    if (gotMessage) return;
+                    try { instance.terminate(); } catch (_) { /* ignore */ }
+                    worker = null;
+                    tryNext(index + 1);
+                };
+                instance.postMessage({ cmd: 'start', payload });
+                worker = instance;
+            } catch (_) {
+                worker = null;
+                tryNext(index + 1);
+            }
+        };
 
-        tryClassic();
+        tryNext(0);
     }
 
     btnAuthorize?.addEventListener('click', authorizeTrello);
