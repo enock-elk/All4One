@@ -51,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnWordToPdfDownload = document.getElementById('btn-word-to-pdf-download');
     const btnDownloadCurrent = document.getElementById('btn-download-current');
     const bayBanner = document.getElementById('pdf-bay-banner');
+    const appToast = document.getElementById('app-toast');
     const fileTableWrap = document.getElementById('pdf-file-table-wrap');
     const fileTableBody = document.getElementById('pdf-file-table-body');
     const viewThumbsBtn = document.getElementById('pdf-view-thumbs');
@@ -74,6 +75,31 @@ document.addEventListener('DOMContentLoaded', () => {
     let pendingExtract = false;
     let fileSeq = 0;
     let bayView = 'thumbs';
+    let toastTimer = null;
+
+    function showToast(message) {
+        if (!appToast) return;
+        appToast.textContent = message;
+        appToast.classList.remove('hidden');
+        appToast.style.opacity = '1';
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+            appToast.classList.add('hidden');
+        }, 2000);
+    }
+
+    function announceSuccess(label) {
+        const msg = `${label} — run another tool or Download.`;
+        showBayBanner(msg);
+        showToast(msg);
+        setHeaderStatus(label.toUpperCase(), 'ok');
+    }
+
+    function showBayBanner(message) {
+        if (!bayBanner) return;
+        bayBanner.textContent = message || 'Updated✅ — run another tool or Download.';
+        bayBanner.classList.remove('hidden');
+    }
 
     function escapeHtml(value) {
         return String(value ?? '')
@@ -195,12 +221,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (btnWordToPdfDownload) btnWordToPdfDownload.disabled = !hasDocx;
         updateExtractButton();
         updateSplitSummary();
-    }
-
-    function showBayBanner(message) {
-        if (!bayBanner) return;
-        bayBanner.textContent = message || 'Bay updated — run another tool or Download.';
-        bayBanner.classList.remove('hidden');
     }
 
     function formatBytes(n) {
@@ -502,7 +522,7 @@ document.addEventListener('DOMContentLoaded', () => {
         downloadBytes(rebuilt.bytes, fileObj.file.name.replace(/(\.pdf)?$/i, '') + '.pdf', 'application/pdf');
     }
 
-    async function replaceBayWithOutput(namedFiles) {
+    async function replaceBayWithOutput(namedFiles, successLabel = 'Updated✅') {
         files = [];
         pages = [];
         renderPages();
@@ -513,8 +533,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (kind === 'image') await addImageFile(file, entry.bytes);
             else await addPdfFile(file, entry.bytes, 'pdf');
         }
-        showBayBanner('Bay updated — run another tool or Download.');
-        setHeaderStatus('BAY UPDATED', 'ok');
+        announceSuccess(successLabel);
     }
 
     async function addPdfFile(file, bytes, origin = 'pdf') {
@@ -817,7 +836,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             });
             renderPages();
-            showBayBanner('Unlocked files are in the bay — split, compress, or download next.');
+            announceSuccess('Unlocked✅');
         });
     });
 
@@ -848,7 +867,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (fa !== fb) return fa - fb;
                 return a.pageIndex - b.pageIndex;
             });
-            renderPages();
+            setBayView('table');
+            announceSuccess('Dates scanned✅');
         });
     });
 
@@ -866,9 +886,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const name = `Merged_History_${Date.now()}.pdf`;
             if (mode === 'download') {
                 downloadBytes(result.bytes, name, 'application/pdf');
+                announceSuccess('Merged✅');
                 return;
             }
-            await replaceBayWithOutput([{ name, bytes: result.bytes, mime: 'application/pdf' }]);
+            await replaceBayWithOutput([{ name, bytes: result.bytes, mime: 'application/pdf' }], 'Merged✅');
         });
     }
 
@@ -892,13 +913,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     const zip = await zipFiles(result.files);
                     downloadBlob(zip, `split_${Date.now()}.zip`);
                 }
+                announceSuccess('Split✅');
                 return;
             }
             await replaceBayWithOutput(result.files.map((f) => ({
                 name: f.name,
                 bytes: f.bytes,
                 mime: 'application/pdf',
-            })));
+            })), 'Split✅');
         });
     }
 
@@ -950,9 +972,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (mode === 'download') {
                 downloadBytes(outBytes, outName, 'application/pdf');
+                announceSuccess(keptOriginal ? 'Compress skipped✅' : 'Compressed✅');
                 return;
             }
-            await replaceBayWithOutput([{ name: outName, bytes: outBytes, mime: 'application/pdf' }]);
+            await replaceBayWithOutput(
+                [{ name: outName, bytes: outBytes, mime: 'application/pdf' }],
+                keptOriginal ? 'Compress skipped✅' : 'Compressed✅',
+            );
         });
     }
 
@@ -969,9 +995,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const name = `images_${Date.now()}.pdf`;
             if (mode === 'download') {
                 downloadBytes(result.bytes, name, 'application/pdf');
+                announceSuccess('JPG → PDF✅');
                 return;
             }
-            await replaceBayWithOutput([{ name, bytes: result.bytes, mime: 'application/pdf' }]);
+            await replaceBayWithOutput([{ name, bytes: result.bytes, mime: 'application/pdf' }], 'JPG → PDF✅');
         });
     }
 
@@ -992,13 +1019,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     const zip = await zipFiles(result.files);
                     downloadBlob(zip, `pages_${Date.now()}.zip`);
                 }
+                announceSuccess('PDF → JPG✅');
                 return;
             }
             await replaceBayWithOutput(result.files.map((f) => ({
                 name: f.name,
                 bytes: f.bytes,
                 mime: 'image/jpeg',
-            })));
+            })), 'PDF → JPG✅');
         });
     }
 
@@ -1015,9 +1043,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const name = `word_${Date.now()}.pdf`;
             if (mode === 'download') {
                 downloadBytes(result.bytes, name, 'application/pdf');
+                announceSuccess('Word → PDF✅');
                 return;
             }
-            await replaceBayWithOutput([{ name, bytes: result.bytes, mime: 'application/pdf' }]);
+            await replaceBayWithOutput([{ name, bytes: result.bytes, mime: 'application/pdf' }], 'Word → PDF✅');
         });
     }
 
@@ -1045,6 +1074,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             downloadBytes(result.bytes, `holding_bay_${Date.now()}.pdf`, 'application/pdf');
+            announceSuccess('Downloaded✅');
         });
     });
 

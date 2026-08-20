@@ -176,12 +176,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Attach click listeners to all sidebar tab buttons
-    tabButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const targetTab = btn.getAttribute('data-tab');
-            activateTab(targetTab);
+        tabButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetTab = btn.getAttribute('data-tab');
+                if (targetTab !== 'dashboard' && typeof window.exitTrelloWatcherFullscreen === 'function') {
+                    window.exitTrelloWatcherFullscreen();
+                }
+                activateTab(targetTab);
+            });
         });
-    });
 
     // --- Initialization ---
     initDarkMode();

@@ -97,6 +97,39 @@
             .trello-clock-time { font-size: 3.2rem; }
             .trello-bucket-card { width: 47%; }
         }
+        body.trello-fullscreen #app-sidebar,
+        body.trello-fullscreen #app-header {
+            display: none !important;
+        }
+        body.trello-fullscreen #trello-hero,
+        body.trello-fullscreen #trello-setup-card,
+        body.trello-fullscreen #trello-console-card {
+            display: none !important;
+        }
+        body.trello-fullscreen #tab-dashboard {
+            position: fixed;
+            inset: 0;
+            z-index: 40;
+        }
+        body.trello-fullscreen #trello-monitor {
+            position: relative;
+            bottom: auto;
+            left: auto;
+            transform: none;
+            width: min(960px, 94%);
+            max-width: 960px;
+            margin: 10vh auto 0;
+        }
+        body.trello-fullscreen .trello-bucket-card {
+            width: 22%;
+            min-width: 120px;
+            padding: 16px 10px;
+        }
+        body.trello-fullscreen .trello-bucket-count { font-size: 2rem; }
+        body.trello-fullscreen .trello-bucket-name { font-size: 0.85rem; }
+        #app-toast {
+            transition: opacity 0.2s ease;
+        }
     </style>
 </head>
 <body class="bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
@@ -142,7 +175,7 @@
     <div id="app-view" class="hidden flex h-screen w-full text-slate-800 dark:text-slate-100 overflow-hidden">
         
         <!-- SIDEBAR -->
-        <div class="w-20 shrink-0 flex flex-col items-center py-6 border-r border-slate-200 dark:border-slate-800 bg-slate-900 dark:bg-slate-950 text-slate-400 z-20 transition-colors duration-300">
+        <div id="app-sidebar" class="w-20 shrink-0 flex flex-col items-center py-6 border-r border-slate-200 dark:border-slate-800 bg-slate-900 dark:bg-slate-950 text-slate-400 z-20 transition-colors duration-300">
             <!-- Logo -->
             <div class="mb-8 hover:scale-105 transition-transform duration-300 cursor-pointer text-amber-500">
                 <i data-lucide="building-2" class="w-10 h-10"></i>
@@ -182,7 +215,7 @@
         <div class="flex-1 relative flex flex-col h-full bg-slate-50 dark:bg-slate-900/50 transition-colors duration-300">
             
             <!-- Dynamic Header -->
-            <header class="h-16 shrink-0 flex items-center justify-between px-8 border-b border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-950/50 backdrop-blur-md z-10">
+            <header id="app-header" class="h-16 shrink-0 flex items-center justify-between px-8 border-b border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-950/50 backdrop-blur-md z-10">
                 <h1 id="header-title" class="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
                     PDF Document Manager
                 </h1>
@@ -283,7 +316,7 @@
                                             <button id="btn-clear-bay" class="text-xs text-rose-500 hover:text-rose-600 font-medium disabled:opacity-50 disabled:cursor-not-allowed" disabled>Clear Bay</button>
                                         </div>
                                     </div>
-                                    <p id="pdf-bay-banner" class="hidden px-4 py-2 text-xs bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-b border-emerald-100 dark:border-emerald-800">Bay updated — run another tool or Download.</p>
+                                    <p id="pdf-bay-banner" class="hidden px-4 py-2 text-xs bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-b border-emerald-100 dark:border-emerald-800"></p>
                                     <div id="pdf-page-grid" class="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4 min-h-[220px]">
                                         <div id="pdf-empty-state" class="col-span-full py-12 text-center text-slate-400 dark:text-slate-500">
                                             <i data-lucide="file-box" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
@@ -395,12 +428,10 @@
                 <div id="tab-dashboard" class="tab-content hidden h-full w-full overflow-hidden relative">
                     <div id="trello-lockscreen" class="trello-lockscreen absolute inset-0 flex flex-col items-center overflow-y-auto text-white">
                         <div class="relative z-10 w-full max-w-xl px-4 pt-10 pb-40 flex flex-col items-center">
-                            <div class="text-center mb-6">
+                            <div id="trello-hero" class="text-center mb-6">
                                 <div id="trello-clock-time" class="trello-clock-time">--:--</div>
                                 <div id="trello-clock-date" class="trello-clock-date">loading...</div>
-                            </div>
-                            <div class="text-center mb-6">
-                                <h2 class="text-2xl font-semibold tracking-wide">TrelloWatcher</h2>
+                                <h2 class="text-2xl font-semibold tracking-wide mt-6">TrelloWatcher</h2>
                                 <p class="text-sm text-white/70">List Activity Monitor</p>
                             </div>
 
@@ -494,9 +525,11 @@
                                 </div>
                             </div>
 
-                            <div class="trello-glass w-full rounded-2xl p-4 mt-4 shadow-2xl">
+                            <div id="trello-console-card" class="trello-glass w-full rounded-2xl p-4 mt-4 shadow-2xl">
                                 <h3 class="font-bold text-sm mb-2 flex items-center gap-2"><i data-lucide="terminal" class="w-4 h-4 text-sky-400"></i> Console</h3>
-                                <div id="trello-log-container" class="bg-slate-950/80 text-emerald-400 p-3 rounded-xl font-mono text-[11px] overflow-y-auto h-36 whitespace-pre-wrap border border-white/10"></div>
+                                <div id="trello-log-home">
+                                    <div id="trello-log-container" class="bg-slate-950/80 text-emerald-400 p-3 rounded-xl font-mono text-[11px] overflow-y-auto h-36 whitespace-pre-wrap border border-white/10"></div>
+                                </div>
                             </div>
                         </div>
 
@@ -505,18 +538,24 @@
                                 <div class="flex items-center gap-2 text-emerald-400 text-xs font-extrabold tracking-wider uppercase">
                                     <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Active
                                 </div>
-                                <div class="flex items-center gap-3">
+                                <div class="flex items-center gap-2">
                                     <label class="flex items-center gap-2 text-xs text-white/70">
                                         Sound
                                         <input type="checkbox" id="trello-sound-toggle-active" class="rounded border-white/30 text-sky-500" checked>
                                     </label>
+                                    <button type="button" id="btn-trello-fullscreen" class="text-xs font-bold uppercase tracking-wide text-sky-200 border border-sky-400/50 px-3 py-1 rounded-md hover:bg-sky-500/20">Fullscreen</button>
+                                    <button type="button" id="btn-trello-exit-fs" class="hidden text-xs font-bold uppercase tracking-wide text-white/80 border border-white/30 px-3 py-1 rounded-md hover:bg-white/10">Exit</button>
                                     <button type="button" class="text-xs font-bold uppercase tracking-wide text-rose-300 border border-rose-400/50 px-3 py-1 rounded-md" onclick="document.getElementById('btn-trello-stop').click()">Stop</button>
                                 </div>
                             </div>
                             <p class="text-center text-sm text-white/80 mt-2 uppercase tracking-wide">
                                 <span id="trello-total-cards" class="text-sky-400 font-extrabold text-base">0</span> cases in total in:
                             </p>
-                            <div id="trello-bucket-grid" class="flex flex-wrap justify-center gap-2 mt-3 max-h-[30vh] overflow-y-auto"></div>
+                            <div id="trello-bucket-grid" class="flex flex-wrap justify-center gap-2 mt-3 max-h-[50vh] overflow-y-auto"></div>
+                            <details id="trello-log-accordion" class="mt-4 rounded-xl border border-white/10 bg-black/20">
+                                <summary class="cursor-pointer select-none px-3 py-2 text-sm font-medium text-white/80">Console log</summary>
+                                <div id="trello-log-fs" class="p-2"></div>
+                            </details>
                         </div>
                     </div>
                 </div>
@@ -535,6 +574,8 @@
             </main>
         </div>
     </div>
+
+    <div id="app-toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] px-4 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-medium shadow-2xl border border-white/10 max-w-[90vw]"></div>
 
     <div id="trello-alarm-overlay" class="hidden fixed inset-0 z-[60] flex flex-col items-center justify-center p-6 bg-slate-950 text-white">
         <div class="text-4xl font-bold mb-3">Alert</div>

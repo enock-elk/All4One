@@ -45,6 +45,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const listBox = document.getElementById('trello-list-checkboxes');
     const userLabel = document.getElementById('trello-user-label');
     const logContainer = document.getElementById('trello-log-container');
+    const logHome = document.getElementById('trello-log-home');
+    const logFs = document.getElementById('trello-log-fs');
+    const consoleCard = document.getElementById('trello-console-card');
+    const btnFullscreen = document.getElementById('btn-trello-fullscreen');
+    const btnExitFs = document.getElementById('btn-trello-exit-fs');
     const bucketGrid = document.getElementById('trello-bucket-grid');
     const lockscreen = document.getElementById('trello-lockscreen');
     const clockTime = document.getElementById('trello-clock-time');
@@ -499,6 +504,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function disconnect() {
+        exitTrelloFullscreen();
         stopPoller();
         stopSilentNoise();
         stopAlarm();
@@ -507,8 +513,10 @@ document.addEventListener('DOMContentLoaded', () => {
         showAuth();
         if (btnStart) btnStart.disabled = true;
         if (btnStop) btnStop.disabled = true;
-        monitorSection?.classList.add('hidden');
         setupCard?.classList.remove('hidden');
+        consoleCard?.classList.remove('hidden');
+        monitorSection?.classList.add('hidden');
+        parkLog(logHome);
         renderBucketGrid([]);
         addLog('Disconnected from Trello.', 'error');
     }
@@ -516,6 +524,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function onWatcherEvent(data) {
         switch (data.type) {
             case 'log':
+                if (!data.isError && /Sync OK\. Tracking/i.test(data.msg || '')) break;
                 addLog(data.msg, data.isError ? 'error' : 'info');
                 break;
             case 'alarm':
@@ -526,7 +535,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 break;
             case 'stats':
-                addLog(`Sync OK. Tracking ${data.total} total cards.`, 'success');
                 if (totalCards) totalCards.textContent = String(data.total ?? 0);
                 if (data.buckets) renderBucketGrid(data.buckets);
                 break;
@@ -538,6 +546,39 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
         }
     }
+
+    function parkLog(target) {
+        if (logContainer && target && logContainer.parentElement !== target) {
+            target.appendChild(logContainer);
+        }
+    }
+
+    function enterTrelloFullscreen() {
+        if (!worker && !mainWatcher) return;
+        document.body.classList.add('trello-fullscreen');
+        btnFullscreen?.classList.add('hidden');
+        btnExitFs?.classList.remove('hidden');
+        parkLog(logFs);
+        const pane = document.getElementById('tab-dashboard') || lockscreen;
+        const req = pane?.requestFullscreen || pane?.webkitRequestFullscreen;
+        if (req) {
+            Promise.resolve(req.call(pane)).catch(() => {});
+        }
+    }
+
+    function exitTrelloFullscreen() {
+        document.body.classList.remove('trello-fullscreen');
+        if (worker || mainWatcher) btnFullscreen?.classList.remove('hidden');
+        btnExitFs?.classList.add('hidden');
+        if (worker || mainWatcher) parkLog(logFs);
+        else parkLog(logHome);
+        if (document.fullscreenElement) {
+            const exit = document.exitFullscreen || document.webkitExitFullscreen;
+            if (exit) Promise.resolve(exit.call(document)).catch(() => {});
+        }
+    }
+
+    window.exitTrelloWatcherFullscreen = exitTrelloFullscreen;
 
     function startWorkerFallback(payload) {
         mainWatcher = createTrelloWatcher(onWatcherEvent);
@@ -691,6 +732,21 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsDataURL(file);
     });
 
+    btnFullscreen?.addEventListener('click', enterTrelloFullscreen);
+    btnExitFs?.addEventListener('click', exitTrelloFullscreen);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && document.body.classList.contains('trello-fullscreen')) {
+            exitTrelloFullscreen();
+        }
+    });
+    document.addEventListener('fullscreenchange', () => {
+        if (!document.fullscreenElement && document.body.classList.contains('trello-fullscreen')) {
+            document.body.classList.remove('trello-fullscreen');
+            if (worker || mainWatcher) btnFullscreen?.classList.remove('hidden');
+            btnExitFs?.classList.add('hidden');
+        }
+    });
+
     document.getElementById('trello-ack-alarm')?.addEventListener('click', stopAlarm);
 
     btnStart?.addEventListener('click', async () => {
@@ -709,7 +765,9 @@ document.addEventListener('DOMContentLoaded', () => {
         startPoller({ apiKey: API_KEY, token: userToken, targets });
 
         setupCard?.classList.add('hidden');
+        consoleCard?.classList.add('hidden');
         monitorSection?.classList.remove('hidden');
+        parkLog(logFs);
         renderBucketGrid(targets.map((t) => ({ ...t, count: '-' })));
         if (btnStart) btnStart.disabled = true;
         if (btnStop) btnStop.disabled = false;
@@ -717,6 +775,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     btnStop?.addEventListener('click', () => {
+        exitTrelloFullscreen();
         stopPoller();
         stopSilentNoise();
         stopAlarm();
@@ -724,7 +783,9 @@ document.addEventListener('DOMContentLoaded', () => {
             wakeLock.release().then(() => { wakeLock = null; }).catch(() => {});
         }
         setupCard?.classList.remove('hidden');
+        consoleCard?.classList.remove('hidden');
         monitorSection?.classList.add('hidden');
+        parkLog(logHome);
         if (btnStart) btnStart.disabled = selectedTargets().length === 0;
         if (btnStop) btnStop.disabled = true;
         addLog('Watcher stopped by user.', 'error');
