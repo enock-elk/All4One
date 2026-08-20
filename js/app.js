@@ -97,9 +97,8 @@ document.addEventListener('DOMContentLoaded', () => {
     async function checkLoginState() {
         const savedUser = localStorage.getItem('username');
         if (savedUser) {
-            // GUARDIAN: Ensure Firebase session is active before showing app
-            await ensureFirebaseAuth();
             showApp();
+            ensureFirebaseAuth();
         } else {
             showLogin();
         }
@@ -117,29 +116,13 @@ document.addEventListener('DOMContentLoaded', () => {
         appView.classList.add('hidden');
     }
 
-    loginForm.addEventListener('submit', async (e) => {
+    loginForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const name = usernameInput.value.trim();
         if (name.length > 2) {
-            
-            // GUARDIAN: UI Feedback during background authentication
-            const submitBtn = loginForm.querySelector('button[type="submit"]');
-            const originalHtml = submitBtn.innerHTML;
-            submitBtn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i><span>Securing Connection...</span>';
-            submitBtn.disabled = true;
-            if (window.lucide) lucide.createIcons();
-
-            // Establish secure connection
-            await ensureFirebaseAuth();
-            
             localStorage.setItem('username', name);
-            
-            // Restore UI
-            submitBtn.innerHTML = originalHtml;
-            submitBtn.disabled = false;
-            if (window.lucide) lucide.createIcons();
-            
             showApp();
+            ensureFirebaseAuth();
         }
     });
 

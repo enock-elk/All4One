@@ -2,6 +2,8 @@
 // ALL4ONE - PDF DOCUMENT MANAGER (FRONTEND UI CONTROLLER)
 // ============================================================================
 
+import { ensurePdfEngine, warmupPdfEngine, scanPdfDate, mergePdfs, unlockPdf, mapLimit } from './pdf-engine.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     // --- DOM Elements ---
     const dropzone = document.getElementById('pdf-dropzone');
@@ -311,61 +313,35 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- WebAssembly / Python Engine (Pyodide) ---
-    let pyodideInstance = null;
     const headerStatusText = document.getElementById('header-status-text');
     const headerStatusDot = document.getElementById('header-status-dot');
+    const passwordInput = document.getElementById('pdf-password-input');
 
-    async function initPyodide() {
+    function setHeaderStatus(label, tone = 'ok') {
+        if (headerStatusText) headerStatusText.textContent = label;
+        if (!headerStatusDot) return;
+        headerStatusDot.classList.remove('bg-emerald-500', 'bg-amber-500', 'bg-rose-500');
+        headerStatusDot.classList.add(tone === 'error' ? 'bg-rose-500' : tone === 'busy' ? 'bg-amber-500' : 'bg-emerald-500');
+    }
+
+    async function readyPdfEngine() {
         try {
-            headerStatusText.textContent = 'LOADING ENGINE...';
-            headerStatusDot.classList.replace('bg-emerald-500', 'bg-amber-500');
-
-            // 1. Inject Pyodide script
-            if (!window.loadPyodide) {
-                await new Promise((resolve, reject) => {
-                    const script = document.createElement('script');
-                    script.src = "https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js";
-                    script.onload = resolve;
-                    script.onerror = reject;
-                    document.head.appendChild(script);
-                });
+            if (!window.pdfjsLib || !window.PDFLib?.PDFDocument) {
+                setHeaderStatus('LOADING PDF TOOLS...', 'busy');
             }
-
-            // 2. Initialize Pyodide & Install Packages
-            const pyodide = await loadPyodide();
-            await pyodide.loadPackage("micropip");
-            const micropip = pyodide.pyimport("micropip");
-            
-            headerStatusText.textContent = 'INSTALLING DEPENDENCIES...';
-            await micropip.install(["pypdf", "cryptography"]);
-
-            // 3. Fetch Local Python Script
-            headerStatusText.textContent = 'MOUNTING LOGIC...';
-            const response = await fetch('/python/document_engine.py');
-            if (!response.ok) throw new Error("Could not load document_engine.py");
-            const pyCode = await response.text();
-            
-            // 4. Run the Python definitions
-            await pyodide.runPythonAsync(pyCode);
-            
-            pyodideInstance = pyodide;
-            headerStatusText.textContent = 'SYSTEM ONLINE';
-            headerStatusDot.classList.replace('bg-amber-500', 'bg-emerald-500');
-            console.log("GUARDIAN: Pyodide Engine Online.");
+            await ensurePdfEngine();
+            setHeaderStatus('SYSTEM ONLINE', 'ok');
         } catch (err) {
-            console.error("GUARDIAN: Pyodide initialization failed:", err);
-            headerStatusText.textContent = 'ENGINE ERROR';
-            headerStatusDot.classList.replace('bg-emerald-500', 'bg-rose-500');
+            console.error('PDF engine failed to load:', err);
+            setHeaderStatus('PDF ENGINE ERROR', 'error');
+            throw err;
         }
     }
 
-    // Initialize Engine in background without blocking UI
-    initPyodide();
+    warmupPdfEngine();
 
     btnUnlock.addEventListener('click', async () => {
-        if (!pyodideInstance) return alert("Engine is still loading. Please wait.");
-        const passwords = document.getElementById('pdf-password-input').value;
+        const passwords = passwordInput ? passwordInput.value : '';
         if (!passwords) return alert("Please enter at least one password to try.");
 
         btnUnlock.disabled = true;
@@ -373,31 +349,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.lucide) lucide.createIcons();
 
         try {
-            for (let i = 0; i < holdingBay.length; i++) {
-                const fileObj = holdingBay[i];
-                if (!fileObj.included) continue;
-
+            await readyPdfEngine();
+            const jobs = holdingBay.filter((f) => f.included);
+            await mapLimit(jobs, 3, async (fileObj) => {
                 const arrayBuffer = await fileObj.file.arrayBuffer();
-                const pyUnlock = pyodideInstance.globals.get('unlock_pdf');
-                
-                // Call Python
-                const resultProxy = pyUnlock(arrayBuffer, passwords);
-                const result = resultProxy.toJs({ dict_converter: Object.fromEntries });
-                resultProxy.destroy();
+                const result = await unlockPdf(arrayBuffer, passwords);
 
                 if (result.success) {
                     if (result.is_encrypted) {
-                        // Create new decrypted file in RAM
                         const blob = new Blob([result.bytes], { type: 'application/pdf' });
-                        const newFile = new File([blob], fileObj.file.name.replace('.pdf', '_unlocked.pdf'), { type: 'application/pdf' });
-                        fileObj.file = newFile;
+                        const newName = fileObj.file.name.replace(/\.pdf$/i, '_unlocked.pdf');
+                        fileObj.file = new File([blob], newName, { type: 'application/pdf' });
                     }
                     fileObj.status = 'unlocked';
                 } else {
                     fileObj.status = 'error';
                     console.warn(`Failed to unlock ${fileObj.file.name}: ${result.error}`);
                 }
-            }
+            });
         } catch (e) {
             console.error(e);
             alert("A critical error occurred during unlocking.");
@@ -410,34 +379,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (btnScan) {
         btnScan.addEventListener('click', async () => {
-            if (!pyodideInstance) return alert("Engine is still loading. Please wait.");
             const docType = document.getElementById('pdf-doc-type').value;
+            const passwords = passwordInput ? passwordInput.value : '';
 
             btnScan.disabled = true;
             btnScan.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Scanning...</span>';
             if (window.lucide) lucide.createIcons();
 
             try {
-                for (let i = 0; i < holdingBay.length; i++) {
-                    const fileObj = holdingBay[i];
-                    if (!fileObj.included) continue;
-
+                await readyPdfEngine();
+                const jobs = holdingBay.filter((f) => f.included);
+                await mapLimit(jobs, 3, async (fileObj) => {
                     const arrayBuffer = await fileObj.file.arrayBuffer();
-                    const pyScan = pyodideInstance.globals.get('scan_pdf_date');
-                    
-                    const resultProxy = pyScan(arrayBuffer, docType);
-                    const result = resultProxy.toJs({ dict_converter: Object.fromEntries });
-                    resultProxy.destroy();
+                    const result = await scanPdfDate(arrayBuffer, docType, passwords);
 
                     if (result.success) {
                         fileObj.detectedDate = result.date;
-                        // Reset error status if it succeeded
                         if (fileObj.status === 'error') fileObj.status = 'pending';
                     } else {
                         fileObj.status = 'error';
                         fileObj.detectedDate = result.error;
                     }
-                }
+                });
             } catch (e) {
                 console.error(e);
                 alert("A critical error occurred during scanning.");
@@ -445,8 +408,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             btnScan.innerHTML = '<i data-lucide="calendar-search" class="w-4 h-4"></i><span>Scan Dates & Sort</span>';
             btnScan.disabled = false;
-            
-            // Auto-sort chronologically (Basic string sort handles YYYY/MM/DD well)
+
             holdingBay.sort((a, b) => {
                 if (!a.detectedDate) return 1;
                 if (!b.detectedDate) return -1;
@@ -458,7 +420,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     btnMerge.addEventListener('click', async () => {
-        if (!pyodideInstance) return alert("Engine is still loading. Please wait.");
         const selectedFiles = holdingBay.filter(f => f.included);
         if (selectedFiles.length === 0) return alert("No files selected to merge.");
 
@@ -467,18 +428,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.lucide) lucide.createIcons();
 
         try {
-            const fileMap = new Map();
+            await readyPdfEngine();
+            const fileEntries = [];
             for (const f of selectedFiles) {
-                fileMap.set(f.file.name, await f.file.arrayBuffer());
+                fileEntries.push({ name: f.file.name, bytes: await f.file.arrayBuffer() });
             }
 
-            const pyMerge = pyodideInstance.globals.get('merge_pdfs');
-            const resultProxy = pyMerge(fileMap);
-            const result = resultProxy.toJs({ dict_converter: Object.fromEntries });
-            resultProxy.destroy();
+            const result = await mergePdfs(fileEntries, passwordInput ? passwordInput.value : '');
 
             if (result.success) {
-                // Trigger Download
                 const blob = new Blob([result.bytes], { type: 'application/pdf' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -488,7 +446,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 a.click();
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
-                
+
                 alert("Merge Complete! File downloaded.");
             } else {
                 alert(`Merge Failed: ${result.error}`);
@@ -507,13 +465,13 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Utility: Convert raw ArrayBuffer to Base64 for Google Cloud API payloads
     function arrayBufferToBase64(buffer) {
-        let binary = '';
         const bytes = new Uint8Array(buffer);
-        const len = bytes.byteLength;
-        for (let i = 0; i < len; i++) {
-            binary += String.fromCharCode(bytes[i]);
+        const chunkSize = 8192;
+        const chunks = [];
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+            chunks.push(String.fromCharCode(...bytes.subarray(i, i + chunkSize)));
         }
-        return window.btoa(binary);
+        return window.btoa(chunks.join(''));
     }
 
     if (btnExtractExcel) {
