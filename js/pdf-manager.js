@@ -1,28 +1,65 @@
 // ============================================================================
-// ALL4ONE - PDF DOCUMENT MANAGER (FRONTEND UI CONTROLLER)
+// ALL4ONE - PDF DOCUMENT MANAGER (page Holding Bay + local tools)
 // ============================================================================
 
-import { ensurePdfEngine, warmupPdfEngine, scanPdfDate, mergePdfs, unlockPdf, mapLimit } from './pdf-engine.js';
+import {
+    ensurePdfEngine,
+    warmupPdfEngine,
+    scanPdfDate,
+    unlockPdf,
+    mapLimit,
+    renderPageThumbnails,
+    renderImageThumbnail,
+    buildPdfFromPages,
+    splitPageItems,
+    fixedLengthRanges,
+    compressPages,
+    pdfPagesToJpegs,
+    imagesToPdf,
+    docxToPdf,
+    zipFiles,
+} from './pdf-engine.js';
+
+const EXCEL_PIN = '10101';
 
 document.addEventListener('DOMContentLoaded', () => {
-    // --- DOM Elements ---
     const dropzone = document.getElementById('pdf-dropzone');
     const fileInput = document.getElementById('pdf-file-input');
-    const fileListBody = document.getElementById('pdf-file-list');
-    const emptyStateRow = document.getElementById('pdf-empty-state');
+    const pageGrid = document.getElementById('pdf-page-grid');
+    const emptyState = document.getElementById('pdf-empty-state');
+    const fileStrip = document.getElementById('pdf-file-strip');
     const selectAllCheckbox = document.getElementById('pdf-select-all');
     const statsCount = document.getElementById('pdf-stats-count');
     const btnClearBay = document.getElementById('btn-clear-bay');
-    
-    // Action Buttons
+    const docTypeSelect = document.getElementById('pdf-doc-type');
+    const passwordInput = document.getElementById('pdf-password-input');
+
     const btnUnlock = document.getElementById('btn-unlock-pdf');
     const btnScan = document.getElementById('btn-scan-pdf');
     const btnMerge = document.getElementById('btn-merge-pdf');
     const btnExtractExcel = document.getElementById('btn-extract-excel');
+    const btnSplit = document.getElementById('btn-split-pdf');
+    const btnCompress = document.getElementById('btn-compress-pdf');
+    const btnJpgToPdf = document.getElementById('btn-jpg-to-pdf');
+    const btnPdfToJpg = document.getElementById('btn-pdf-to-jpg');
+    const btnWordToPdf = document.getElementById('btn-word-to-pdf');
 
-    // --- State Management ---
-    // This acts as our localized RAM before passing to the Python engine
-    let holdingBay = []; 
+    const pinModal = document.getElementById('excel-pin-modal');
+    const pinInput = document.getElementById('excel-pin-input');
+    const pinError = document.getElementById('excel-pin-error');
+    const pinSubmit = document.getElementById('excel-pin-submit');
+    const pinCancel = document.getElementById('excel-pin-cancel');
+
+    const headerStatusText = document.getElementById('header-status-text');
+    const headerStatusDot = document.getElementById('header-status-dot');
+
+    let files = [];
+    let pages = [];
+    let activeTool = 'merge';
+    let splitMode = 'custom';
+    let excelPinUnlocked = false;
+    let pendingExtract = false;
+    let fileSeq = 0;
 
     function escapeHtml(value) {
         return String(value ?? '')
@@ -33,289 +70,13 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/'/g, '&#39;');
     }
 
-    // --- Core Functions ---
-
-    /**
-     * Re-renders the file table based on the holdingBay array.
-     */
-    function renderTable() {
-        // Clear all rows EXCEPT the empty state stub
-        const rows = Array.from(fileListBody.querySelectorAll('tr'));
-        rows.forEach(row => {
-            if (row.id !== 'pdf-empty-state') {
-                row.remove();
-            }
-        });
-
-        // Toggle Empty State Visibility
-        if (holdingBay.length === 0) {
-            emptyStateRow.style.display = 'table-row';
-            selectAllCheckbox.disabled = true;
-            selectAllCheckbox.checked = false;
-            btnClearBay.disabled = true;
-            toggleActionButtons(false);
-            statsCount.textContent = '0 files tracked';
-            return;
-        }
-
-        emptyStateRow.style.display = 'none';
-        selectAllCheckbox.disabled = false;
-        btnClearBay.disabled = false;
-        toggleActionButtons(true);
-        statsCount.textContent = `${holdingBay.length} file${holdingBay.length > 1 ? 's' : ''} tracked`;
-
-        // Render each file
-        holdingBay.forEach((fileObj, index) => {
-            const tr = document.createElement('tr');
-            tr.className = 'hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors duration-150 cursor-move';
-            tr.setAttribute('draggable', 'true');
-            tr.setAttribute('data-index', index);
-            
-            // Status Badge Logic
-            let statusBadge = '';
-            if (fileObj.status === 'pending') {
-                statusBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300">Pending</span>';
-            } else if (fileObj.status === 'unlocked') {
-                statusBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">Unlocked</span>';
-            } else if (fileObj.status === 'error') {
-                statusBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400">Error</span>';
-            }
-
-            tr.innerHTML = `
-                <td class="px-4 py-3 whitespace-nowrap text-center">
-                    <input type="checkbox" class="file-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500 bg-slate-50 dark:bg-slate-800 dark:border-slate-600 cursor-pointer" data-index="${index}" ${fileObj.included ? 'checked' : ''}>
-                </td>
-                <td class="px-4 py-3 text-sm font-medium text-slate-900 dark:text-slate-100 truncate max-w-xs" title="${escapeHtml(fileObj.file.name)}">
-                    ${escapeHtml(fileObj.file.name)}
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap">
-                    ${statusBadge}
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap">
-                    <input type="text" class="w-full bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-blue-500 outline-none text-sm px-1 py-0.5 transition-colors" value="${escapeHtml(fileObj.detectedDate || '')}" placeholder="Scan to detect..." data-index="${index}">
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap text-center">
-                    <div class="flex items-center justify-center gap-2">
-                        <button class="download-btn text-slate-400 hover:text-blue-500 transition-colors ${fileObj.status === 'error' ? 'hidden' : ''}" data-index="${index}" title="Download File">
-                            <i data-lucide="download" class="w-4 h-4"></i>
-                        </button>
-                        <button class="delete-btn text-slate-400 hover:text-rose-500 transition-colors" data-index="${index}" title="Remove File">
-                            <i data-lucide="trash-2" class="w-4 h-4 mx-auto"></i>
-                        </button>
-                    </div>
-                </td>
-            `;
-
-            fileListBody.appendChild(tr);
-        });
-
-        // Attach listeners to dynamically created elements
-        attachRowListeners();
-        
-        // Re-init newly injected icons
-        if (window.lucide) {
-            lucide.createIcons();
-        }
+    function passwords() {
+        return passwordInput ? passwordInput.value : '';
     }
 
-    function toggleActionButtons(enable) {
-        btnUnlock.disabled = !enable;
-        if (btnScan) btnScan.disabled = !enable;
-        btnMerge.disabled = !enable;
-        if (btnExtractExcel) btnExtractExcel.disabled = !enable;
+    function includedPages() {
+        return pages.filter((p) => p.included);
     }
-
-    function attachRowListeners() {
-        // Individual Checkboxes
-        document.querySelectorAll('.file-checkbox').forEach(cb => {
-            cb.addEventListener('change', (e) => {
-                const idx = e.target.getAttribute('data-index');
-                holdingBay[idx].included = e.target.checked;
-                updateSelectAllState();
-            });
-        });
-
-        // Date Inputs (Save manual edits)
-        document.querySelectorAll('input[placeholder="Scan to detect..."]').forEach(input => {
-            input.addEventListener('change', (e) => {
-                const idx = e.target.getAttribute('data-index');
-                holdingBay[idx].detectedDate = e.target.value.trim();
-            });
-        });
-
-        // Download Buttons
-        document.querySelectorAll('.download-btn').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                const idx = e.currentTarget.getAttribute('data-index');
-                const fileObj = holdingBay[idx];
-                
-                try {
-                    const arrayBuffer = await fileObj.file.arrayBuffer();
-                    const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
-                    const url = URL.createObjectURL(blob);
-                    
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = fileObj.file.name;
-                    document.body.appendChild(a);
-                    a.click();
-                    
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                } catch (err) {
-                    console.error("Download failed:", err);
-                    alert("Could not download the file.");
-                }
-            });
-        });
-
-        // Delete Buttons
-        document.querySelectorAll('.delete-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const idx = e.currentTarget.getAttribute('data-index');
-                holdingBay.splice(idx, 1);
-                renderTable();
-            });
-        });
-
-        // --- Drag and Drop Reordering Logic ---
-        let draggedIndex = null;
-        const rows = document.querySelectorAll('#pdf-file-list tr:not(#pdf-empty-state)');
-        
-        rows.forEach(row => {
-            row.addEventListener('dragstart', (e) => {
-                draggedIndex = parseInt(row.getAttribute('data-index'));
-                row.classList.add('opacity-50', 'bg-blue-50', 'dark:bg-blue-900/20');
-                e.dataTransfer.effectAllowed = 'move';
-                // Necessary for Firefox support
-                e.dataTransfer.setData('text/plain', draggedIndex);
-            });
-
-            row.addEventListener('dragend', () => {
-                row.classList.remove('opacity-50', 'bg-blue-50', 'dark:bg-blue-900/20');
-                draggedIndex = null;
-            });
-
-            row.addEventListener('dragover', (e) => {
-                e.preventDefault(); // Necessary to allow dropping
-                e.dataTransfer.dropEffect = 'move';
-                
-                const dropIndex = parseInt(row.getAttribute('data-index'));
-                if (draggedIndex !== null && draggedIndex !== dropIndex) {
-                    row.classList.add('border-t-2', 'border-blue-500');
-                }
-            });
-
-            row.addEventListener('dragleave', () => {
-                row.classList.remove('border-t-2', 'border-blue-500');
-            });
-
-            row.addEventListener('drop', (e) => {
-                e.preventDefault();
-                row.classList.remove('border-t-2', 'border-blue-500');
-                
-                const dropIndex = parseInt(row.getAttribute('data-index'));
-                if (draggedIndex !== null && draggedIndex !== dropIndex) {
-                    const [draggedItem] = holdingBay.splice(draggedIndex, 1);
-                    // After removal, indices above the source shift down by 1
-                    const insertIndex = draggedIndex < dropIndex ? dropIndex - 1 : dropIndex;
-                    holdingBay.splice(insertIndex, 0, draggedItem);
-                    renderTable();
-                }
-            });
-        });
-    }
-
-    function updateSelectAllState() {
-        const allChecked = holdingBay.length > 0 && holdingBay.every(f => f.included);
-        selectAllCheckbox.checked = allChecked;
-    }
-
-    function handleFilesAdded(files) {
-        let addedCount = 0;
-        Array.from(files).forEach(file => {
-            if (file.type === 'application/pdf') {
-                // Prevent exact duplicates by filename
-                if (!holdingBay.some(f => f.file.name === file.name)) {
-                    holdingBay.push({
-                        file: file,
-                        status: 'pending', // pending, unlocked, error
-                        detectedDate: null,
-                        included: true
-                    });
-                    addedCount++;
-                }
-            }
-        });
-
-        if (addedCount > 0) {
-            renderTable();
-        }
-    }
-
-    // --- Drag & Drop Listeners ---
-    
-    // Prevent default browser behavior
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropzone.addEventListener(eventName, preventDefaults, false);
-        document.body.addEventListener(eventName, preventDefaults, false);
-    });
-
-    function preventDefaults(e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-
-    // Highlight dropzone
-    ['dragenter', 'dragover'].forEach(eventName => {
-        dropzone.addEventListener(eventName, () => {
-            dropzone.classList.add('border-blue-500', 'bg-blue-50', 'dark:bg-blue-900/20');
-            dropzone.classList.remove('border-slate-300', 'dark:border-slate-600');
-        }, false);
-    });
-
-    ['dragleave', 'drop'].forEach(eventName => {
-        dropzone.addEventListener(eventName, () => {
-            dropzone.classList.remove('border-blue-500', 'bg-blue-50', 'dark:bg-blue-900/20');
-            dropzone.classList.add('border-slate-300', 'dark:border-slate-600');
-        }, false);
-    });
-
-    // Handle drops
-    dropzone.addEventListener('drop', (e) => {
-        const dt = e.dataTransfer;
-        const files = dt.files;
-        handleFilesAdded(files);
-    });
-
-    // Handle clicks to browse
-    dropzone.addEventListener('click', () => {
-        fileInput.click();
-    });
-
-    fileInput.addEventListener('change', function() {
-        handleFilesAdded(this.files);
-        this.value = ''; // Reset input so same files can be re-selected if deleted
-    });
-
-    // --- Global Controls ---
-    
-    selectAllCheckbox.addEventListener('change', (e) => {
-        const isChecked = e.target.checked;
-        holdingBay.forEach(f => f.included = isChecked);
-        document.querySelectorAll('.file-checkbox').forEach(cb => cb.checked = isChecked);
-    });
-
-    btnClearBay.addEventListener('click', () => {
-        if (confirm("Are you sure you want to clear the holding bay?")) {
-            holdingBay = [];
-            renderTable();
-        }
-    });
-
-    const headerStatusText = document.getElementById('header-status-text');
-    const headerStatusDot = document.getElementById('header-status-dot');
-    const passwordInput = document.getElementById('pdf-password-input');
 
     function setHeaderStatus(label, tone = 'ok') {
         if (headerStatusText) headerStatusText.textContent = label;
@@ -338,134 +99,657 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    warmupPdfEngine();
+    function downloadBlob(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
 
-    btnUnlock.addEventListener('click', async () => {
-        const passwords = passwordInput ? passwordInput.value : '';
-        if (!passwords) return alert("Please enter at least one password to try.");
+    function downloadBytes(bytes, filename, mime) {
+        downloadBlob(new Blob([bytes], { type: mime }), filename);
+    }
 
-        btnUnlock.disabled = true;
-        btnUnlock.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span class="hidden sm:inline">Processing...</span>';
-        if (window.lucide) lucide.createIcons();
+    function classifyFile(file) {
+        const name = (file.name || '').toLowerCase();
+        const type = file.type || '';
+        if (type === 'application/pdf' || name.endsWith('.pdf')) return 'pdf';
+        if (type.startsWith('image/') || /\.(jpe?g|png)$/i.test(name)) return 'image';
+        if (name.endsWith('.docx') || type.includes('wordprocessingml')) return 'docx';
+        return null;
+    }
 
-        try {
-            await readyPdfEngine();
-            const jobs = holdingBay.filter((f) => f.included);
-            await mapLimit(jobs, 3, async (fileObj) => {
-                const arrayBuffer = await fileObj.file.arrayBuffer();
-                const result = await unlockPdf(arrayBuffer, passwords);
-
-                if (result.success) {
-                    if (result.is_encrypted) {
-                        const blob = new Blob([result.bytes], { type: 'application/pdf' });
-                        const newName = fileObj.file.name.replace(/\.pdf$/i, '_unlocked.pdf');
-                        fileObj.file = new File([blob], newName, { type: 'application/pdf' });
-                    }
-                    fileObj.status = 'unlocked';
-                } else {
-                    fileObj.status = 'error';
-                    console.warn(`Failed to unlock ${fileObj.file.name}: ${result.error}`);
-                }
-            });
-        } catch (e) {
-            console.error(e);
-            alert("A critical error occurred during unlocking.");
-        }
-
-        btnUnlock.innerHTML = '<i data-lucide="unlock" class="w-4 h-4"></i><span class="hidden sm:inline">Unlock</span>';
-        btnUnlock.disabled = false;
-        renderTable();
-    });
-
-    if (btnScan) {
-        btnScan.addEventListener('click', async () => {
-            const docType = document.getElementById('pdf-doc-type').value;
-            const passwords = passwordInput ? passwordInput.value : '';
-
-            btnScan.disabled = true;
-            btnScan.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Scanning...</span>';
-            if (window.lucide) lucide.createIcons();
-
-            try {
-                await readyPdfEngine();
-                const jobs = holdingBay.filter((f) => f.included);
-                await mapLimit(jobs, 3, async (fileObj) => {
-                    const arrayBuffer = await fileObj.file.arrayBuffer();
-                    const result = await scanPdfDate(arrayBuffer, docType, passwords);
-
-                    if (result.success) {
-                        fileObj.detectedDate = result.date;
-                        if (fileObj.status === 'error') fileObj.status = 'pending';
-                    } else {
-                        fileObj.status = 'error';
-                        fileObj.detectedDate = result.error;
-                    }
-                });
-            } catch (e) {
-                console.error(e);
-                alert("A critical error occurred during scanning.");
-            }
-
-            btnScan.innerHTML = '<i data-lucide="calendar-search" class="w-4 h-4"></i><span>Scan Dates & Sort</span>';
-            btnScan.disabled = false;
-
-            holdingBay.sort((a, b) => {
-                if (!a.detectedDate) return 1;
-                if (!b.detectedDate) return -1;
-                return a.detectedDate.localeCompare(b.detectedDate);
-            });
-
-            renderTable();
+    function pageSpecs(list) {
+        return list.map((p) => {
+            const fileObj = files.find((f) => f.id === p.fileId);
+            return {
+                fileId: p.fileId,
+                kind: p.kind === 'image' ? 'image' : 'pdf',
+                pageIndex: p.pageIndex,
+                rotation: p.rotation || 0,
+                bytes: fileObj?.bytes,
+                mime: fileObj?.mime,
+            };
         });
     }
 
-    btnMerge.addEventListener('click', async () => {
-        const selectedFiles = holdingBay.filter(f => f.included);
-        if (selectedFiles.length === 0) return alert("No files selected to merge.");
-
-        btnMerge.disabled = true;
-        btnMerge.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Merging...</span>';
+    function refreshIcons() {
         if (window.lucide) lucide.createIcons();
+    }
 
-        try {
-            await readyPdfEngine();
-            const fileEntries = [];
-            for (const f of selectedFiles) {
-                fileEntries.push({ name: f.file.name, bytes: await f.file.arrayBuffer() });
-            }
+    function updateSelectAllState() {
+        selectAllCheckbox.disabled = pages.length === 0;
+        selectAllCheckbox.checked = pages.length > 0 && pages.every((p) => p.included);
+    }
 
-            const result = await mergePdfs(fileEntries, passwordInput ? passwordInput.value : '');
+    function isBankProfile() {
+        return docTypeSelect && docTypeSelect.value === 'bank';
+    }
 
-            if (result.success) {
-                const blob = new Blob([result.bytes], { type: 'application/pdf' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `Merged_History_${new Date().getTime()}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
+    function updateExtractButton() {
+        const hasWork = files.some((f) => f.kind === 'pdf' || f.origin === 'docx');
+        const allow = isBankProfile() && hasWork;
+        if (!btnExtractExcel) return;
+        btnExtractExcel.disabled = !allow;
+        btnExtractExcel.title = allow
+            ? (excelPinUnlocked ? 'Powered by Google Document AI' : 'PIN required')
+            : 'Choose Document Type Profile: Bank Statements';
+    }
 
-                alert("Merge Complete! File downloaded.");
-            } else {
-                alert(`Merge Failed: ${result.error}`);
-            }
-        } catch (e) {
-            console.error(e);
-            alert("A critical error occurred during merging.");
+    function toggleActionButtons() {
+        const hasPages = pages.length > 0;
+        const hasIncluded = includedPages().length > 0;
+        btnUnlock.disabled = !files.some((f) => f.kind === 'pdf');
+        if (btnScan) btnScan.disabled = !files.some((f) => f.kind === 'pdf');
+        btnClearBay.disabled = !hasPages && files.length === 0;
+        if (btnMerge) btnMerge.disabled = !hasIncluded;
+        if (btnSplit) btnSplit.disabled = !hasIncluded;
+        if (btnCompress) btnCompress.disabled = !hasIncluded;
+        if (btnJpgToPdf) btnJpgToPdf.disabled = !includedPages().some((p) => p.kind === 'image');
+        if (btnPdfToJpg) btnPdfToJpg.disabled = !includedPages().some((p) => p.kind !== 'image');
+        if (btnWordToPdf) btnWordToPdf.disabled = !includedPages().some((p) => p.origin === 'docx');
+        updateExtractButton();
+        updateSplitSummary();
+    }
+
+    function renderFileStrip() {
+        if (!files.length) {
+            fileStrip.classList.add('hidden');
+            fileStrip.innerHTML = '';
+            return;
+        }
+        fileStrip.classList.remove('hidden');
+        fileStrip.innerHTML = files.map((f) => {
+            const status = f.status === 'unlocked'
+                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+                : f.status === 'error'
+                    ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300'
+                    : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200';
+            return `
+                <div class="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs max-w-full">
+                    <span class="font-medium truncate max-w-[10rem]" title="${escapeHtml(f.file.name)}">${escapeHtml(f.file.name)}</span>
+                    <span class="px-1.5 py-0.5 rounded ${status}">${escapeHtml(f.status)}</span>
+                    ${f.detectedDate ? `<span class="text-slate-500">${escapeHtml(f.detectedDate)}</span>` : ''}
+                    <button type="button" class="file-download text-slate-400 hover:text-blue-500" data-file-id="${f.id}" title="Download">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                    </button>
+                    <button type="button" class="file-remove text-slate-400 hover:text-rose-500" data-file-id="${f.id}" title="Remove file">
+                        <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>`;
+        }).join('');
+
+        fileStrip.querySelectorAll('.file-remove').forEach((btn) => {
+            btn.addEventListener('click', () => removeFile(btn.getAttribute('data-file-id')));
+        });
+        fileStrip.querySelectorAll('.file-download').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const fileObj = files.find((f) => f.id === btn.getAttribute('data-file-id'));
+                if (!fileObj?.bytes) return;
+                const mime = fileObj.kind === 'image' ? (fileObj.mime || 'image/jpeg') : 'application/pdf';
+                downloadBytes(fileObj.bytes, fileObj.file.name, mime);
+            });
+        });
+        refreshIcons();
+    }
+
+    function renderPages() {
+        const cards = pageGrid.querySelectorAll('.page-card');
+        cards.forEach((el) => el.remove());
+
+        if (!pages.length) {
+            emptyState.classList.remove('hidden');
+            statsCount.textContent = '0 pages';
+            updateSelectAllState();
+            toggleActionButtons();
+            renderFileStrip();
+            return;
         }
 
-        btnMerge.innerHTML = '<i data-lucide="layers" class="w-4 h-4"></i><span>Merge Selected</span>';
-        btnMerge.disabled = false;
-        renderTable();
+        emptyState.classList.add('hidden');
+        const included = includedPages().length;
+        statsCount.textContent = `${pages.length} page${pages.length === 1 ? '' : 's'} · ${included} included · ${files.length} file${files.length === 1 ? '' : 's'}`;
+
+        pages.forEach((page, index) => {
+            const fileObj = files.find((f) => f.id === page.fileId);
+            const card = document.createElement('div');
+            card.className = 'page-card relative bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl p-2 cursor-move hover:border-blue-400 transition-colors';
+            card.draggable = true;
+            card.dataset.index = String(index);
+            card.innerHTML = `
+                <input type="checkbox" class="page-include absolute top-3 left-3 z-10 w-4 h-4 rounded border-slate-300 text-blue-600" ${page.included ? 'checked' : ''} title="Include in export">
+                <button type="button" class="page-rotate absolute top-2 right-2 z-10 p-1.5 rounded-full bg-white/90 dark:bg-slate-800 shadow-sm text-slate-600 hover:text-blue-600" title="Rotate">
+                    <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+                </button>
+                <div class="aspect-[3/4] bg-white dark:bg-slate-800 rounded-lg overflow-hidden flex items-center justify-center mt-6 mb-2">
+                    ${page.thumbUrl
+                        ? `<img src="${page.thumbUrl}" alt="" class="max-h-full max-w-full object-contain" style="transform: rotate(${page.rotation || 0}deg)">`
+                        : `<span class="text-[10px] text-slate-400">Loading…</span>`}
+                </div>
+                <p class="text-[10px] font-medium text-slate-700 dark:text-slate-200 truncate" title="${escapeHtml(fileObj?.file.name || '')}">${escapeHtml(fileObj?.file.name || '')}</p>
+                <p class="text-[10px] text-slate-400">Page ${page.pageIndex + 1}</p>
+            `;
+            pageGrid.appendChild(card);
+        });
+
+        attachPageListeners();
+        updateSelectAllState();
+        toggleActionButtons();
+        renderFileStrip();
+        refreshIcons();
+    }
+
+    function attachPageListeners() {
+        pageGrid.querySelectorAll('.page-include').forEach((cb) => {
+            cb.addEventListener('change', (e) => {
+                const idx = Number(e.target.closest('.page-card').dataset.index);
+                pages[idx].included = e.target.checked;
+                updateSelectAllState();
+                toggleActionButtons();
+                statsCount.textContent = `${pages.length} page${pages.length === 1 ? '' : 's'} · ${includedPages().length} included · ${files.length} file${files.length === 1 ? '' : 's'}`;
+            });
+        });
+
+        pageGrid.querySelectorAll('.page-rotate').forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const idx = Number(e.currentTarget.closest('.page-card').dataset.index);
+                pages[idx].rotation = ((pages[idx].rotation || 0) + 90) % 360;
+                renderPages();
+            });
+        });
+
+        let draggedIndex = null;
+        pageGrid.querySelectorAll('.page-card').forEach((card) => {
+            card.addEventListener('dragstart', (e) => {
+                draggedIndex = Number(card.dataset.index);
+                card.classList.add('opacity-50');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', String(draggedIndex));
+            });
+            card.addEventListener('dragend', () => {
+                card.classList.remove('opacity-50');
+                draggedIndex = null;
+            });
+            card.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                card.classList.add('ring-2', 'ring-blue-500');
+            });
+            card.addEventListener('dragleave', () => {
+                card.classList.remove('ring-2', 'ring-blue-500');
+            });
+            card.addEventListener('drop', (e) => {
+                e.preventDefault();
+                card.classList.remove('ring-2', 'ring-blue-500');
+                const dropIndex = Number(card.dataset.index);
+                if (draggedIndex === null || draggedIndex === dropIndex) return;
+                const [item] = pages.splice(draggedIndex, 1);
+                pages.splice(dropIndex, 0, item);
+                renderPages();
+            });
+        });
+    }
+
+    function removeFile(fileId) {
+        pages = pages.filter((p) => p.fileId !== fileId);
+        files = files.filter((f) => f.id !== fileId);
+        renderPages();
+    }
+
+    async function addPdfFile(file, bytes, origin = 'pdf') {
+        const id = `f_${Date.now()}_${fileSeq++}`;
+        const fileObj = {
+            id,
+            file,
+            kind: 'pdf',
+            origin,
+            status: 'pending',
+            detectedDate: null,
+            bytes,
+            mime: 'application/pdf',
+        };
+        files.push(fileObj);
+        renderFileStrip();
+        try {
+            await readyPdfEngine();
+            const thumbs = await renderPageThumbnails(bytes, passwords());
+            thumbs.forEach((thumb) => {
+                pages.push({
+                    id: `${id}_${thumb.pageIndex}`,
+                    fileId: id,
+                    pageIndex: thumb.pageIndex,
+                    rotation: 0,
+                    included: true,
+                    thumbUrl: thumb.thumbUrl,
+                    kind: 'pdf',
+                    origin,
+                });
+            });
+            fileObj.status = 'ready';
+        } catch (err) {
+            fileObj.status = 'error';
+            console.warn(`Failed to preview ${file.name}:`, err);
+        }
+        renderPages();
+    }
+
+    async function addImageFile(file, bytes) {
+        const id = `f_${Date.now()}_${fileSeq++}`;
+        const mime = file.type || (file.name.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg');
+        const fileObj = {
+            id,
+            file,
+            kind: 'image',
+            origin: 'image',
+            status: 'ready',
+            detectedDate: null,
+            bytes,
+            mime,
+        };
+        files.push(fileObj);
+        const thumbUrl = await renderImageThumbnail(bytes, mime);
+        pages.push({
+            id: `${id}_0`,
+            fileId: id,
+            pageIndex: 0,
+            rotation: 0,
+            included: true,
+            thumbUrl,
+            kind: 'image',
+            origin: 'image',
+        });
+        renderPages();
+    }
+
+    async function handleFilesAdded(fileList) {
+        const incoming = Array.from(fileList || []);
+        if (!incoming.length) return;
+        setHeaderStatus('LOADING FILES...', 'busy');
+        for (const file of incoming) {
+            const kind = classifyFile(file);
+            if (!kind) continue;
+            if (files.some((f) => f.file.name === file.name)) continue;
+            try {
+                const bytes = new Uint8Array(await file.arrayBuffer());
+                if (kind === 'pdf') {
+                    await addPdfFile(file, bytes, 'pdf');
+                } else if (kind === 'image') {
+                    await addImageFile(file, bytes);
+                } else if (kind === 'docx') {
+                    setHeaderStatus('CONVERTING WORD...', 'busy');
+                    const converted = await docxToPdf(bytes);
+                    if (!converted.success) {
+                        alert(`Could not convert ${file.name}: ${converted.error}`);
+                        continue;
+                    }
+                    const pdfName = file.name.replace(/\.docx$/i, '.pdf');
+                    const pdfFile = new File([converted.bytes], pdfName, { type: 'application/pdf' });
+                    await addPdfFile(pdfFile, converted.bytes, 'docx');
+                }
+            } catch (err) {
+                console.error(err);
+                alert(`Failed to add ${file.name}: ${err.message}`);
+            }
+        }
+        setHeaderStatus('SYSTEM ONLINE', 'ok');
+    }
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach((eventName) => {
+        dropzone.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
     });
 
-    // --- Document AI Extraction Groundwork ---
-    
-    // Utility: Convert raw ArrayBuffer to Base64 for Google Cloud API payloads
+    ['dragenter', 'dragover'].forEach((eventName) => {
+        dropzone.addEventListener(eventName, () => {
+            dropzone.classList.add('border-blue-500', 'bg-blue-50', 'dark:bg-blue-900/20');
+            dropzone.classList.remove('border-slate-300', 'dark:border-slate-600');
+        });
+    });
+
+    ['dragleave', 'drop'].forEach((eventName) => {
+        dropzone.addEventListener(eventName, () => {
+            dropzone.classList.remove('border-blue-500', 'bg-blue-50', 'dark:bg-blue-900/20');
+            dropzone.classList.add('border-slate-300', 'dark:border-slate-600');
+        });
+    });
+
+    dropzone.addEventListener('drop', (e) => handleFilesAdded(e.dataTransfer.files));
+    dropzone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', function () {
+        handleFilesAdded(this.files);
+        this.value = '';
+    });
+
+    selectAllCheckbox.addEventListener('change', (e) => {
+        const checked = e.target.checked;
+        pages.forEach((p) => { p.included = checked; });
+        renderPages();
+    });
+
+    btnClearBay.addEventListener('click', () => {
+        if (!confirm('Clear the holding bay?')) return;
+        files = [];
+        pages = [];
+        renderPages();
+    });
+
+    const toolMeta = {
+        merge: { title: 'Merge PDF', hint: 'Included pages are combined in the current grid order.' },
+        split: { title: 'Split PDF', hint: 'Split the included page sequence using custom ranges or a fixed length.' },
+        compress: { title: 'Compress PDF', hint: 'Rebuild included pages as compressed JPEGs in a smaller PDF.' },
+        convert: { title: 'Convert', hint: 'JPG ↔ PDF and Word → PDF. Word layout is approximate in the browser.' },
+    };
+
+    function setActiveTool(tool) {
+        activeTool = tool;
+        document.querySelectorAll('.pdf-tool-btn').forEach((btn) => {
+            const on = btn.getAttribute('data-tool') === tool;
+            btn.classList.toggle('text-white', on);
+            btn.classList.toggle('bg-slate-800', on);
+            btn.classList.toggle('text-slate-600', !on);
+            btn.classList.toggle('dark:text-slate-300', !on);
+            btn.classList.toggle('hover:bg-slate-100', !on);
+            btn.classList.toggle('dark:hover:bg-slate-700', !on);
+        });
+        document.getElementById('pdf-tool-title').textContent = toolMeta[tool].title;
+        document.getElementById('pdf-tool-hint').textContent = toolMeta[tool].hint;
+        ['merge', 'split', 'compress', 'convert'].forEach((name) => {
+            document.getElementById(`panel-${name}`).classList.toggle('hidden', name !== tool);
+        });
+        refreshIcons();
+    }
+
+    document.querySelectorAll('.pdf-tool-btn').forEach((btn) => {
+        btn.addEventListener('click', () => setActiveTool(btn.getAttribute('data-tool')));
+    });
+
+    function splitRangesFromUi() {
+        return Array.from(document.querySelectorAll('.split-range-row')).map((row) => ({
+            from: Number(row.querySelector('.split-from').value) || 1,
+            to: Number(row.querySelector('.split-to').value) || 1,
+        }));
+    }
+
+    function addSplitRange(from = 1, to = Math.max(1, includedPages().length)) {
+        const wrap = document.getElementById('split-ranges');
+        const row = document.createElement('div');
+        row.className = 'split-range-row flex items-center gap-2';
+        row.innerHTML = `
+            <input type="number" min="1" class="split-from w-full px-2 py-1.5 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg" value="${from}">
+            <span class="text-xs text-slate-400">to</span>
+            <input type="number" min="1" class="split-to w-full px-2 py-1.5 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg" value="${to}">
+            <button type="button" class="split-remove text-slate-400 hover:text-rose-500" title="Remove range">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        `;
+        row.querySelector('.split-remove').addEventListener('click', () => {
+            row.remove();
+            updateSplitSummary();
+        });
+        row.querySelectorAll('input').forEach((input) => input.addEventListener('input', updateSplitSummary));
+        wrap.appendChild(row);
+        refreshIcons();
+        updateSplitSummary();
+    }
+
+    function updateSplitSummary() {
+        const summary = document.getElementById('split-summary');
+        if (!summary) return;
+        const total = includedPages().length;
+        if (splitMode === 'fixed') {
+            const n = Math.max(1, Number(document.getElementById('split-fixed-length').value) || 1);
+            const count = total ? Math.ceil(total / n) : 0;
+            summary.textContent = total
+                ? `Included pages will be split into files of ${n} pages. ${count} PDF${count === 1 ? '' : 's'} will be created.`
+                : 'Include pages in the Holding Bay to split.';
+            return;
+        }
+        const ranges = splitRangesFromUi();
+        summary.textContent = total
+            ? `${ranges.length} custom range${ranges.length === 1 ? '' : 's'} over ${total} included page${total === 1 ? '' : 's'}.`
+            : 'Include pages in the Holding Bay to split.';
+    }
+
+    function setSplitMode(mode) {
+        splitMode = mode;
+        document.querySelectorAll('.split-mode-btn').forEach((btn) => {
+            const on = btn.getAttribute('data-split-mode') === mode;
+            btn.classList.toggle('border-blue-500', on);
+            btn.classList.toggle('bg-blue-50', on);
+            btn.classList.toggle('dark:bg-blue-900/20', on);
+            btn.classList.toggle('border-slate-200', !on);
+            btn.classList.toggle('dark:border-slate-600', !on);
+        });
+        document.getElementById('split-custom-wrap').classList.toggle('hidden', mode !== 'custom');
+        document.getElementById('split-fixed-wrap').classList.toggle('hidden', mode !== 'fixed');
+        updateSplitSummary();
+    }
+
+    document.querySelectorAll('.split-mode-btn').forEach((btn) => {
+        btn.addEventListener('click', () => setSplitMode(btn.getAttribute('data-split-mode')));
+    });
+    document.getElementById('btn-add-range').addEventListener('click', () => addSplitRange());
+    document.getElementById('split-fixed-length').addEventListener('input', updateSplitSummary);
+    document.getElementById('compress-quality').addEventListener('input', (e) => {
+        document.getElementById('compress-quality-label').textContent = `${e.target.value}%`;
+    });
+
+    addSplitRange(1, 1);
+    setActiveTool('merge');
+
+    warmupPdfEngine();
+
+    async function withBusyButton(button, busyLabel, work) {
+        const original = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>${busyLabel}</span>`;
+        refreshIcons();
+        try {
+            await work();
+        } finally {
+            button.innerHTML = original;
+            button.disabled = false;
+            refreshIcons();
+            toggleActionButtons();
+        }
+    }
+
+    btnUnlock.addEventListener('click', async () => {
+        const pw = passwords();
+        if (!pw) return alert('Please enter at least one password to try.');
+        await withBusyButton(btnUnlock, 'Processing...', async () => {
+            await readyPdfEngine();
+            const jobs = files.filter((f) => f.kind === 'pdf');
+            await mapLimit(jobs, 2, async (fileObj) => {
+                const result = await unlockPdf(fileObj.bytes, pw);
+                if (!result.success) {
+                    fileObj.status = 'error';
+                    return;
+                }
+                if (result.is_encrypted) {
+                    fileObj.bytes = result.bytes;
+                    const newName = fileObj.file.name.replace(/\.pdf$/i, '_unlocked.pdf');
+                    fileObj.file = new File([result.bytes], newName, { type: 'application/pdf' });
+                }
+                fileObj.status = 'unlocked';
+                pages = pages.filter((p) => p.fileId !== fileObj.id);
+                const thumbs = await renderPageThumbnails(fileObj.bytes, pw);
+                thumbs.forEach((thumb) => {
+                    pages.push({
+                        id: `${fileObj.id}_${thumb.pageIndex}`,
+                        fileId: fileObj.id,
+                        pageIndex: thumb.pageIndex,
+                        rotation: 0,
+                        included: true,
+                        thumbUrl: thumb.thumbUrl,
+                        kind: 'pdf',
+                        origin: fileObj.origin,
+                    });
+                });
+            });
+            renderPages();
+        });
+    });
+
+    btnScan.addEventListener('click', async () => {
+        const docType = docTypeSelect.value;
+        await withBusyButton(btnScan, 'Scanning...', async () => {
+            await readyPdfEngine();
+            const jobs = files.filter((f) => f.kind === 'pdf');
+            await mapLimit(jobs, 2, async (fileObj) => {
+                const result = await scanPdfDate(fileObj.bytes, docType, passwords());
+                if (result.success) {
+                    fileObj.detectedDate = result.date;
+                    if (fileObj.status === 'error') fileObj.status = 'ready';
+                } else {
+                    fileObj.status = 'error';
+                    fileObj.detectedDate = result.error;
+                }
+            });
+            files.sort((a, b) => {
+                if (!a.detectedDate) return 1;
+                if (!b.detectedDate) return -1;
+                return String(a.detectedDate).localeCompare(String(b.detectedDate));
+            });
+            const order = new Map(files.map((f, i) => [f.id, i]));
+            pages.sort((a, b) => {
+                const fa = order.get(a.fileId) ?? 0;
+                const fb = order.get(b.fileId) ?? 0;
+                if (fa !== fb) return fa - fb;
+                return a.pageIndex - b.pageIndex;
+            });
+            renderPages();
+        });
+    });
+
+    btnMerge.addEventListener('click', async () => {
+        const selected = includedPages();
+        if (!selected.length) return alert('No pages selected to merge.');
+        await withBusyButton(btnMerge, 'Merging...', async () => {
+            await readyPdfEngine();
+            const result = await buildPdfFromPages(pageSpecs(selected), passwords());
+            if (!result.success) {
+                alert(`Merge failed: ${result.error}`);
+                return;
+            }
+            downloadBytes(result.bytes, `Merged_History_${Date.now()}.pdf`, 'application/pdf');
+            alert('Merge complete. File downloaded.');
+        });
+    });
+
+    btnSplit.addEventListener('click', async () => {
+        const selected = includedPages();
+        if (!selected.length) return alert('Include at least one page to split.');
+        await withBusyButton(btnSplit, 'Splitting...', async () => {
+            const ranges = splitMode === 'fixed'
+                ? fixedLengthRanges(selected.length, document.getElementById('split-fixed-length').value)
+                : splitRangesFromUi();
+            const result = await splitPageItems(pageSpecs(selected), ranges, passwords());
+            if (!result.success) {
+                alert(`Split failed: ${result.error}`);
+                return;
+            }
+            if (result.files.length === 1) {
+                downloadBytes(result.files[0].bytes, result.files[0].name, 'application/pdf');
+            } else {
+                const zip = await zipFiles(result.files);
+                downloadBlob(zip, `split_${Date.now()}.zip`);
+            }
+            alert('Split complete.');
+        });
+    });
+
+    btnCompress.addEventListener('click', async () => {
+        const selected = includedPages();
+        if (!selected.length) return alert('Include at least one page to compress.');
+        await withBusyButton(btnCompress, 'Compressing...', async () => {
+            const quality = Number(document.getElementById('compress-quality').value) / 100;
+            const result = await compressPages(pageSpecs(selected), { quality, passwordsStr: passwords() });
+            if (!result.success) {
+                alert(`Compress failed: ${result.error}`);
+                return;
+            }
+            downloadBytes(result.bytes, `compressed_${Date.now()}.pdf`, 'application/pdf');
+            alert('Compress complete.');
+        });
+    });
+
+    btnJpgToPdf.addEventListener('click', async () => {
+        const selected = includedPages().filter((p) => p.kind === 'image');
+        if (!selected.length) return alert('Include at least one JPG/PNG page.');
+        await withBusyButton(btnJpgToPdf, 'Converting...', async () => {
+            const result = await imagesToPdf(pageSpecs(selected));
+            if (!result.success) {
+                alert(`JPG to PDF failed: ${result.error}`);
+                return;
+            }
+            downloadBytes(result.bytes, `images_${Date.now()}.pdf`, 'application/pdf');
+        });
+    });
+
+    btnPdfToJpg.addEventListener('click', async () => {
+        const selected = includedPages().filter((p) => p.kind !== 'image');
+        if (!selected.length) return alert('Include at least one PDF page.');
+        await withBusyButton(btnPdfToJpg, 'Exporting...', async () => {
+            const result = await pdfPagesToJpegs(pageSpecs(selected), { passwordsStr: passwords() });
+            if (!result.success) {
+                alert(`PDF to JPG failed: ${result.error}`);
+                return;
+            }
+            if (result.files.length === 1) {
+                downloadBytes(result.files[0].bytes, result.files[0].name, 'image/jpeg');
+            } else {
+                const zip = await zipFiles(result.files);
+                downloadBlob(zip, `pages_${Date.now()}.zip`);
+            }
+        });
+    });
+
+    btnWordToPdf.addEventListener('click', async () => {
+        const selected = includedPages().filter((p) => p.origin === 'docx');
+        if (!selected.length) return alert('Add a .docx file first. It is converted when dropped into the bay.');
+        await withBusyButton(btnWordToPdf, 'Exporting...', async () => {
+            const result = await buildPdfFromPages(pageSpecs(selected), passwords());
+            if (!result.success) {
+                alert(`Word to PDF failed: ${result.error}`);
+                return;
+            }
+            downloadBytes(result.bytes, `word_${Date.now()}.pdf`, 'application/pdf');
+        });
+    });
+
     function arrayBufferToBase64(buffer) {
-        const bytes = new Uint8Array(buffer);
+        const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
         const chunkSize = 8192;
         const chunks = [];
         for (let i = 0; i < bytes.length; i += chunkSize) {
@@ -474,153 +758,132 @@ document.addEventListener('DOMContentLoaded', () => {
         return window.btoa(chunks.join(''));
     }
 
-    if (btnExtractExcel) {
-        btnExtractExcel.addEventListener('click', async () => {
-            const selectedFiles = holdingBay.filter(f => f.included);
-            if (selectedFiles.length === 0) return alert("No files selected for extraction.");
-            
-            btnExtractExcel.disabled = true;
-            const originalText = btnExtractExcel.innerHTML;
-            btnExtractExcel.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Initializing Assembly Line...</span>';
-            if (window.lucide) lucide.createIcons();
+    function openPinModal() {
+        pinError.classList.add('hidden');
+        pinInput.value = '';
+        pinModal.classList.remove('hidden');
+        pinInput.focus();
+    }
 
-            // Open placeholder tabs synchronously while we still have a user gesture (avoids popup blockers)
+    function closePinModal() {
+        pinModal.classList.add('hidden');
+        pendingExtract = false;
+    }
+
+    async function runExtract() {
+        const pdfFiles = files.filter((f) => f.kind === 'pdf');
+        const selectedFiles = pdfFiles.filter((f) => pages.some((p) => p.fileId === f.id && p.included));
+        if (!selectedFiles.length) return alert('Include at least one page from a PDF.');
+
+        await withBusyButton(btnExtractExcel, 'Initializing Assembly Line...', async () => {
             const placeholderTabs = selectedFiles.map(() => {
-                try {
-                    return window.open('about:blank', '_blank');
-                } catch (_) {
-                    return null;
-                }
+                try { return window.open('about:blank', '_blank'); } catch (_) { return null; }
             });
             const openedSheetUrls = [];
             const lastExtractStats = [];
-            
             try {
-                console.log(`GUARDIAN EVENT: Initiating Cloud Assembly Line for ${selectedFiles.length} files...`);
-                
                 for (let i = 0; i < selectedFiles.length; i++) {
                     const fileObj = selectedFiles[i];
-                    
-                    // Update UI to show progress for multi-file batches
                     btnExtractExcel.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Processing File ${i + 1} of ${selectedFiles.length}...</span>`;
-                    if (window.lucide) lucide.createIcons();
+                    refreshIcons();
 
-                    // 1. Get raw bytes securely from local RAM
-                    const arrayBuffer = await fileObj.file.arrayBuffer();
-                    
-                    // 2. Convert to Base64 (Required format for GCP Document AI)
-                    const base64Data = arrayBufferToBase64(arrayBuffer);
-                    
-                    console.log(`[Assembly Line] Payload prepared for: ${fileObj.file.name}`);
-                    
-                    // --- GUARDIAN SECURITY UPGRADE ---
+                    const filePages = pages.filter((p) => p.fileId === fileObj.id && p.included);
+                    let payloadBytes = fileObj.bytes;
+                    if (filePages.length !== pages.filter((p) => p.fileId === fileObj.id).length || filePages.some((p) => p.rotation)) {
+                        const rebuilt = await buildPdfFromPages(pageSpecs(filePages), passwords());
+                        if (!rebuilt.success) throw new Error(rebuilt.error);
+                        payloadBytes = rebuilt.bytes;
+                    }
+
                     const authToken = await window.getGuardianAuthToken();
                     if (!authToken) {
-                        throw new Error("Authentication Token missing. Please lock and unlock the workspace to establish a secure session.");
+                        throw new Error('Authentication token missing. Please lock and unlock the workspace to establish a secure session.');
                     }
-                    
-                    // 3. LIVE FIREBASE FUNCTION CALL (NOW SECURED & PIPELINED)
-                    const response = await fetch('https://us-central1-all4one-nexus.cloudfunctions.net/extractBankData', { 
+
+                    const response = await fetch('https://us-central1-all4one-nexus.cloudfunctions.net/extractBankData', {
                         method: 'POST',
-                        headers: { 
+                        headers: {
                             'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${authToken}` 
+                            Authorization: `Bearer ${authToken}`,
                         },
-                        body: JSON.stringify({ 
-                            filename: fileObj.file.name, 
-                            documentType: document.getElementById('pdf-doc-type').value,
-                            documentBase64: base64Data 
-                        })
+                        body: JSON.stringify({
+                            filename: fileObj.file.name,
+                            documentType: docTypeSelect.value,
+                            documentBase64: arrayBufferToBase64(payloadBytes),
+                        }),
                     });
 
                     let data;
                     try {
                         data = await response.json();
                     } catch (_) {
-                        throw new Error(`Server returned a non-JSON response (HTTP ${response.status}). The function may be down or misconfigured.`);
+                        throw new Error(`Server returned a non-JSON response (HTTP ${response.status}).`);
                     }
-
-                    if (!response.ok) {
-                        throw new Error(data.error || 'Unknown error occurred during AI extraction.');
-                    }
-
-                    console.log(`[Assembly Line] Processing Success for ${fileObj.file.name}.`);
+                    if (!response.ok) throw new Error(data.error || 'Unknown error during AI extraction.');
 
                     const tab = placeholderTabs[i];
-
                     if (data.sheetUrl) {
                         openedSheetUrls.push(data.sheetUrl);
-                        if (tab && !tab.closed) {
-                            tab.location.href = data.sheetUrl;
-                        }
+                        if (tab && !tab.closed) tab.location.href = data.sheetUrl;
                     } else if (data.csvData) {
-                        // Sheets API unavailable — download CSV instead
                         try { if (tab && !tab.closed) tab.close(); } catch (_) {}
-                        const blob = new Blob([data.csvData], { type: 'text/csv;charset=utf-8;' });
-                        const csvUrl = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = csvUrl;
-                        a.download = `Extracted_${fileObj.file.name.replace(/\.pdf$/i, '')}.csv`;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(csvUrl);
+                        downloadBytes(new TextEncoder().encode(data.csvData), `Extracted_${fileObj.file.name.replace(/\.pdf$/i, '')}.csv`, 'text/csv;charset=utf-8;');
                     } else {
-                        throw new Error("Backend did not return a Google Sheets URL or CSV data.");
+                        throw new Error('Backend did not return a Google Sheets URL or CSV data.');
                     }
 
-                    if (data.warning) {
-                        console.warn(data.warning);
-                    }
-
-                    const mismatch = data.flaggedCount || 0;
-                    const profileLabel = data.bankId ? `${data.bankId}/${data.layoutId || '?'}` : 'unknown';
-                    console.log(`[Assembly Line] Profile=${profileLabel} rows=${data.tableCount} mismatches=${mismatch}`);
                     lastExtractStats.push({
                         file: fileObj.file.name,
                         rows: data.tableCount || 0,
-                        mismatches: mismatch,
-                        profile: profileLabel,
-                        mode: data.outputMode || 'unknown'
+                        mismatches: data.flaggedCount || 0,
+                        profile: data.bankId ? `${data.bankId}/${data.layoutId || '?'}` : 'unknown',
+                        mode: data.outputMode || 'unknown',
                     });
                 }
 
-                const sheetCount = openedSheetUrls.length;
-                const csvNote = sheetCount < selectedFiles.length
-                    ? `\n\n${selectedFiles.length - sheetCount} file(s) downloaded as CSV (Sheets unavailable).`
-                    : '';
-
                 const statsNote = lastExtractStats.length
-                    ? '\n\n' + lastExtractStats.map((s) =>
-                        `${s.file}: ${s.rows} rows, ${s.mismatches} MATH MISMATCH, profile ${s.profile} (${s.mode})`
-                    ).join('\n')
+                    ? '\n\n' + lastExtractStats.map((s) => `${s.file}: ${s.rows} rows, ${s.mismatches} MATH MISMATCH, profile ${s.profile} (${s.mode})`).join('\n')
                     : '';
-
-                const blocked = openedSheetUrls.filter((_, idx) => {
-                    const tab = placeholderTabs[idx];
-                    return !tab || tab.closed;
-                });
-
-                if (blocked.length > 0) {
-                    alert(`Assembly Line Complete! ${sheetCount} sheet(s) ready.${csvNote}${statsNote}\n\nSome tabs were blocked — open manually:\n${blocked.join('\n')}`);
-                } else {
-                    alert(`Assembly Line Complete! Processed ${selectedFiles.length} file(s).${csvNote}${statsNote}`);
-                }
+                alert(`Assembly Line Complete! Processed ${selectedFiles.length} file(s).${statsNote}`);
             } catch (err) {
-                // Close any leftover blank placeholders on failure
-                placeholderTabs.forEach(tab => {
+                placeholderTabs.forEach((tab) => {
                     try { if (tab && !tab.closed && tab.location.href === 'about:blank') tab.close(); } catch (_) {}
                 });
-                console.error("Extraction pipeline failed:", err);
+                console.error(err);
                 alert(`A critical error occurred during AI extraction: ${err.message}`);
-            } finally {
-                btnExtractExcel.innerHTML = originalText;
-                btnExtractExcel.disabled = false;
-                if (window.lucide) lucide.createIcons();
             }
         });
     }
 
-    // --- Initial Render ---
-    renderTable();
+    btnExtractExcel.addEventListener('click', () => {
+        if (!isBankProfile()) return alert('Extract to Excel is only available for Bank Statements.');
+        if (!excelPinUnlocked) {
+            pendingExtract = true;
+            openPinModal();
+            return;
+        }
+        runExtract();
+    });
+
+    pinCancel.addEventListener('click', closePinModal);
+    pinSubmit.addEventListener('click', () => {
+        if (pinInput.value.trim() !== EXCEL_PIN) {
+            pinError.classList.remove('hidden');
+            return;
+        }
+        excelPinUnlocked = true;
+        pinModal.classList.add('hidden');
+        const shouldRun = pendingExtract;
+        pendingExtract = false;
+        updateExtractButton();
+        if (shouldRun) runExtract();
+    });
+    pinInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') pinSubmit.click();
+        if (e.key === 'Escape') closePinModal();
+    });
+
+    docTypeSelect.addEventListener('change', updateExtractButton);
+
+    renderPages();
 });

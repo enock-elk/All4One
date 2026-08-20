@@ -1,11 +1,14 @@
 // ============================================================================
 // ALL4ONE - BROWSER PDF ENGINE (no Pyodide)
-// Scan / merge / unlock in JS. Replaces the ~30MB Python WASM runtime.
+// Scan / merge / unlock / convert / split / compress in JS.
 // ============================================================================
 
 const PDFJS_SRC = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
 const PDFJS_WORKER = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 const PDF_LIB_SRC = 'https://cdn.jsdelivr.net/npm/@cantoo/pdf-lib@2.4.2/dist/pdf-lib.min.js';
+const JSZIP_SRC = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
+const MAMMOTH_SRC = 'https://cdn.jsdelivr.net/npm/mammoth@1.9.0/mammoth.browser.min.js';
+const HTML2CANVAS_SRC = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
 
 let enginePromise = null;
 
@@ -58,6 +61,17 @@ export function warmupPdfEngine() {
     }
 }
 
+async function ensureZipLib() {
+    await loadScript(JSZIP_SRC);
+    if (!window.JSZip) throw new Error('JSZip failed to load.');
+}
+
+async function ensureDocxLibs() {
+    await Promise.all([loadScript(MAMMOTH_SRC), loadScript(HTML2CANVAS_SRC)]);
+    if (!window.mammoth) throw new Error('Mammoth failed to load.');
+    if (!window.html2canvas) throw new Error('html2canvas failed to load.');
+}
+
 function parsePasswords(passwordsStr) {
     return String(passwordsStr || '')
         .split(',')
@@ -73,6 +87,11 @@ function isPasswordError(err) {
     const name = err?.name || '';
     const message = err?.message || '';
     return /password/i.test(name) || /password/i.test(message) || /encrypt/i.test(message);
+}
+
+function isPngBytes(bytes) {
+    const b = toUint8(bytes);
+    return b.length >= 4 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47;
 }
 
 async function openPdfJs(bytes, passwords = []) {
@@ -264,4 +283,333 @@ export async function mapLimit(items, limit, worker) {
         if (executing.size >= limit) await Promise.race(executing);
     }
     return Promise.all(results);
+}
+
+function canvasToJpegBytes(canvas, quality = 0.7) {
+    return new Promise((resolve, reject) => {
+        canvas.toBlob(async (blob) => {
+            if (!blob) {
+                try {
+                    const dataUrl = canvas.toDataURL('image/jpeg', quality);
+                    const binary = atob(dataUrl.split(',')[1] || '');
+                    const out = new Uint8Array(binary.length);
+                    for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
+                    resolve(out);
+                } catch (err) {
+                    reject(err);
+                }
+                return;
+            }
+            resolve(new Uint8Array(await blob.arrayBuffer()));
+        }, 'image/jpeg', quality);
+    });
+}
+
+function loadImageElement(src) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('Failed to decode image.'));
+        img.src = src;
+    });
+}
+
+function bytesToObjectUrl(bytes, mime = 'application/octet-stream') {
+    return URL.createObjectURL(new Blob([toUint8(bytes)], { type: mime }));
+}
+
+export async function renderPageThumbnails(bytes, passwordsStr = '', scale = 0.28) {
+    await ensurePdfEngine();
+    const pdf = await openPdfJs(bytes, parsePasswords(passwordsStr));
+    const thumbs = [];
+    try {
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const viewport = page.getViewport({ scale });
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.floor(viewport.width));
+            canvas.height = Math.max(1, Math.floor(viewport.height));
+            await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+            thumbs.push({
+                pageIndex: i - 1,
+                thumbUrl: canvas.toDataURL('image/jpeg', 0.72),
+            });
+        }
+    } finally {
+        await pdf.destroy();
+    }
+    return thumbs;
+}
+
+export async function renderImageThumbnail(bytes, mime = 'image/jpeg') {
+    const url = bytesToObjectUrl(bytes, mime);
+    try {
+        const img = await loadImageElement(url);
+        const max = 280;
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        return canvas.toDataURL('image/jpeg', 0.72);
+    } finally {
+        URL.revokeObjectURL(url);
+    }
+}
+
+async function embedImageInPdf(pdf, bytes, mime) {
+    const data = toUint8(bytes);
+    if (isPngBytes(data) || String(mime || '').includes('png')) {
+        return pdf.embedPng(data);
+    }
+    return pdf.embedJpg(data);
+}
+
+export async function imagesToPdf(imageEntries) {
+    try {
+        await ensurePdfEngine();
+        const { PDFDocument } = window.PDFLib;
+        const pdf = await PDFDocument.create();
+        for (const entry of imageEntries) {
+            const image = await embedImageInPdf(pdf, entry.bytes, entry.mime);
+            const page = pdf.addPage([image.width, image.height]);
+            page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+            if (entry.rotation) {
+                page.setRotation(window.PDFLib.degrees(((entry.rotation % 360) + 360) % 360));
+            }
+        }
+        return { success: true, bytes: await pdf.save({ useObjectStreams: false }) };
+    } catch (err) {
+        return { success: false, error: err.message || String(err) };
+    }
+}
+
+export async function buildPdfFromPages(pageItems, passwordsStr = '') {
+    try {
+        await ensurePdfEngine();
+        const { PDFDocument, degrees } = window.PDFLib;
+        const out = await PDFDocument.create();
+        const passwords = parsePasswords(passwordsStr);
+        const docCache = new Map();
+
+        for (const item of pageItems) {
+            if (item.kind === 'image') {
+                const image = await embedImageInPdf(out, item.bytes, item.mime);
+                const page = out.addPage([image.width, image.height]);
+                page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+                if (item.rotation) {
+                    page.setRotation(degrees(((item.rotation % 360) + 360) % 360));
+                }
+                continue;
+            }
+
+            let src = docCache.get(item.fileId);
+            if (!src) {
+                src = (await loadPdfLibDoc(item.bytes, passwords)).doc;
+                docCache.set(item.fileId, src);
+            }
+            const [copied] = await out.copyPages(src, [item.pageIndex]);
+            if (item.rotation) {
+                const current = copied.getRotation().angle || 0;
+                copied.setRotation(degrees((((current + item.rotation) % 360) + 360) % 360));
+            }
+            out.addPage(copied);
+        }
+
+        return { success: true, bytes: await out.save({ useObjectStreams: false }) };
+    } catch (err) {
+        return { success: false, error: err.message || String(err) };
+    }
+}
+
+export function fixedLengthRanges(totalPages, length) {
+    const n = Math.max(1, Number(length) || 1);
+    const ranges = [];
+    for (let i = 1; i <= totalPages; i += n) {
+        ranges.push({ from: i, to: Math.min(totalPages, i + n - 1) });
+    }
+    return ranges;
+}
+
+export async function splitPageItems(pageItems, ranges, passwordsStr = '') {
+    try {
+        const files = [];
+        for (const range of ranges) {
+            const from = Math.max(1, Number(range.from) || 1);
+            const to = Math.max(from, Number(range.to) || from);
+            const slice = pageItems.slice(from - 1, to);
+            if (!slice.length) continue;
+            const built = await buildPdfFromPages(slice, passwordsStr);
+            if (!built.success) return built;
+            files.push({
+                name: `split_${from}-${Math.min(to, pageItems.length)}.pdf`,
+                bytes: built.bytes,
+            });
+        }
+        if (!files.length) return { success: false, error: 'No pages in the selected ranges.' };
+        return { success: true, files };
+    } catch (err) {
+        return { success: false, error: err.message || String(err) };
+    }
+}
+
+async function renderPdfPageToCanvas(bytes, pageIndex, { scale = 1.4, rotation = 0, passwords = [] } = {}) {
+    const pdf = await openPdfJs(bytes, passwords);
+    try {
+        const page = await pdf.getPage(pageIndex + 1);
+        const viewport = page.getViewport({ scale, rotation });
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.floor(viewport.width));
+        canvas.height = Math.max(1, Math.floor(viewport.height));
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+        return canvas;
+    } finally {
+        await pdf.destroy();
+    }
+}
+
+export async function pdfPagesToJpegs(pageItems, { quality = 0.85, scale = 1.5, passwordsStr = '' } = {}) {
+    try {
+        await ensurePdfEngine();
+        const files = [];
+        const passwords = parsePasswords(passwordsStr);
+
+        for (let i = 0; i < pageItems.length; i++) {
+            const item = pageItems[i];
+            let canvas;
+            if (item.kind === 'image') {
+                const url = bytesToObjectUrl(item.bytes, item.mime || 'image/jpeg');
+                try {
+                    const img = await loadImageElement(url);
+                    canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    if (item.rotation) {
+                        canvas.width = (item.rotation % 180 === 0) ? img.width : img.height;
+                        canvas.height = (item.rotation % 180 === 0) ? img.height : img.width;
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.translate(canvas.width / 2, canvas.height / 2);
+                        ctx.rotate((item.rotation * Math.PI) / 180);
+                        ctx.drawImage(img, -img.width / 2, -img.height / 2);
+                    } else {
+                        ctx.drawImage(img, 0, 0);
+                    }
+                } finally {
+                    URL.revokeObjectURL(url);
+                }
+            } else {
+                canvas = await renderPdfPageToCanvas(item.bytes, item.pageIndex, {
+                    scale,
+                    rotation: item.rotation || 0,
+                    passwords,
+                });
+            }
+            const jpeg = await canvasToJpegBytes(canvas, quality);
+            files.push({
+                name: `page_${String(i + 1).padStart(3, '0')}.jpg`,
+                bytes: jpeg,
+            });
+        }
+        return { success: true, files };
+    } catch (err) {
+        return { success: false, error: err.message || String(err) };
+    }
+}
+
+export async function compressPages(pageItems, { quality = 0.7, scale = 1.35, passwordsStr = '' } = {}) {
+    try {
+        await ensurePdfEngine();
+        const { PDFDocument } = window.PDFLib;
+        const out = await PDFDocument.create();
+        const jpegResult = await pdfPagesToJpegs(pageItems, { quality, scale, passwordsStr });
+        if (!jpegResult.success) return jpegResult;
+
+        for (const file of jpegResult.files) {
+            const image = await out.embedJpg(file.bytes);
+            const maxW = 595;
+            const maxH = 842;
+            const fit = Math.min(maxW / image.width, maxH / image.height, 1);
+            const w = image.width * fit;
+            const h = image.height * fit;
+            const page = out.addPage([w, h]);
+            page.drawImage(image, { x: 0, y: 0, width: w, height: h });
+        }
+        return { success: true, bytes: await out.save({ useObjectStreams: false }) };
+    } catch (err) {
+        return { success: false, error: err.message || String(err) };
+    }
+}
+
+export async function docxToPdf(arrayBuffer) {
+    try {
+        await ensurePdfEngine();
+        await ensureDocxLibs();
+        const buf = arrayBuffer instanceof Uint8Array
+            ? arrayBuffer.buffer.slice(arrayBuffer.byteOffset, arrayBuffer.byteOffset + arrayBuffer.byteLength)
+            : arrayBuffer;
+        const result = await window.mammoth.convertToHtml({ arrayBuffer: buf });
+        const container = document.createElement('div');
+        container.style.cssText = [
+            'position:fixed',
+            'left:-12000px',
+            'top:0',
+            'width:794px',
+            'padding:48px 56px',
+            'background:#fff',
+            'color:#111',
+            'font-family:Times New Roman,Times,serif',
+            'font-size:16px',
+            'line-height:1.45',
+            'z-index:-1',
+        ].join(';');
+        container.innerHTML = result.value || '<p></p>';
+        document.body.appendChild(container);
+
+        const canvas = await window.html2canvas(container, {
+            scale: 2,
+            backgroundColor: '#ffffff',
+            useCORS: true,
+        });
+        document.body.removeChild(container);
+
+        const { PDFDocument } = window.PDFLib;
+        const pdf = await PDFDocument.create();
+        const pageWidth = 595;
+        const pageHeight = 842;
+        const sliceHeight = Math.max(1, Math.floor(canvas.width * (pageHeight / pageWidth)));
+        let y = 0;
+        let pageNo = 0;
+        while (y < canvas.height) {
+            const h = Math.min(sliceHeight, canvas.height - y);
+            const slice = document.createElement('canvas');
+            slice.width = canvas.width;
+            slice.height = h;
+            slice.getContext('2d').drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+            const jpeg = await canvasToJpegBytes(slice, 0.85);
+            const image = await pdf.embedJpg(jpeg);
+            const drawnH = h * (pageWidth / canvas.width);
+            const page = pdf.addPage([pageWidth, pageHeight]);
+            page.drawImage(image, { x: 0, y: pageHeight - drawnH, width: pageWidth, height: drawnH });
+            y += sliceHeight;
+            pageNo += 1;
+            if (pageNo > 80) break;
+        }
+        return { success: true, bytes: await pdf.save({ useObjectStreams: false }) };
+    } catch (err) {
+        return { success: false, error: err.message || String(err) };
+    }
+}
+
+export async function zipFiles(fileEntries) {
+    await ensureZipLib();
+    const zip = new window.JSZip();
+    for (const entry of fileEntries) {
+        zip.file(entry.name, entry.bytes);
+    }
+    const blob = await zip.generateAsync({ type: 'blob' });
+    return blob;
 }

@@ -130,149 +130,202 @@
             <main class="flex-1 overflow-hidden relative">
                 
                 <!-- PDF MANAGER TAB -->
-                <div id="tab-pdf-manager" class="tab-content block h-full w-full overflow-y-auto p-6 lg:p-8">
-                    <div class="max-w-6xl mx-auto space-y-6 pb-20">
-                        
-                        <!-- Top Controls / Settings -->
-                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors duration-300">
+                <div id="tab-pdf-manager" class="tab-content block h-full w-full overflow-y-auto p-4 lg:p-6">
+                    <div class="max-w-[90rem] mx-auto space-y-4 pb-16">
+
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
                             <div>
                                 <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100">Holding Bay</h2>
-                                <p class="text-sm text-slate-500 dark:text-slate-400">Manage, sort, and process your PDF documents locally.</p>
+                                <p class="text-sm text-slate-500 dark:text-slate-400">Preview pages, include or exclude them, rotate, and reorder before export.</p>
                             </div>
-                            <div class="flex items-center gap-3 w-full sm:w-auto">
-                                <div class="flex flex-col w-full sm:w-56">
-                                    <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Document Type Profile</label>
-                                    <select id="pdf-doc-type" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 outline-none transition-colors duration-300">
-                                        <option value="generic">Auto-Detect / Generic</option>
-                                        <option value="bank">Bank Statements (Standard Bank)</option>
-                                        <option value="payslip">Payslips</option>
-                                    </select>
-                                </div>
+                            <div class="flex flex-col w-full sm:w-56">
+                                <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Document Type Profile</label>
+                                <select id="pdf-doc-type" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 outline-none">
+                                    <option value="generic">Auto-Detect / Generic</option>
+                                    <option value="bank">Bank Statements (Standard Bank)</option>
+                                    <option value="payslip">Payslips</option>
+                                </select>
                             </div>
                         </div>
 
-                        <!-- Drag & Drop Zone -->
-                        <div id="pdf-dropzone" class="w-full border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-blue-500 dark:hover:border-blue-500 rounded-2xl p-10 text-center cursor-pointer transition-colors duration-300 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col items-center justify-center min-h-[200px] group">
-                            <i data-lucide="upload-cloud" class="w-12 h-12 text-slate-400 group-hover:text-blue-500 transition-colors mb-4"></i>
-                            <p class="text-slate-600 dark:text-slate-300 font-medium mb-1">Drag & Drop PDF files here</p>
-                            <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">or click to browse from your computer</p>
-                            <input type="file" id="pdf-file-input" multiple accept=".pdf" class="hidden">
-                            <button class="px-6 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-sm font-medium rounded-lg transition-colors shadow-sm pointer-events-none">
-                                Browse Files
+                        <nav id="pdf-tool-strip" class="flex flex-wrap gap-2 bg-white dark:bg-slate-800 p-3 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+                            <button type="button" data-tool="merge" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-slate-800">
+                                <i data-lucide="layers" class="w-4 h-4"></i> Merge PDF
                             </button>
-                        </div>
+                            <button type="button" data-tool="split" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
+                                <i data-lucide="scissors" class="w-4 h-4"></i> Split PDF
+                            </button>
+                            <button type="button" data-tool="compress" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
+                                <i data-lucide="minimize-2" class="w-4 h-4"></i> Compress PDF
+                            </button>
+                            <button type="button" data-tool="convert" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
+                                <i data-lucide="refresh-cw" class="w-4 h-4"></i> Convert
+                            </button>
+                        </nav>
 
-                        <!-- Action Toolbar -->
-                        <div class="flex flex-col xl:flex-row flex-wrap gap-4 bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors duration-300">
-                            
-                            <!-- Passwords & Unlock -->
+                        <div class="flex flex-col xl:flex-row flex-wrap gap-3 bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
                             <div class="flex items-center gap-2 mr-auto w-full xl:w-auto">
-                                <input type="text" id="pdf-password-input" placeholder="Passwords (comma separated)" class="w-full xl:w-64 px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 dark:text-slate-200 transition-colors duration-300" title="Passwords to try for unlocking">
-                                <button id="btn-unlock-pdf" class="flex items-center justify-center shrink-0 gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg shadow-sm shadow-amber-500/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <input type="text" id="pdf-password-input" placeholder="Passwords (comma separated)" class="w-full xl:w-64 px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 dark:text-slate-200" title="Passwords to try for unlocking">
+                                <button id="btn-unlock-pdf" class="flex items-center justify-center shrink-0 gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
                                     <i data-lucide="unlock" class="w-4 h-4"></i>
                                     <span class="hidden sm:inline">Unlock</span>
                                 </button>
                             </div>
-                            
-                            <div class="flex items-center gap-3 w-full xl:w-auto">
-                                <!-- GUARDIAN: Restored btn-scan-pdf -->
-                                <button id="btn-scan-pdf" class="flex-1 xl:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg shadow-sm shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <div class="flex flex-wrap items-center gap-2 w-full xl:w-auto">
+                                <button id="btn-scan-pdf" class="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
                                     <i data-lucide="calendar-search" class="w-4 h-4"></i>
                                     <span>Scan Dates & Sort</span>
                                 </button>
-
-                                <button id="btn-merge-pdf" class="flex-1 xl:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg shadow-sm shadow-emerald-600/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
-                                    <i data-lucide="layers" class="w-4 h-4"></i>
-                                    <span>Merge Selected</span>
-                                </button>
-
-                                <button id="btn-extract-excel" class="flex-1 xl:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg shadow-sm shadow-purple-600/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed" title="Powered by Google Document AI">
+                                <button id="btn-extract-excel" class="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed" title="Requires Bank Statements profile and PIN" disabled>
                                     <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
                                     <span>Extract to Excel (AI)</span>
                                 </button>
                             </div>
                         </div>
 
-                        <!-- File List / Review Table -->
-                        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden transition-colors duration-300">
-                            <div class="overflow-x-auto">
-                                <table class="w-full text-left text-sm text-slate-600 dark:text-slate-300">
-                                    <thead class="bg-slate-50 dark:bg-slate-900/50 text-xs uppercase text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
-                                        <tr>
-                                            <th scope="col" class="px-4 py-4 w-12 text-center">
-                                                <input type="checkbox" id="pdf-select-all" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 bg-slate-50 dark:bg-slate-800 dark:border-slate-600 cursor-pointer" disabled>
-                                            </th>
-                                            <th scope="col" class="px-4 py-4">Filename</th>
-                                            <th scope="col" class="px-4 py-4 w-32">Status</th>
-                                            <!-- GUARDIAN: Restored Detected Date Column Header -->
-                                            <th scope="col" class="px-4 py-4 w-48">Detected Date</th>
-                                            <th scope="col" class="px-4 py-4 w-24 text-center">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="pdf-file-list" class="divide-y divide-slate-200 dark:divide-slate-700 transition-colors duration-300">
-                                        <!-- Empty State Stub -->
-                                        <tr id="pdf-empty-state">
-                                            <!-- GUARDIAN: Restored colspan to 5 -->
-                                            <td colspan="5" class="px-4 py-12 text-center text-slate-400 dark:text-slate-500">
-                                                <i data-lucide="file-box" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
-                                                <p>No files in the Holding Bay.</p>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <div class="px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center text-xs text-slate-500 dark:text-slate-400 transition-colors duration-300">
-                                <span id="pdf-stats-count">0 files tracked</span>
-                                <button id="btn-clear-bay" class="text-rose-500 hover:text-rose-600 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>Clear Bay</button>
-                            </div>
-                        </div>
+                        <div class="flex flex-col xl:flex-row gap-4 items-start">
+                            <div class="flex-1 min-w-0 space-y-4 w-full">
+                                <div id="pdf-dropzone" class="w-full border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-blue-500 rounded-2xl p-8 text-center cursor-pointer bg-slate-50/50 dark:bg-slate-800/30 flex flex-col items-center justify-center min-h-[140px] group">
+                                    <i data-lucide="upload-cloud" class="w-10 h-10 text-slate-400 group-hover:text-blue-500 mb-3"></i>
+                                    <p class="text-slate-600 dark:text-slate-300 font-medium mb-1">Drag &amp; drop PDF, JPG, PNG, or Word files</p>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">or click to browse</p>
+                                    <input type="file" id="pdf-file-input" multiple accept=".pdf,.jpg,.jpeg,.png,.docx,application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.wordprocessingml.document" class="hidden">
+                                    <span class="px-6 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-medium rounded-lg pointer-events-none">Browse Files</span>
+                                </div>
 
+                                <div id="pdf-file-strip" class="hidden flex flex-wrap gap-2"></div>
+
+                                <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                                    <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
+                                        <label class="flex items-center gap-2 text-xs font-medium text-slate-500">
+                                            <input type="checkbox" id="pdf-select-all" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" disabled>
+                                            Include all pages
+                                        </label>
+                                        <span id="pdf-stats-count" class="text-xs text-slate-500">0 pages</span>
+                                        <button id="btn-clear-bay" class="text-xs text-rose-500 hover:text-rose-600 font-medium disabled:opacity-50 disabled:cursor-not-allowed" disabled>Clear Bay</button>
+                                    </div>
+                                    <div id="pdf-page-grid" class="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4 min-h-[220px]">
+                                        <div id="pdf-empty-state" class="col-span-full py-12 text-center text-slate-400 dark:text-slate-500">
+                                            <i data-lucide="file-box" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
+                                            <p>No files in the Holding Bay.</p>
+                                            <p class="text-xs mt-1">Unchecked pages are left out of Merge, Split, Compress, and Convert.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <aside id="pdf-tool-panel" class="w-full xl:w-80 shrink-0 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 space-y-4 xl:sticky xl:top-4">
+                                <div>
+                                    <h3 id="pdf-tool-title" class="text-lg font-bold text-slate-800 dark:text-slate-100">Merge PDF</h3>
+                                    <p id="pdf-tool-hint" class="text-sm text-slate-500 dark:text-slate-400 mt-1">Included pages are combined in the current grid order.</p>
+                                </div>
+
+                                <div id="panel-merge" class="space-y-3">
+                                    <div class="text-xs text-slate-500 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl p-3">Drag page cards to reorder. Uncheck a page to exclude it from the merged file.</div>
+                                    <button id="btn-merge-pdf" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed">
+                                        <i data-lucide="layers" class="w-4 h-4"></i>
+                                        <span>Merge PDF</span>
+                                    </button>
+                                </div>
+
+                                <div id="panel-split" class="hidden space-y-4">
+                                    <div class="flex gap-2">
+                                        <button type="button" data-split-mode="custom" class="split-mode-btn flex-1 px-3 py-2 text-sm rounded-lg border border-blue-500 bg-blue-50 dark:bg-blue-900/20 font-medium">Custom</button>
+                                        <button type="button" data-split-mode="fixed" class="split-mode-btn flex-1 px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-600 font-medium">Fixed</button>
+                                    </div>
+                                    <div id="split-custom-wrap" class="space-y-3">
+                                        <div id="split-ranges" class="space-y-2"></div>
+                                        <button type="button" id="btn-add-range" class="text-sm text-blue-600 hover:text-blue-700 font-medium">+ Add Range</button>
+                                    </div>
+                                    <div id="split-fixed-wrap" class="hidden space-y-2">
+                                        <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Split into page ranges of</label>
+                                        <input type="number" id="split-fixed-length" min="1" value="4" class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg">
+                                    </div>
+                                    <p id="split-summary" class="text-xs text-slate-500 bg-slate-50 dark:bg-slate-900/50 rounded-xl p-3"></p>
+                                    <button id="btn-split-pdf" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl disabled:opacity-50">
+                                        <i data-lucide="scissors" class="w-4 h-4"></i>
+                                        <span>Split PDF</span>
+                                    </button>
+                                </div>
+
+                                <div id="panel-compress" class="hidden space-y-4">
+                                    <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500">JPEG quality <span id="compress-quality-label">70%</span></label>
+                                    <input type="range" id="compress-quality" min="40" max="90" value="70" class="w-full">
+                                    <p class="text-xs text-slate-500">Rebuilds included pages as compressed JPEGs inside a new PDF.</p>
+                                    <button id="btn-compress-pdf" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-xl disabled:opacity-50">
+                                        <i data-lucide="minimize-2" class="w-4 h-4"></i>
+                                        <span>Compress PDF</span>
+                                    </button>
+                                </div>
+
+                                <div id="panel-convert" class="hidden space-y-2">
+                                    <button id="btn-jpg-to-pdf" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-xl disabled:opacity-50">JPG to PDF</button>
+                                    <button id="btn-pdf-to-jpg" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-xl disabled:opacity-50">PDF to JPG</button>
+                                    <button id="btn-word-to-pdf" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-xl disabled:opacity-50">Word to PDF</button>
+                                    <p class="text-xs text-slate-500 pt-1">JPG to PDF uses included image pages. PDF to JPG exports included PDF pages as a zip. Word files are converted when added (layout is approximate).</p>
+                                </div>
+                            </aside>
+                        </div>
                     </div>
                 </div>
 
                 <!-- TRELLO WATCHER TAB -->
                 <div id="tab-dashboard" class="tab-content hidden h-full w-full overflow-y-auto p-6 lg:p-8">
                     <div class="max-w-6xl mx-auto space-y-6 pb-20">
-                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors duration-300">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
                             <div>
                                 <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100">Trello Watcher</h2>
-                                <p class="text-sm text-slate-500 dark:text-slate-400">Background polling and alarm system off the main thread.</p>
+                                <p class="text-sm text-slate-500 dark:text-slate-400">Authorize once with Trello. API keys stay in the app — pick a board and lists, then start watching.</p>
                             </div>
                             <div class="flex items-center gap-3">
-                                <button id="btn-trello-start" class="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg shadow-sm transition-all active:scale-95">
+                                <button id="btn-trello-start" class="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50" disabled>
                                     <i data-lucide="play" class="w-4 h-4"></i> Start Worker
                                 </button>
-                                <button id="btn-trello-stop" class="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-50" disabled>
+                                <button id="btn-trello-stop" class="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50" disabled>
                                     <i data-lucide="square" class="w-4 h-4"></i> Stop
                                 </button>
                             </div>
                         </div>
 
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <!-- Config Panel -->
-                            <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors duration-300 space-y-4">
+                            <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 space-y-4">
                                 <h3 class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                                    <i data-lucide="settings-2" class="w-5 h-5 text-slate-400"></i> Configuration
+                                    <i data-lucide="settings-2" class="w-5 h-5 text-slate-400"></i> Board &amp; lists
                                 </h3>
-                                <div>
-                                    <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 block">Trello API Key</label>
-                                    <input type="password" id="trello-api-key" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none transition-colors duration-300">
+
+                                <div id="trello-auth-panel" class="space-y-3">
+                                    <p class="text-sm text-slate-500 dark:text-slate-400">Connect your Trello account to load boards. The app key is already configured.</p>
+                                    <button id="btn-trello-authorize" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl">
+                                        <i data-lucide="key-round" class="w-4 h-4"></i>
+                                        Authorize with Trello
+                                    </button>
                                 </div>
-                                <div>
-                                    <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 block">Trello Token</label>
-                                    <input type="password" id="trello-token" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none transition-colors duration-300">
-                                </div>
-                                <div>
-                                    <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 block">Target Lists (JSON Array)</label>
-                                    <textarea id="trello-targets" rows="4" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-mono text-xs rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none transition-colors duration-300" placeholder='[{"id":"...", "name":"..."}]'></textarea>
+
+                                <div id="trello-setup-panel" class="hidden space-y-4">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <p id="trello-user-label" class="text-sm text-slate-500">Connected</p>
+                                        <button id="btn-trello-disconnect" class="text-xs text-rose-500 hover:text-rose-600 font-medium">Disconnect</button>
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 block">Board</label>
+                                        <select id="trello-board-select" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-lg p-2.5 outline-none">
+                                            <option value="">Loading boards...</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 block">Lists to watch (max 10)</label>
+                                        <div id="trello-list-checkboxes" class="max-h-64 overflow-y-auto space-y-1 rounded-xl border border-slate-200 dark:border-slate-700 p-2 bg-slate-50 dark:bg-slate-900/40">
+                                            <p class="text-xs text-slate-400 p-2">Select a board.</p>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            
-                            <!-- Logs Panel -->
-                            <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors duration-300 flex flex-col">
+
+                            <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col">
                                 <h3 class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-4">
                                     <i data-lucide="terminal" class="w-5 h-5 text-slate-400"></i> Worker Console
                                 </h3>
+                                <div id="trello-bucket-grid" class="hidden grid grid-cols-2 gap-2 mb-4"></div>
                                 <div id="trello-log-container" class="flex-1 bg-slate-950 text-emerald-400 p-4 rounded-xl font-mono text-xs overflow-y-auto h-64 whitespace-pre-wrap border border-slate-900 shadow-inner"></div>
                             </div>
                         </div>
@@ -294,7 +347,19 @@
         </div>
     </div>
 
-    <!-- Initialize Icons immediately -->
+    <div id="excel-pin-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+        <div class="w-full max-w-sm bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6">
+            <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-1">Extract to Excel</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Enter the PIN to run the bank-statement assembly line.</p>
+            <input id="excel-pin-input" type="password" inputmode="numeric" maxlength="8" placeholder="PIN" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm outline-none focus:ring-2 focus:ring-purple-500 dark:text-white mb-2">
+            <p id="excel-pin-error" class="hidden text-sm text-rose-500 mb-3">Incorrect PIN.</p>
+            <div class="flex gap-2">
+                <button type="button" id="excel-pin-cancel" class="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 text-sm font-medium">Cancel</button>
+                <button type="button" id="excel-pin-submit" class="flex-1 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold">Unlock</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         lucide.createIcons();
     </script>
