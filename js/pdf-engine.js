@@ -520,25 +520,69 @@ export async function pdfPagesToJpegs(pageItems, { quality = 0.85, scale = 1.5, 
     }
 }
 
-export async function compressPages(pageItems, { quality = 0.7, scale = 1.35, passwordsStr = '' } = {}) {
+function qualityToRenderScale(quality) {
+    const q = Math.min(0.9, Math.max(0.4, Number(quality) || 0.7));
+    return 0.45 + (q - 0.4) * 1.4;
+}
+
+export async function compressPages(pageItems, {
+    quality = 0.7,
+    scale,
+    passwordsStr = '',
+    sourceBytes = 0,
+} = {}) {
     try {
         await ensurePdfEngine();
         const { PDFDocument } = window.PDFLib;
-        const out = await PDFDocument.create();
-        const jpegResult = await pdfPagesToJpegs(pageItems, { quality, scale, passwordsStr });
-        if (!jpegResult.success) return jpegResult;
+        const jpegQuality = Math.min(0.9, Math.max(0.35, Number(quality) || 0.7));
+        let renderScale = scale ?? qualityToRenderScale(jpegQuality);
 
-        for (const file of jpegResult.files) {
-            const image = await out.embedJpg(file.bytes);
-            const maxW = 595;
-            const maxH = 842;
-            const fit = Math.min(maxW / image.width, maxH / image.height, 1);
-            const w = image.width * fit;
-            const h = image.height * fit;
-            const page = out.addPage([w, h]);
-            page.drawImage(image, { x: 0, y: 0, width: w, height: h });
+        const buildRaster = async (q, sc) => {
+            const out = await PDFDocument.create();
+            const jpegResult = await pdfPagesToJpegs(pageItems, { quality: q, scale: sc, passwordsStr });
+            if (!jpegResult.success) return jpegResult;
+            for (const file of jpegResult.files) {
+                const image = await out.embedJpg(file.bytes);
+                const maxW = 595;
+                const maxH = 842;
+                const fit = Math.min(maxW / image.width, maxH / image.height, 1);
+                const w = image.width * fit;
+                const h = image.height * fit;
+                const page = out.addPage([w, h]);
+                page.drawImage(image, { x: 0, y: 0, width: w, height: h });
+            }
+            const bytes = await out.save({ useObjectStreams: true });
+            return { success: true, bytes };
+        };
+
+        let result = await buildRaster(jpegQuality, renderScale);
+        if (!result.success) return result;
+
+        if (sourceBytes && result.bytes.length >= sourceBytes && renderScale > 0.55) {
+            result = await buildRaster(Math.max(0.35, jpegQuality * 0.85), renderScale * 0.7);
+            if (!result.success) return result;
         }
-        return { success: true, bytes: await out.save({ useObjectStreams: false }) };
+
+        const compressedBytes = result.bytes.length;
+        if (sourceBytes && compressedBytes >= sourceBytes) {
+            return {
+                success: true,
+                bytes: null,
+                skipped: true,
+                originalBytes: sourceBytes,
+                compressedBytes,
+                keptOriginal: true,
+            };
+        }
+
+        return {
+            success: true,
+            bytes: result.bytes,
+            skipped: false,
+            originalBytes: sourceBytes || compressedBytes,
+            compressedBytes,
+            keptOriginal: false,
+        };
     } catch (err) {
         return { success: false, error: err.message || String(err) };
     }

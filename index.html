@@ -2,8 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>All4One Command Center</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
     <!-- Favicon (Inherited from original React build) -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f59e0b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 19.5v.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8.5L18 5.5'/%3E%3Cpath d='m15 5 3 3'/%3E%3Cpath d='m11.5 11.5 3 3L22 4c-.5-.5-1.5-.5-2 0l-8.5 8.5Z'/%3E%3Cpath d='M8 10h.01'/%3E%3Cpath d='M8 14h.01'/%3E%3Cpath d='M8 18h.01'/%3E%3C/svg%3E" />
     
@@ -28,6 +32,72 @@
     <script type="module" src="js/app.js"></script>
     <script type="module" src="js/pdf-manager.js"></script>
     <script type="module" src="js/trello.js"></script>
+    <style>
+        .trello-lockscreen {
+            background-color: #0f172a;
+            background-size: cover;
+            background-position: center;
+        }
+        .trello-lockscreen::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: rgba(2, 6, 23, 0.45);
+            pointer-events: none;
+        }
+        .trello-clock-time {
+            font-size: 4.5rem;
+            font-weight: 200;
+            line-height: 1;
+            letter-spacing: -0.03em;
+            color: #fff;
+            text-shadow: 0 4px 18px rgba(0,0,0,0.55);
+        }
+        .trello-clock-date {
+            font-size: 1.15rem;
+            color: rgba(255,255,255,0.9);
+            margin-top: 4px;
+        }
+        .trello-glass {
+            background: rgba(15, 23, 42, 0.78);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(255,255,255,0.12);
+        }
+        .trello-mode-active {
+            background: rgba(56, 189, 248, 0.18) !important;
+            border-color: rgb(56, 189, 248) !important;
+            color: #fff !important;
+        }
+        .trello-bucket-card {
+            width: 31%;
+            min-width: 90px;
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 12px;
+            padding: 8px;
+            text-align: center;
+        }
+        .trello-bucket-count {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: #38bdf8;
+            line-height: 1;
+        }
+        .trello-bucket-name {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #cbd5e1;
+            margin-top: 4px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        @media (max-width: 640px) {
+            .trello-clock-time { font-size: 3.2rem; }
+            .trello-bucket-card { width: 47%; }
+        }
+    </style>
 </head>
 <body class="bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
 
@@ -133,18 +203,24 @@
                 <div id="tab-pdf-manager" class="tab-content block h-full w-full overflow-y-auto p-4 lg:p-6">
                     <div class="max-w-[90rem] mx-auto space-y-4 pb-16">
 
-                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+                        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
                             <div>
                                 <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100">Holding Bay</h2>
-                                <p class="text-sm text-slate-500 dark:text-slate-400">Preview pages, include or exclude them, rotate, and reorder before export.</p>
+                                <p class="text-sm text-slate-500 dark:text-slate-400">Preview, rotate, reorder, then Apply a tool to keep working — or Download when you are done.</p>
                             </div>
-                            <div class="flex flex-col w-full sm:w-56">
-                                <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Document Type Profile</label>
-                                <select id="pdf-doc-type" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 outline-none">
-                                    <option value="generic">Auto-Detect / Generic</option>
-                                    <option value="bank">Bank Statements (Standard Bank)</option>
-                                    <option value="payslip">Payslips</option>
-                                </select>
+                            <div class="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+                                <div class="flex rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                                    <button type="button" id="pdf-view-thumbs" class="px-3 py-2 text-xs font-bold bg-slate-800 text-white" title="Thumbnail preview">Thumbnails</button>
+                                    <button type="button" id="pdf-view-table" class="px-3 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" title="Unique files and dates">File table</button>
+                                </div>
+                                <div class="flex flex-col w-full sm:w-56">
+                                    <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Document Type Profile</label>
+                                    <select id="pdf-doc-type" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 outline-none">
+                                        <option value="generic">Auto-Detect / Generic</option>
+                                        <option value="bank">Bank Statements (Standard Bank)</option>
+                                        <option value="payslip">Payslips</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
 
@@ -196,20 +272,38 @@
                                 <div id="pdf-file-strip" class="hidden flex flex-wrap gap-2"></div>
 
                                 <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-                                    <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
+                                    <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3">
                                         <label class="flex items-center gap-2 text-xs font-medium text-slate-500">
                                             <input type="checkbox" id="pdf-select-all" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" disabled>
                                             Include all pages
                                         </label>
                                         <span id="pdf-stats-count" class="text-xs text-slate-500">0 pages</span>
-                                        <button id="btn-clear-bay" class="text-xs text-rose-500 hover:text-rose-600 font-medium disabled:opacity-50 disabled:cursor-not-allowed" disabled>Clear Bay</button>
+                                        <div class="flex items-center gap-3">
+                                            <button id="btn-download-current" class="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed" disabled title="Build a PDF from included pages and rotations">Download current</button>
+                                            <button id="btn-clear-bay" class="text-xs text-rose-500 hover:text-rose-600 font-medium disabled:opacity-50 disabled:cursor-not-allowed" disabled>Clear Bay</button>
+                                        </div>
                                     </div>
+                                    <p id="pdf-bay-banner" class="hidden px-4 py-2 text-xs bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-b border-emerald-100 dark:border-emerald-800">Bay updated — run another tool or Download.</p>
                                     <div id="pdf-page-grid" class="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4 min-h-[220px]">
                                         <div id="pdf-empty-state" class="col-span-full py-12 text-center text-slate-400 dark:text-slate-500">
                                             <i data-lucide="file-box" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
                                             <p>No files in the Holding Bay.</p>
-                                            <p class="text-xs mt-1">Unchecked pages are left out of Merge, Split, Compress, and Convert.</p>
+                                            <p class="text-xs mt-1">Rotate pages, then Apply a tool to keep the result in the bay, or Download current to save it.</p>
                                         </div>
+                                    </div>
+                                    <div id="pdf-file-table-wrap" class="hidden overflow-x-auto">
+                                        <table class="w-full text-left text-sm text-slate-600 dark:text-slate-300">
+                                            <thead class="bg-slate-50 dark:bg-slate-900/50 text-xs uppercase text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+                                                <tr>
+                                                    <th scope="col" class="px-4 py-3 w-12 text-center">Incl.</th>
+                                                    <th scope="col" class="px-4 py-3">Filename</th>
+                                                    <th scope="col" class="px-4 py-3 w-32">Status</th>
+                                                    <th scope="col" class="px-4 py-3 w-48">Detected Date</th>
+                                                    <th scope="col" class="px-4 py-3 w-24 text-center">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="pdf-file-table-body" class="divide-y divide-slate-200 dark:border-slate-700"></tbody>
+                                        </table>
                                     </div>
                                 </div>
                             </div>
@@ -217,15 +311,21 @@
                             <aside id="pdf-tool-panel" class="w-full xl:w-80 shrink-0 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 space-y-4 xl:sticky xl:top-4">
                                 <div>
                                     <h3 id="pdf-tool-title" class="text-lg font-bold text-slate-800 dark:text-slate-100">Merge PDF</h3>
-                                    <p id="pdf-tool-hint" class="text-sm text-slate-500 dark:text-slate-400 mt-1">Included pages are combined in the current grid order.</p>
+                                    <p id="pdf-tool-hint" class="text-sm text-slate-500 dark:text-slate-400 mt-1">Merge included pages into the bay (then split or compress), or Download a copy.</p>
                                 </div>
 
                                 <div id="panel-merge" class="space-y-3">
-                                    <div class="text-xs text-slate-500 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl p-3">Drag page cards to reorder. Uncheck a page to exclude it from the merged file.</div>
-                                    <button id="btn-merge-pdf" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed">
-                                        <i data-lucide="layers" class="w-4 h-4"></i>
-                                        <span>Merge PDF</span>
-                                    </button>
+                                    <div class="text-xs text-slate-500 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl p-3">Drag page cards or filenames to reorder. Merge keeps the result in the bay so you can split or compress next. Download saves a copy.</div>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <button id="btn-merge-pdf" class="flex items-center justify-center gap-2 px-3 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed">
+                                            <i data-lucide="layers" class="w-4 h-4"></i>
+                                            <span>Merge</span>
+                                        </button>
+                                        <button id="btn-merge-download" class="flex items-center justify-center gap-2 px-3 py-3 bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed">
+                                            <i data-lucide="download" class="w-4 h-4"></i>
+                                            <span>Download</span>
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div id="panel-split" class="hidden space-y-4">
@@ -242,27 +342,49 @@
                                         <input type="number" id="split-fixed-length" min="1" value="4" class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg">
                                     </div>
                                     <p id="split-summary" class="text-xs text-slate-500 bg-slate-50 dark:bg-slate-900/50 rounded-xl p-3"></p>
-                                    <button id="btn-split-pdf" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl disabled:opacity-50">
-                                        <i data-lucide="scissors" class="w-4 h-4"></i>
-                                        <span>Split PDF</span>
-                                    </button>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <button id="btn-split-pdf" class="flex items-center justify-center gap-2 px-3 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl disabled:opacity-50">
+                                            <i data-lucide="scissors" class="w-4 h-4"></i>
+                                            <span>Split</span>
+                                        </button>
+                                        <button id="btn-split-download" class="flex items-center justify-center gap-2 px-3 py-3 bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold rounded-xl disabled:opacity-50">
+                                            <i data-lucide="download" class="w-4 h-4"></i>
+                                            <span>Download</span>
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div id="panel-compress" class="hidden space-y-4">
                                     <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500">JPEG quality <span id="compress-quality-label">70%</span></label>
                                     <input type="range" id="compress-quality" min="40" max="90" value="70" class="w-full">
-                                    <p class="text-xs text-slate-500">Rebuilds included pages as compressed JPEGs inside a new PDF.</p>
-                                    <button id="btn-compress-pdf" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-xl disabled:opacity-50">
-                                        <i data-lucide="minimize-2" class="w-4 h-4"></i>
-                                        <span>Compress PDF</span>
-                                    </button>
+                                    <p class="text-xs text-slate-500">Rasterizes pages at a scale matched to this quality. If the result would be larger than the original, the original is kept.</p>
+                                    <p id="compress-size-readout" class="text-xs text-slate-500 bg-slate-50 dark:bg-slate-900/50 rounded-xl p-3 hidden"></p>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <button id="btn-compress-pdf" class="flex items-center justify-center gap-2 px-3 py-3 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-xl disabled:opacity-50">
+                                            <i data-lucide="minimize-2" class="w-4 h-4"></i>
+                                            <span>Compress</span>
+                                        </button>
+                                        <button id="btn-compress-download" class="flex items-center justify-center gap-2 px-3 py-3 bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold rounded-xl disabled:opacity-50">
+                                            <i data-lucide="download" class="w-4 h-4"></i>
+                                            <span>Download</span>
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div id="panel-convert" class="hidden space-y-2">
-                                    <button id="btn-jpg-to-pdf" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-xl disabled:opacity-50">JPG to PDF</button>
-                                    <button id="btn-pdf-to-jpg" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-xl disabled:opacity-50">PDF to JPG</button>
-                                    <button id="btn-word-to-pdf" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-xl disabled:opacity-50">Word to PDF</button>
-                                    <p class="text-xs text-slate-500 pt-1">JPG to PDF uses included image pages. PDF to JPG exports included PDF pages as a zip. Word files are converted when added (layout is approximate).</p>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <button id="btn-jpg-to-pdf" class="flex items-center justify-center gap-2 px-3 py-3 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-xl disabled:opacity-50">JPG → PDF</button>
+                                        <button id="btn-jpg-to-pdf-download" class="flex items-center justify-center gap-2 px-3 py-3 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-xl disabled:opacity-50">Download</button>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <button id="btn-pdf-to-jpg" class="flex items-center justify-center gap-2 px-3 py-3 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-xl disabled:opacity-50">PDF → JPG</button>
+                                        <button id="btn-pdf-to-jpg-download" class="flex items-center justify-center gap-2 px-3 py-3 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-xl disabled:opacity-50">Download</button>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <button id="btn-word-to-pdf" class="flex items-center justify-center gap-2 px-3 py-3 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-xl disabled:opacity-50">Word → PDF</button>
+                                        <button id="btn-word-to-pdf-download" class="flex items-center justify-center gap-2 px-3 py-3 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-xl disabled:opacity-50">Download</button>
+                                    </div>
+                                    <p class="text-xs text-slate-500 pt-1">The left button applies the conversion into the Holding Bay. Download saves a copy without replacing the bay. Word layout is approximate.</p>
                                 </div>
                             </aside>
                         </div>
@@ -270,31 +392,32 @@
                 </div>
 
                 <!-- TRELLO WATCHER TAB -->
-                <div id="tab-dashboard" class="tab-content hidden h-full w-full overflow-y-auto p-6 lg:p-8">
-                    <div class="max-w-6xl mx-auto space-y-6 pb-20">
-                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
-                            <div>
-                                <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100">Trello Watcher</h2>
-                                <p class="text-sm text-slate-500 dark:text-slate-400">Authorize once with Trello. API keys stay in the app — pick a board and lists, then start watching.</p>
+                <div id="tab-dashboard" class="tab-content hidden h-full w-full overflow-hidden relative">
+                    <div id="trello-lockscreen" class="trello-lockscreen absolute inset-0 flex flex-col items-center overflow-y-auto text-white">
+                        <div class="relative z-10 w-full max-w-xl px-4 pt-10 pb-40 flex flex-col items-center">
+                            <div class="text-center mb-6">
+                                <div id="trello-clock-time" class="trello-clock-time">--:--</div>
+                                <div id="trello-clock-date" class="trello-clock-date">loading...</div>
                             </div>
-                            <div class="flex items-center gap-3">
-                                <button id="btn-trello-start" class="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50" disabled>
-                                    <i data-lucide="play" class="w-4 h-4"></i> Start Worker
-                                </button>
-                                <button id="btn-trello-stop" class="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50" disabled>
-                                    <i data-lucide="square" class="w-4 h-4"></i> Stop
-                                </button>
+                            <div class="text-center mb-6">
+                                <h2 class="text-2xl font-semibold tracking-wide">TrelloWatcher</h2>
+                                <p class="text-sm text-white/70">List Activity Monitor</p>
                             </div>
-                        </div>
 
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 space-y-4">
-                                <h3 class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                                    <i data-lucide="settings-2" class="w-5 h-5 text-slate-400"></i> Board &amp; lists
-                                </h3>
+                            <div id="trello-setup-card" class="trello-glass w-full rounded-2xl p-5 space-y-4 shadow-2xl">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                    <h3 class="font-bold flex items-center gap-2">
+                                        <i data-lucide="settings-2" class="w-5 h-5 text-sky-400"></i> Board &amp; lists
+                                    </h3>
+                                    <div class="flex items-center gap-2">
+                                        <button type="button" id="trello-wallpaper-btn" class="text-xs px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20" title="Upload background">Wallpaper</button>
+                                        <button type="button" id="trello-reset-bg" class="text-xs px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20" title="Reset background">Reset</button>
+                                        <input type="file" id="trello-bg-input" accept="image/*" class="hidden">
+                                    </div>
+                                </div>
 
                                 <div id="trello-auth-panel" class="space-y-3">
-                                    <p class="text-sm text-slate-500 dark:text-slate-400">Connect your Trello account to load boards. The app key is already configured.</p>
+                                    <p class="text-sm text-white/70">Connect your Trello account to load boards. The app key is already configured.</p>
                                     <button id="btn-trello-authorize" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl">
                                         <i data-lucide="key-round" class="w-4 h-4"></i>
                                         Authorize with Trello
@@ -303,31 +426,97 @@
 
                                 <div id="trello-setup-panel" class="hidden space-y-4">
                                     <div class="flex items-center justify-between gap-2">
-                                        <p id="trello-user-label" class="text-sm text-slate-500">Connected</p>
-                                        <button id="btn-trello-disconnect" class="text-xs text-rose-500 hover:text-rose-600 font-medium">Disconnect</button>
+                                        <p id="trello-user-label" class="text-sm text-white/70">Connected</p>
+                                        <button id="btn-trello-disconnect" class="text-xs text-rose-300 hover:text-rose-200 font-medium">Disconnect</button>
                                     </div>
                                     <div>
-                                        <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 block">Board</label>
-                                        <select id="trello-board-select" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-lg p-2.5 outline-none">
+                                        <label class="text-[10px] font-bold uppercase tracking-wider text-white/50 mb-1 block">Board</label>
+                                        <select id="trello-board-select" class="w-full bg-black/30 border border-white/15 text-white text-sm rounded-lg p-2.5 outline-none">
                                             <option value="">Loading boards...</option>
                                         </select>
                                     </div>
                                     <div>
-                                        <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 block">Lists to watch (max 10)</label>
-                                        <div id="trello-list-checkboxes" class="max-h-64 overflow-y-auto space-y-1 rounded-xl border border-slate-200 dark:border-slate-700 p-2 bg-slate-50 dark:bg-slate-900/40">
-                                            <p class="text-xs text-slate-400 p-2">Select a board.</p>
+                                        <label class="text-[10px] font-bold uppercase tracking-wider text-white/50 mb-1 block">Lists to watch (max 10)</label>
+                                        <div id="trello-list-checkboxes" class="max-h-48 overflow-y-auto space-y-1 rounded-xl border border-white/15 p-2 bg-black/20">
+                                            <p class="text-xs text-white/50 p-2">Select a board.</p>
                                         </div>
+                                    </div>
+
+                                    <div>
+                                        <label class="text-[10px] font-bold uppercase tracking-wider text-white/50 mb-2 block">Alert type</label>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <button type="button" id="trello-mode-wake" class="trello-mode-active rounded-xl border border-white/15 px-3 py-2 text-left">
+                                                <div class="text-sm font-bold">Wake Me Up</div>
+                                                <div class="text-[10px] text-white/60">Continuous loop</div>
+                                            </button>
+                                            <button type="button" id="trello-mode-notify" class="rounded-xl border border-white/15 px-3 py-2 text-left">
+                                                <div class="text-sm font-bold">Notification</div>
+                                                <div class="text-[10px] text-white/60">One-time chime</div>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-sm">Sound enabled</span>
+                                        <label class="inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" id="trello-sound-toggle" class="sr-only peer" checked>
+                                            <span class="w-10 h-5 bg-white/20 rounded-full peer-checked:bg-sky-500 relative after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full peer-checked:after:translate-x-5 after:transition"></span>
+                                        </label>
+                                    </div>
+
+                                    <div class="flex items-center gap-2">
+                                        <label class="text-sm shrink-0">Alert sound</label>
+                                        <select id="trello-tone-select" class="flex-1 bg-black/30 border border-white/15 text-white text-sm rounded-lg p-2 outline-none"></select>
+                                        <button type="button" id="trello-test-sound" class="w-10 h-10 rounded-lg bg-sky-500 text-white font-bold" title="Test sound">▶</button>
+                                    </div>
+                                    <p id="trello-custom-sound-status" class="hidden text-xs text-sky-300">Custom loaded</p>
+                                    <input type="file" id="trello-sound-input" accept="audio/*" class="hidden">
+
+                                    <div class="flex items-start justify-between gap-3 pt-1 border-t border-white/10">
+                                        <div>
+                                            <div class="text-sm font-medium">Stealth keep-alive</div>
+                                            <p class="text-[11px] text-white/60">Plays a silent 30Hz tone so the browser keeps the tab active in the background.</p>
+                                        </div>
+                                        <label class="inline-flex items-center cursor-pointer mt-1">
+                                            <input type="checkbox" id="trello-stealth-toggle" class="sr-only peer" checked>
+                                            <span class="w-10 h-5 bg-white/20 rounded-full peer-checked:bg-sky-500 relative after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full peer-checked:after:translate-x-5 after:transition"></span>
+                                        </label>
+                                    </div>
+
+                                    <div class="flex gap-2">
+                                        <button id="btn-trello-start" class="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl disabled:opacity-50" disabled>
+                                            <i data-lucide="play" class="w-4 h-4"></i> Start Watching
+                                        </button>
+                                        <button id="btn-trello-stop" class="flex items-center justify-center gap-2 px-4 py-3 bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold rounded-xl disabled:opacity-50" disabled>
+                                            <i data-lucide="square" class="w-4 h-4"></i> Stop
+                                        </button>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col">
-                                <h3 class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-4">
-                                    <i data-lucide="terminal" class="w-5 h-5 text-slate-400"></i> Worker Console
-                                </h3>
-                                <div id="trello-bucket-grid" class="hidden grid grid-cols-2 gap-2 mb-4"></div>
-                                <div id="trello-log-container" class="flex-1 bg-slate-950 text-emerald-400 p-4 rounded-xl font-mono text-xs overflow-y-auto h-64 whitespace-pre-wrap border border-slate-900 shadow-inner"></div>
+                            <div class="trello-glass w-full rounded-2xl p-4 mt-4 shadow-2xl">
+                                <h3 class="font-bold text-sm mb-2 flex items-center gap-2"><i data-lucide="terminal" class="w-4 h-4 text-sky-400"></i> Console</h3>
+                                <div id="trello-log-container" class="bg-slate-950/80 text-emerald-400 p-3 rounded-xl font-mono text-[11px] overflow-y-auto h-36 whitespace-pre-wrap border border-white/10"></div>
                             </div>
+                        </div>
+
+                        <div id="trello-monitor" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-20 w-[95%] max-w-xl trello-glass rounded-2xl p-4 shadow-2xl">
+                            <div class="flex items-center justify-between gap-3">
+                                <div class="flex items-center gap-2 text-emerald-400 text-xs font-extrabold tracking-wider uppercase">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Active
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <label class="flex items-center gap-2 text-xs text-white/70">
+                                        Sound
+                                        <input type="checkbox" id="trello-sound-toggle-active" class="rounded border-white/30 text-sky-500" checked>
+                                    </label>
+                                    <button type="button" class="text-xs font-bold uppercase tracking-wide text-rose-300 border border-rose-400/50 px-3 py-1 rounded-md" onclick="document.getElementById('btn-trello-stop').click()">Stop</button>
+                                </div>
+                            </div>
+                            <p class="text-center text-sm text-white/80 mt-2 uppercase tracking-wide">
+                                <span id="trello-total-cards" class="text-sky-400 font-extrabold text-base">0</span> cases in total in:
+                            </p>
+                            <div id="trello-bucket-grid" class="flex flex-wrap justify-center gap-2 mt-3 max-h-[30vh] overflow-y-auto"></div>
                         </div>
                     </div>
                 </div>
@@ -345,6 +534,17 @@
 
             </main>
         </div>
+    </div>
+
+    <div id="trello-alarm-overlay" class="hidden fixed inset-0 z-[60] flex flex-col items-center justify-center p-6 bg-slate-950 text-white">
+        <div class="text-4xl font-bold mb-3">Alert</div>
+        <div class="text-slate-300 mb-2">Incoming to: <span id="trello-alarm-list" class="text-sky-400 font-bold">List</span></div>
+        <div id="trello-alarm-card" class="text-2xl font-semibold text-center mb-8 max-w-lg">Card Name</div>
+        <button id="trello-ack-alarm" class="px-8 py-3 rounded-xl bg-rose-600 hover:bg-rose-700 font-bold">Acknowledge</button>
+    </div>
+    <div id="trello-volume-hud" class="hidden fixed bottom-8 right-8 z-[61] bg-slate-900/90 text-white rounded-2xl px-5 py-4 shadow-2xl border border-white/10">
+        <div class="font-bold">Is sound on?</div>
+        <div class="text-xs text-white/60">Check system volume</div>
     </div>
 
     <div id="excel-pin-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">

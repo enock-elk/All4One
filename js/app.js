@@ -186,4 +186,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Initialization ---
     initDarkMode();
     checkLoginState();
+
+    if ('serviceWorker' in navigator) {
+        const registerSw = (path) => navigator.serviceWorker.register(path);
+        registerSw('./sw.js').catch(() => registerSw('public/sw.js').catch((err) => {
+            console.warn('Service worker registration skipped:', err);
+        }));
+    }
 });

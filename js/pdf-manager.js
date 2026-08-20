@@ -37,12 +37,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnUnlock = document.getElementById('btn-unlock-pdf');
     const btnScan = document.getElementById('btn-scan-pdf');
     const btnMerge = document.getElementById('btn-merge-pdf');
+    const btnMergeDownload = document.getElementById('btn-merge-download');
     const btnExtractExcel = document.getElementById('btn-extract-excel');
     const btnSplit = document.getElementById('btn-split-pdf');
+    const btnSplitDownload = document.getElementById('btn-split-download');
     const btnCompress = document.getElementById('btn-compress-pdf');
+    const btnCompressDownload = document.getElementById('btn-compress-download');
     const btnJpgToPdf = document.getElementById('btn-jpg-to-pdf');
+    const btnJpgToPdfDownload = document.getElementById('btn-jpg-to-pdf-download');
     const btnPdfToJpg = document.getElementById('btn-pdf-to-jpg');
+    const btnPdfToJpgDownload = document.getElementById('btn-pdf-to-jpg-download');
     const btnWordToPdf = document.getElementById('btn-word-to-pdf');
+    const btnWordToPdfDownload = document.getElementById('btn-word-to-pdf-download');
+    const btnDownloadCurrent = document.getElementById('btn-download-current');
+    const bayBanner = document.getElementById('pdf-bay-banner');
+    const fileTableWrap = document.getElementById('pdf-file-table-wrap');
+    const fileTableBody = document.getElementById('pdf-file-table-body');
+    const viewThumbsBtn = document.getElementById('pdf-view-thumbs');
+    const viewTableBtn = document.getElementById('pdf-view-table');
+    const compressReadout = document.getElementById('compress-size-readout');
 
     const pinModal = document.getElementById('excel-pin-modal');
     const pinInput = document.getElementById('excel-pin-input');
@@ -60,6 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let excelPinUnlocked = false;
     let pendingExtract = false;
     let fileSeq = 0;
+    let bayView = 'thumbs';
 
     function escapeHtml(value) {
         return String(value ?? '')
@@ -163,17 +177,102 @@ document.addEventListener('DOMContentLoaded', () => {
     function toggleActionButtons() {
         const hasPages = pages.length > 0;
         const hasIncluded = includedPages().length > 0;
+        const hasImages = includedPages().some((p) => p.kind === 'image');
+        const hasPdfPages = includedPages().some((p) => p.kind !== 'image');
+        const hasDocx = includedPages().some((p) => p.origin === 'docx');
         btnUnlock.disabled = !files.some((f) => f.kind === 'pdf');
         if (btnScan) btnScan.disabled = !files.some((f) => f.kind === 'pdf');
         btnClearBay.disabled = !hasPages && files.length === 0;
-        if (btnMerge) btnMerge.disabled = !hasIncluded;
-        if (btnSplit) btnSplit.disabled = !hasIncluded;
-        if (btnCompress) btnCompress.disabled = !hasIncluded;
-        if (btnJpgToPdf) btnJpgToPdf.disabled = !includedPages().some((p) => p.kind === 'image');
-        if (btnPdfToJpg) btnPdfToJpg.disabled = !includedPages().some((p) => p.kind !== 'image');
-        if (btnWordToPdf) btnWordToPdf.disabled = !includedPages().some((p) => p.origin === 'docx');
+        if (btnDownloadCurrent) btnDownloadCurrent.disabled = !hasIncluded;
+        [btnMerge, btnMergeDownload, btnSplit, btnSplitDownload, btnCompress, btnCompressDownload].forEach((btn) => {
+            if (btn) btn.disabled = !hasIncluded;
+        });
+        if (btnJpgToPdf) btnJpgToPdf.disabled = !hasImages;
+        if (btnJpgToPdfDownload) btnJpgToPdfDownload.disabled = !hasImages;
+        if (btnPdfToJpg) btnPdfToJpg.disabled = !hasPdfPages;
+        if (btnPdfToJpgDownload) btnPdfToJpgDownload.disabled = !hasPdfPages;
+        if (btnWordToPdf) btnWordToPdf.disabled = !hasDocx;
+        if (btnWordToPdfDownload) btnWordToPdfDownload.disabled = !hasDocx;
         updateExtractButton();
         updateSplitSummary();
+    }
+
+    function showBayBanner(message) {
+        if (!bayBanner) return;
+        bayBanner.textContent = message || 'Bay updated — run another tool or Download.';
+        bayBanner.classList.remove('hidden');
+    }
+
+    function formatBytes(n) {
+        if (!n && n !== 0) return '—';
+        if (n < 1024) return `${n} B`;
+        if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+        return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+    }
+
+    function setBayView(view) {
+        bayView = view === 'table' ? 'table' : 'thumbs';
+        const thumbsOn = bayView === 'thumbs';
+        pageGrid.classList.toggle('hidden', !thumbsOn);
+        fileTableWrap?.classList.toggle('hidden', thumbsOn);
+        viewThumbsBtn?.classList.toggle('bg-slate-800', thumbsOn);
+        viewThumbsBtn?.classList.toggle('text-white', thumbsOn);
+        viewThumbsBtn?.classList.toggle('text-slate-600', !thumbsOn);
+        viewTableBtn?.classList.toggle('bg-slate-800', !thumbsOn);
+        viewTableBtn?.classList.toggle('text-white', !thumbsOn);
+        viewTableBtn?.classList.toggle('text-slate-600', thumbsOn);
+        viewTableBtn?.classList.toggle('dark:text-slate-300', thumbsOn);
+        viewThumbsBtn?.classList.toggle('dark:text-slate-300', !thumbsOn);
+        renderPages();
+    }
+
+    function renderFileTable() {
+        if (!fileTableBody) return;
+        fileTableBody.innerHTML = '';
+        if (!files.length) {
+            const row = document.createElement('tr');
+            row.innerHTML = `<td colspan="5" class="px-4 py-12 text-center text-slate-400 dark:text-slate-500">No files in the Holding Bay.</td>`;
+            fileTableBody.appendChild(row);
+            return;
+        }
+        files.forEach((f) => {
+            const filePages = pages.filter((p) => p.fileId === f.id);
+            const included = filePages.length > 0 && filePages.every((p) => p.included);
+            const row = document.createElement('tr');
+            row.className = 'hover:bg-slate-50 dark:hover:bg-slate-900/40';
+            row.innerHTML = `
+                <td class="px-4 py-3 text-center">
+                    <input type="checkbox" class="file-include rounded border-slate-300 text-blue-600" data-file-id="${f.id}" ${included ? 'checked' : ''}>
+                </td>
+                <td class="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">${escapeHtml(f.file.name)}</td>
+                <td class="px-4 py-3">${escapeHtml(f.status)}</td>
+                <td class="px-4 py-3">${escapeHtml(f.detectedDate || '—')}</td>
+                <td class="px-4 py-3 text-center">
+                    <button type="button" class="file-download text-slate-400 hover:text-blue-500 mr-2" data-file-id="${f.id}" title="Download with current rotations">
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                    </button>
+                    <button type="button" class="file-remove text-slate-400 hover:text-rose-500" data-file-id="${f.id}" title="Remove file">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </td>
+            `;
+            fileTableBody.appendChild(row);
+        });
+        fileTableBody.querySelectorAll('.file-include').forEach((cb) => {
+            cb.addEventListener('change', () => {
+                const fileId = cb.getAttribute('data-file-id');
+                pages.forEach((p) => {
+                    if (p.fileId === fileId) p.included = cb.checked;
+                });
+                renderPages();
+            });
+        });
+        fileTableBody.querySelectorAll('.file-remove').forEach((btn) => {
+            btn.addEventListener('click', () => removeFile(btn.getAttribute('data-file-id')));
+        });
+        fileTableBody.querySelectorAll('.file-download').forEach((btn) => {
+            btn.addEventListener('click', () => downloadFileFromBay(btn.getAttribute('data-file-id')));
+        });
     }
 
     function renderFileStrip() {
@@ -190,11 +289,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300'
                     : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200';
             return `
-                <div class="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs max-w-full">
+                <div class="file-chip flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs max-w-full cursor-move" draggable="true" data-file-id="${f.id}">
                     <span class="font-medium truncate max-w-[10rem]" title="${escapeHtml(f.file.name)}">${escapeHtml(f.file.name)}</span>
                     <span class="px-1.5 py-0.5 rounded ${status}">${escapeHtml(f.status)}</span>
                     ${f.detectedDate ? `<span class="text-slate-500">${escapeHtml(f.detectedDate)}</span>` : ''}
-                    <button type="button" class="file-download text-slate-400 hover:text-blue-500" data-file-id="${f.id}" title="Download">
+                    <button type="button" class="file-download text-slate-400 hover:text-blue-500" data-file-id="${f.id}" title="Download with current rotations">
                         <i data-lucide="download" class="w-3.5 h-3.5"></i>
                     </button>
                     <button type="button" class="file-remove text-slate-400 hover:text-rose-500" data-file-id="${f.id}" title="Remove file">
@@ -204,17 +303,56 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
 
         fileStrip.querySelectorAll('.file-remove').forEach((btn) => {
-            btn.addEventListener('click', () => removeFile(btn.getAttribute('data-file-id')));
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeFile(btn.getAttribute('data-file-id'));
+            });
         });
         fileStrip.querySelectorAll('.file-download').forEach((btn) => {
-            btn.addEventListener('click', () => {
-                const fileObj = files.find((f) => f.id === btn.getAttribute('data-file-id'));
-                if (!fileObj?.bytes) return;
-                const mime = fileObj.kind === 'image' ? (fileObj.mime || 'image/jpeg') : 'application/pdf';
-                downloadBytes(fileObj.bytes, fileObj.file.name, mime);
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                downloadFileFromBay(btn.getAttribute('data-file-id'));
+            });
+        });
+
+        let draggedFileId = null;
+        fileStrip.querySelectorAll('.file-chip').forEach((chip) => {
+            chip.addEventListener('dragstart', (e) => {
+                draggedFileId = chip.getAttribute('data-file-id');
+                chip.classList.add('opacity-50');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', draggedFileId);
+            });
+            chip.addEventListener('dragend', () => {
+                chip.classList.remove('opacity-50');
+                draggedFileId = null;
+            });
+            chip.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                chip.classList.add('ring-2', 'ring-blue-500');
+            });
+            chip.addEventListener('dragleave', () => {
+                chip.classList.remove('ring-2', 'ring-blue-500');
+            });
+            chip.addEventListener('drop', (e) => {
+                e.preventDefault();
+                chip.classList.remove('ring-2', 'ring-blue-500');
+                const dropId = chip.getAttribute('data-file-id');
+                if (!draggedFileId || draggedFileId === dropId) return;
+                reorderFiles(draggedFileId, dropId);
             });
         });
         refreshIcons();
+    }
+
+    function reorderFiles(fromId, toId) {
+        const fromIdx = files.findIndex((f) => f.id === fromId);
+        const toIdx = files.findIndex((f) => f.id === toId);
+        if (fromIdx < 0 || toIdx < 0) return;
+        const [item] = files.splice(fromIdx, 1);
+        files.splice(toIdx, 0, item);
+        pages = files.flatMap((f) => pages.filter((p) => p.fileId === f.id));
+        renderPages();
     }
 
     function renderPages() {
@@ -227,6 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateSelectAllState();
             toggleActionButtons();
             renderFileStrip();
+            renderFileTable();
             return;
         }
 
@@ -240,18 +379,22 @@ document.addEventListener('DOMContentLoaded', () => {
             card.className = 'page-card relative bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl p-2 cursor-move hover:border-blue-400 transition-colors';
             card.draggable = true;
             card.dataset.index = String(index);
+            const rotation = page.rotation || 0;
             card.innerHTML = `
                 <input type="checkbox" class="page-include absolute top-3 left-3 z-10 w-4 h-4 rounded border-slate-300 text-blue-600" ${page.included ? 'checked' : ''} title="Include in export">
-                <button type="button" class="page-rotate absolute top-2 right-2 z-10 p-1.5 rounded-full bg-white/90 dark:bg-slate-800 shadow-sm text-slate-600 hover:text-blue-600" title="Rotate">
-                    <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+                <button type="button" class="page-rotate absolute top-2 right-2 z-10 px-2 py-1 rounded-full bg-white/90 dark:bg-slate-800 shadow-sm text-slate-600 hover:text-blue-600 text-[10px] font-bold" title="Rotate 90°">
+                    <i data-lucide="rotate-cw" class="w-3.5 h-3.5 inline"></i> ${rotation}°
                 </button>
                 <div class="aspect-[3/4] bg-white dark:bg-slate-800 rounded-lg overflow-hidden flex items-center justify-center mt-6 mb-2">
                     ${page.thumbUrl
-                        ? `<img src="${page.thumbUrl}" alt="" class="max-h-full max-w-full object-contain" style="transform: rotate(${page.rotation || 0}deg)">`
+                        ? `<img src="${page.thumbUrl}" alt="" class="max-h-full max-w-full object-contain" style="transform: rotate(${rotation}deg)">`
                         : `<span class="text-[10px] text-slate-400">Loading…</span>`}
                 </div>
-                <p class="text-[10px] font-medium text-slate-700 dark:text-slate-200 truncate" title="${escapeHtml(fileObj?.file.name || '')}">${escapeHtml(fileObj?.file.name || '')}</p>
+                <p class="text-[10px] font-medium text-slate-700 dark:text-slate-200 truncate pr-6" title="${escapeHtml(fileObj?.file.name || '')}">${escapeHtml(fileObj?.file.name || '')}</p>
                 <p class="text-[10px] text-slate-400">Page ${page.pageIndex + 1}</p>
+                <button type="button" class="page-remove absolute bottom-2 right-2 z-10 w-6 h-6 rounded-full bg-white dark:bg-slate-800 shadow border border-slate-200 dark:border-slate-600 text-slate-400 hover:text-rose-500 hover:border-rose-300" title="Remove this page from the bay">
+                    <i data-lucide="x" class="w-3.5 h-3.5 mx-auto"></i>
+                </button>
             `;
             pageGrid.appendChild(card);
         });
@@ -260,6 +403,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateSelectAllState();
         toggleActionButtons();
         renderFileStrip();
+        renderFileTable();
         refreshIcons();
     }
 
@@ -281,6 +425,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 const idx = Number(e.currentTarget.closest('.page-card').dataset.index);
                 pages[idx].rotation = ((pages[idx].rotation || 0) + 90) % 360;
                 renderPages();
+            });
+        });
+
+        pageGrid.querySelectorAll('.page-remove').forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const idx = Number(e.currentTarget.closest('.page-card').dataset.index);
+                removePage(idx);
             });
         });
 
@@ -315,10 +468,53 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function removePage(index) {
+        const page = pages[index];
+        if (!page) return;
+        pages.splice(index, 1);
+        if (!pages.some((p) => p.fileId === page.fileId)) {
+            files = files.filter((f) => f.id !== page.fileId);
+        }
+        renderPages();
+    }
+
     function removeFile(fileId) {
         pages = pages.filter((p) => p.fileId !== fileId);
         files = files.filter((f) => f.id !== fileId);
         renderPages();
+    }
+
+    async function downloadFileFromBay(fileId) {
+        const fileObj = files.find((f) => f.id === fileId);
+        if (!fileObj) return;
+        const filePages = pages.filter((p) => p.fileId === fileId && p.included);
+        if (!filePages.length) {
+            const mime = fileObj.kind === 'image' ? (fileObj.mime || 'image/jpeg') : 'application/pdf';
+            downloadBytes(fileObj.bytes, fileObj.file.name, mime);
+            return;
+        }
+        await readyPdfEngine();
+        const rebuilt = await buildPdfFromPages(pageSpecs(filePages), passwords());
+        if (!rebuilt.success) {
+            alert(`Download failed: ${rebuilt.error}`);
+            return;
+        }
+        downloadBytes(rebuilt.bytes, fileObj.file.name.replace(/(\.pdf)?$/i, '') + '.pdf', 'application/pdf');
+    }
+
+    async function replaceBayWithOutput(namedFiles) {
+        files = [];
+        pages = [];
+        renderPages();
+        for (const entry of namedFiles) {
+            const mime = entry.mime || 'application/pdf';
+            const file = new File([entry.bytes], entry.name, { type: mime });
+            const kind = classifyFile(file) || (mime.startsWith('image/') ? 'image' : 'pdf');
+            if (kind === 'image') await addImageFile(file, entry.bytes);
+            else await addPdfFile(file, entry.bytes, 'pdf');
+        }
+        showBayBanner('Bay updated — run another tool or Download.');
+        setHeaderStatus('BAY UPDATED', 'ok');
     }
 
     async function addPdfFile(file, bytes, origin = 'pdf') {
@@ -463,11 +659,14 @@ document.addEventListener('DOMContentLoaded', () => {
         renderPages();
     });
 
+    viewThumbsBtn?.addEventListener('click', () => setBayView('thumbs'));
+    viewTableBtn?.addEventListener('click', () => setBayView('table'));
+
     const toolMeta = {
-        merge: { title: 'Merge PDF', hint: 'Included pages are combined in the current grid order.' },
-        split: { title: 'Split PDF', hint: 'Split the included page sequence using custom ranges or a fixed length.' },
-        compress: { title: 'Compress PDF', hint: 'Rebuild included pages as compressed JPEGs in a smaller PDF.' },
-        convert: { title: 'Convert', hint: 'JPG ↔ PDF and Word → PDF. Word layout is approximate in the browser.' },
+        merge: { title: 'Merge PDF', hint: 'Merge included pages into the bay (then split or compress), or Download a copy.' },
+        split: { title: 'Split PDF', hint: 'Split stays in the bay as new files. Download saves a PDF or zip.' },
+        compress: { title: 'Compress PDF', hint: 'Compress into the bay if smaller. Download saves a copy.' },
+        convert: { title: 'Convert', hint: 'Left button applies into the bay. Download saves without replacing.' },
     };
 
     function setActiveTool(tool) {
@@ -618,6 +817,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             });
             renderPages();
+            showBayBanner('Unlocked files are in the bay — split, compress, or download next.');
         });
     });
 
@@ -652,25 +852,31 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    btnMerge.addEventListener('click', async () => {
+    async function runMerge(mode) {
         const selected = includedPages();
         if (!selected.length) return alert('No pages selected to merge.');
-        await withBusyButton(btnMerge, 'Merging...', async () => {
+        const button = mode === 'download' ? btnMergeDownload : btnMerge;
+        await withBusyButton(button, 'Merging...', async () => {
             await readyPdfEngine();
             const result = await buildPdfFromPages(pageSpecs(selected), passwords());
             if (!result.success) {
                 alert(`Merge failed: ${result.error}`);
                 return;
             }
-            downloadBytes(result.bytes, `Merged_History_${Date.now()}.pdf`, 'application/pdf');
-            alert('Merge complete. File downloaded.');
+            const name = `Merged_History_${Date.now()}.pdf`;
+            if (mode === 'download') {
+                downloadBytes(result.bytes, name, 'application/pdf');
+                return;
+            }
+            await replaceBayWithOutput([{ name, bytes: result.bytes, mime: 'application/pdf' }]);
         });
-    });
+    }
 
-    btnSplit.addEventListener('click', async () => {
+    async function runSplit(mode) {
         const selected = includedPages();
         if (!selected.length) return alert('Include at least one page to split.');
-        await withBusyButton(btnSplit, 'Splitting...', async () => {
+        const button = mode === 'download' ? btnSplitDownload : btnSplit;
+        await withBusyButton(button, 'Splitting...', async () => {
             const ranges = splitMode === 'fixed'
                 ? fixedLengthRanges(selected.length, document.getElementById('split-fixed-length').value)
                 : splitRangesFromUi();
@@ -679,72 +885,166 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert(`Split failed: ${result.error}`);
                 return;
             }
-            if (result.files.length === 1) {
-                downloadBytes(result.files[0].bytes, result.files[0].name, 'application/pdf');
-            } else {
-                const zip = await zipFiles(result.files);
-                downloadBlob(zip, `split_${Date.now()}.zip`);
+            if (mode === 'download') {
+                if (result.files.length === 1) {
+                    downloadBytes(result.files[0].bytes, result.files[0].name, 'application/pdf');
+                } else {
+                    const zip = await zipFiles(result.files);
+                    downloadBlob(zip, `split_${Date.now()}.zip`);
+                }
+                return;
             }
-            alert('Split complete.');
+            await replaceBayWithOutput(result.files.map((f) => ({
+                name: f.name,
+                bytes: f.bytes,
+                mime: 'application/pdf',
+            })));
         });
-    });
+    }
 
-    btnCompress.addEventListener('click', async () => {
+    function sourceBytesForPages(selected) {
+        const seen = new Set();
+        let total = 0;
+        selected.forEach((p) => {
+            if (seen.has(p.fileId)) return;
+            seen.add(p.fileId);
+            const fileObj = files.find((f) => f.id === p.fileId);
+            total += fileObj?.bytes?.length || 0;
+        });
+        return total;
+    }
+
+    async function runCompress(mode) {
         const selected = includedPages();
         if (!selected.length) return alert('Include at least one page to compress.');
-        await withBusyButton(btnCompress, 'Compressing...', async () => {
+        const button = mode === 'download' ? btnCompressDownload : btnCompress;
+        await withBusyButton(button, 'Compressing...', async () => {
+            await readyPdfEngine();
+            const lossless = await buildPdfFromPages(pageSpecs(selected), passwords());
+            if (!lossless.success) {
+                alert(`Compress failed: ${lossless.error}`);
+                return;
+            }
             const quality = Number(document.getElementById('compress-quality').value) / 100;
-            const result = await compressPages(pageSpecs(selected), { quality, passwordsStr: passwords() });
+            const sourceBytes = lossless.bytes.length || sourceBytesForPages(selected);
+            const result = await compressPages(pageSpecs(selected), {
+                quality,
+                passwordsStr: passwords(),
+                sourceBytes,
+            });
             if (!result.success) {
                 alert(`Compress failed: ${result.error}`);
                 return;
             }
-            downloadBytes(result.bytes, `compressed_${Date.now()}.pdf`, 'application/pdf');
-            alert('Compress complete.');
+            const keptOriginal = result.keptOriginal || !result.bytes;
+            const outBytes = keptOriginal ? lossless.bytes : result.bytes;
+            const outName = keptOriginal
+                ? `original_${Date.now()}.pdf`
+                : `compressed_${Date.now()}.pdf`;
+            if (compressReadout) {
+                compressReadout.classList.remove('hidden');
+                const rasterKb = result.compressedBytes || outBytes.length;
+                compressReadout.textContent = keptOriginal
+                    ? `${formatBytes(sourceBytes)} → ${formatBytes(sourceBytes)} (kept original; rasterizing would be ${formatBytes(rasterKb)})`
+                    : `${formatBytes(sourceBytes)} → ${formatBytes(outBytes.length)}`;
+            }
+            if (mode === 'download') {
+                downloadBytes(outBytes, outName, 'application/pdf');
+                return;
+            }
+            await replaceBayWithOutput([{ name: outName, bytes: outBytes, mime: 'application/pdf' }]);
         });
-    });
+    }
 
-    btnJpgToPdf.addEventListener('click', async () => {
+    async function runJpgToPdf(mode) {
         const selected = includedPages().filter((p) => p.kind === 'image');
         if (!selected.length) return alert('Include at least one JPG/PNG page.');
-        await withBusyButton(btnJpgToPdf, 'Converting...', async () => {
+        const button = mode === 'download' ? btnJpgToPdfDownload : btnJpgToPdf;
+        await withBusyButton(button, 'Converting...', async () => {
             const result = await imagesToPdf(pageSpecs(selected));
             if (!result.success) {
                 alert(`JPG to PDF failed: ${result.error}`);
                 return;
             }
-            downloadBytes(result.bytes, `images_${Date.now()}.pdf`, 'application/pdf');
+            const name = `images_${Date.now()}.pdf`;
+            if (mode === 'download') {
+                downloadBytes(result.bytes, name, 'application/pdf');
+                return;
+            }
+            await replaceBayWithOutput([{ name, bytes: result.bytes, mime: 'application/pdf' }]);
         });
-    });
+    }
 
-    btnPdfToJpg.addEventListener('click', async () => {
+    async function runPdfToJpg(mode) {
         const selected = includedPages().filter((p) => p.kind !== 'image');
         if (!selected.length) return alert('Include at least one PDF page.');
-        await withBusyButton(btnPdfToJpg, 'Exporting...', async () => {
+        const button = mode === 'download' ? btnPdfToJpgDownload : btnPdfToJpg;
+        await withBusyButton(button, 'Exporting...', async () => {
             const result = await pdfPagesToJpegs(pageSpecs(selected), { passwordsStr: passwords() });
             if (!result.success) {
                 alert(`PDF to JPG failed: ${result.error}`);
                 return;
             }
-            if (result.files.length === 1) {
-                downloadBytes(result.files[0].bytes, result.files[0].name, 'image/jpeg');
-            } else {
-                const zip = await zipFiles(result.files);
-                downloadBlob(zip, `pages_${Date.now()}.zip`);
+            if (mode === 'download') {
+                if (result.files.length === 1) {
+                    downloadBytes(result.files[0].bytes, result.files[0].name, 'image/jpeg');
+                } else {
+                    const zip = await zipFiles(result.files);
+                    downloadBlob(zip, `pages_${Date.now()}.zip`);
+                }
+                return;
             }
+            await replaceBayWithOutput(result.files.map((f) => ({
+                name: f.name,
+                bytes: f.bytes,
+                mime: 'image/jpeg',
+            })));
         });
-    });
+    }
 
-    btnWordToPdf.addEventListener('click', async () => {
+    async function runWordToPdf(mode) {
         const selected = includedPages().filter((p) => p.origin === 'docx');
         if (!selected.length) return alert('Add a .docx file first. It is converted when dropped into the bay.');
-        await withBusyButton(btnWordToPdf, 'Exporting...', async () => {
+        const button = mode === 'download' ? btnWordToPdfDownload : btnWordToPdf;
+        await withBusyButton(button, 'Exporting...', async () => {
             const result = await buildPdfFromPages(pageSpecs(selected), passwords());
             if (!result.success) {
                 alert(`Word to PDF failed: ${result.error}`);
                 return;
             }
-            downloadBytes(result.bytes, `word_${Date.now()}.pdf`, 'application/pdf');
+            const name = `word_${Date.now()}.pdf`;
+            if (mode === 'download') {
+                downloadBytes(result.bytes, name, 'application/pdf');
+                return;
+            }
+            await replaceBayWithOutput([{ name, bytes: result.bytes, mime: 'application/pdf' }]);
+        });
+    }
+
+    btnMerge.addEventListener('click', () => runMerge('apply'));
+    btnMergeDownload?.addEventListener('click', () => runMerge('download'));
+    btnSplit.addEventListener('click', () => runSplit('apply'));
+    btnSplitDownload?.addEventListener('click', () => runSplit('download'));
+    btnCompress.addEventListener('click', () => runCompress('apply'));
+    btnCompressDownload?.addEventListener('click', () => runCompress('download'));
+    btnJpgToPdf.addEventListener('click', () => runJpgToPdf('apply'));
+    btnJpgToPdfDownload?.addEventListener('click', () => runJpgToPdf('download'));
+    btnPdfToJpg.addEventListener('click', () => runPdfToJpg('apply'));
+    btnPdfToJpgDownload?.addEventListener('click', () => runPdfToJpg('download'));
+    btnWordToPdf.addEventListener('click', () => runWordToPdf('apply'));
+    btnWordToPdfDownload?.addEventListener('click', () => runWordToPdf('download'));
+
+    btnDownloadCurrent?.addEventListener('click', async () => {
+        const selected = includedPages();
+        if (!selected.length) return alert('Include at least one page.');
+        await withBusyButton(btnDownloadCurrent, 'Building...', async () => {
+            await readyPdfEngine();
+            const result = await buildPdfFromPages(pageSpecs(selected), passwords());
+            if (!result.success) {
+                alert(`Download failed: ${result.error}`);
+                return;
+            }
+            downloadBytes(result.bytes, `holding_bay_${Date.now()}.pdf`, 'application/pdf');
         });
     });
 
