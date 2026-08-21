@@ -58,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Titles Mapping ---
     const tabTitles = {
-        'pdf-manager': 'PDF Document Manager',
+        'pdf-manager': 'Document Manager',
         'dashboard': 'Trello Watcher',
         'casemaker': 'Case Maker'
     };
