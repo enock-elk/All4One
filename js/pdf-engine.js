@@ -520,50 +520,106 @@ export async function pdfPagesToJpegs(pageItems, { quality = 0.85, scale = 1.5, 
     }
 }
 
-function qualityToRenderScale(quality) {
-    const q = Math.min(0.9, Math.max(0.4, Number(quality) || 0.7));
-    return 0.45 + (q - 0.4) * 1.4;
+function clamp(n, min, max) {
+    const x = Number(n);
+    if (!Number.isFinite(x)) return min;
+    return Math.min(max, Math.max(min, x));
+}
+
+export async function renderPagePreview(item, { scale = 2, passwordsStr = '' } = {}) {
+    await ensurePdfEngine();
+    if (item.kind === 'image') {
+        const url = bytesToObjectUrl(item.bytes, item.mime || 'image/jpeg');
+        try {
+            const img = await loadImageElement(url);
+            const rot = ((item.rotation || 0) % 360 + 360) % 360;
+            const canvas = document.createElement('canvas');
+            const swap = rot === 90 || rot === 270;
+            canvas.width = swap ? img.height : img.width;
+            canvas.height = swap ? img.width : img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.rotate((rot * Math.PI) / 180);
+            ctx.drawImage(img, -img.width / 2, -img.height / 2);
+            return canvas.toDataURL('image/jpeg', 0.92);
+        } finally {
+            URL.revokeObjectURL(url);
+        }
+    }
+    const canvas = await renderPdfPageToCanvas(item.bytes, item.pageIndex, {
+        scale,
+        rotation: item.rotation || 0,
+        passwords: parsePasswords(passwordsStr),
+    });
+    return canvas.toDataURL('image/jpeg', 0.92);
 }
 
 export async function compressPages(pageItems, {
-    quality = 0.7,
-    scale,
+    quality = 0.8,
+    scale = 2,
     passwordsStr = '',
     sourceBytes = 0,
 } = {}) {
+    const pdfJsDocs = [];
     try {
         await ensurePdfEngine();
         const { PDFDocument } = window.PDFLib;
-        const jpegQuality = Math.min(0.9, Math.max(0.35, Number(quality) || 0.7));
-        let renderScale = scale ?? qualityToRenderScale(jpegQuality);
+        const jpegQuality = clamp(quality ?? 0.8, 0.4, 0.95);
+        const renderScale = clamp(scale ?? 2, 0.8, 3.5);
+        const passwords = parsePasswords(passwordsStr);
+        const out = await PDFDocument.create();
+        const docCache = new Map();
 
-        const buildRaster = async (q, sc) => {
-            const out = await PDFDocument.create();
-            const jpegResult = await pdfPagesToJpegs(pageItems, { quality: q, scale: sc, passwordsStr });
-            if (!jpegResult.success) return jpegResult;
-            for (const file of jpegResult.files) {
-                const image = await out.embedJpg(file.bytes);
-                const maxW = 595;
-                const maxH = 842;
-                const fit = Math.min(maxW / image.width, maxH / image.height, 1);
-                const w = image.width * fit;
-                const h = image.height * fit;
-                const page = out.addPage([w, h]);
-                page.drawImage(image, { x: 0, y: 0, width: w, height: h });
+        for (const item of pageItems) {
+            if (item.kind === 'image') {
+                const url = bytesToObjectUrl(item.bytes, item.mime || 'image/jpeg');
+                try {
+                    const img = await loadImageElement(url);
+                    const canvas = document.createElement('canvas');
+                    const rot = ((item.rotation || 0) % 360 + 360) % 360;
+                    const swap = rot === 90 || rot === 270;
+                    canvas.width = Math.max(1, swap ? img.height : img.width);
+                    canvas.height = Math.max(1, swap ? img.width : img.height);
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.translate(canvas.width / 2, canvas.height / 2);
+                    ctx.rotate((rot * Math.PI) / 180);
+                    ctx.drawImage(img, -img.width / 2, -img.height / 2);
+                    const jpeg = await canvasToJpegBytes(canvas, jpegQuality);
+                    const image = await out.embedJpg(jpeg);
+                    const page = out.addPage([image.width, image.height]);
+                    page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+                } finally {
+                    URL.revokeObjectURL(url);
+                }
+                continue;
             }
-            const bytes = await out.save({ useObjectStreams: true });
-            return { success: true, bytes };
-        };
 
-        let result = await buildRaster(jpegQuality, renderScale);
-        if (!result.success) return result;
-
-        if (sourceBytes && result.bytes.length >= sourceBytes && renderScale > 0.55) {
-            result = await buildRaster(Math.max(0.35, jpegQuality * 0.85), renderScale * 0.7);
-            if (!result.success) return result;
+            let pdf = docCache.get(item.fileId);
+            if (!pdf) {
+                pdf = await openPdfJs(item.bytes, passwords);
+                docCache.set(item.fileId, pdf);
+                pdfJsDocs.push(pdf);
+            }
+            const page = await pdf.getPage(item.pageIndex + 1);
+            const rotation = item.rotation || 0;
+            const baseVp = page.getViewport({ scale: 1, rotation });
+            const renderVp = page.getViewport({ scale: renderScale, rotation });
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.floor(renderVp.width));
+            canvas.height = Math.max(1, Math.floor(renderVp.height));
+            await page.render({ canvasContext: canvas.getContext('2d'), viewport: renderVp }).promise;
+            const jpeg = await canvasToJpegBytes(canvas, jpegQuality);
+            const image = await out.embedJpg(jpeg);
+            const pdfPage = out.addPage([baseVp.width, baseVp.height]);
+            pdfPage.drawImage(image, { x: 0, y: 0, width: baseVp.width, height: baseVp.height });
         }
 
-        const compressedBytes = result.bytes.length;
+        const bytes = await out.save({ useObjectStreams: true });
+        const compressedBytes = bytes.length;
         if (sourceBytes && compressedBytes >= sourceBytes) {
             return {
                 success: true,
@@ -577,7 +633,7 @@ export async function compressPages(pageItems, {
 
         return {
             success: true,
-            bytes: result.bytes,
+            bytes,
             skipped: false,
             originalBytes: sourceBytes || compressedBytes,
             compressedBytes,
@@ -585,6 +641,8 @@ export async function compressPages(pageItems, {
         };
     } catch (err) {
         return { success: false, error: err.message || String(err) };
+    } finally {
+        await Promise.all(pdfJsDocs.map((pdf) => pdf.destroy().catch(() => {})));
     }
 }
 
