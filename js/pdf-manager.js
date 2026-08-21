@@ -18,7 +18,10 @@ import {
     imagesToPdf,
     docxToPdf,
     zipFiles,
-    renderPagePreview,
+    getPageBitmap,
+    prefetchPageBitmaps,
+    clearPreviewCaches,
+    previewScaleForDisplay,
 } from './pdf-engine.js';
 
 const EXCEL_PIN = '10101';
@@ -62,12 +65,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const compressScaleLabel = document.getElementById('compress-scale-label');
     const btnUndoCompress = document.getElementById('btn-undo-compress');
     const previewModal = document.getElementById('pdf-page-preview');
+    const previewCanvas = document.getElementById('pdf-preview-canvas');
     const previewImage = document.getElementById('pdf-preview-image');
     const previewCaption = document.getElementById('pdf-preview-caption');
     const previewInclude = document.getElementById('pdf-preview-include');
     const previewCloseBtn = document.getElementById('pdf-preview-close');
     const previewPrevBtn = document.getElementById('pdf-preview-prev');
     const previewNextBtn = document.getElementById('pdf-preview-next');
+    const previewRotate = document.getElementById('pdf-preview-rotate');
+    const previewRotateLabel = document.getElementById('pdf-preview-rotate-label');
+    const previewRotate90 = document.getElementById('pdf-preview-rotate-90');
+    const previewRotateCcw = document.getElementById('pdf-preview-rotate-ccw');
+    const previewRotateCw = document.getElementById('pdf-preview-rotate-cw');
     const pickModal = document.getElementById('pdf-pick-modal');
     const pickTitle = document.getElementById('pdf-pick-title');
     const pickHint = document.getElementById('pdf-pick-hint');
@@ -98,6 +107,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let previewIndex = 0;
     let previewToken = 0;
     let previewOpen = false;
+    let previewBitmap = null;
+    let prefetchTimer = null;
     let pickResolve = null;
 
     function showToast(message) {
@@ -135,6 +146,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function passwords() {
         return passwordInput ? passwordInput.value : '';
+    }
+
+    function normalizeRotation(angle) {
+        return ((Math.round(Number(angle) || 0) % 360) + 360) % 360;
+    }
+
+    function formatRotation(angle) {
+        return `${normalizeRotation(angle)}°`;
     }
 
     function includedPages() {
@@ -228,6 +247,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function restoreBay(snap) {
         files = snap.files.map((f) => ({ ...f }));
         pages = snap.pages.map((p) => ({ ...p }));
+        previewBitmap = null;
+        clearPreviewCaches();
         renderPages();
     }
 
@@ -480,14 +501,15 @@ document.addEventListener('DOMContentLoaded', () => {
         pages.forEach((page, index) => {
             const fileObj = files.find((f) => f.id === page.fileId);
             const card = document.createElement('div');
-            card.className = 'page-card relative bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl p-2 cursor-move hover:border-blue-400 transition-colors';
+            card.className = 'page-card self-start relative bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl p-2 cursor-move hover:border-blue-400 transition-colors';
             card.draggable = true;
             card.dataset.index = String(index);
             const rotation = page.rotation || 0;
+            const rotationLabel = formatRotation(rotation);
             card.innerHTML = `
                 <input type="checkbox" class="page-include absolute top-3 left-3 z-10 w-4 h-4 rounded border-slate-300 text-blue-600" ${page.included ? 'checked' : ''} title="Include in export">
                 <button type="button" class="page-rotate absolute top-2 right-2 z-10 px-2 py-1 rounded-full bg-white/90 dark:bg-slate-800 shadow-sm text-slate-600 hover:text-blue-600 text-[10px] font-bold" title="Rotate 90°">
-                    <i data-lucide="rotate-cw" class="w-3.5 h-3.5 inline"></i> ${rotation}°
+                    <i data-lucide="rotate-cw" class="w-3.5 h-3.5 inline"></i> ${rotationLabel}
                 </button>
                 <div class="page-thumb aspect-[3/4] bg-white dark:bg-slate-800 rounded-lg overflow-hidden flex items-center justify-center mt-6 mb-2 cursor-zoom-in" title="Preview page">
                     ${page.thumbUrl
@@ -543,10 +565,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.preventDefault();
                 e.stopPropagation();
                 const idx = Number(e.currentTarget.closest('.page-card').dataset.index);
-                pages[idx].rotation = ((pages[idx].rotation || 0) + 90) % 360;
-                pages[idx].previewUrl = null;
-                renderPages();
-                if (previewOpen && previewIndex === idx) showPreviewPage(idx);
+                pages[idx].rotation = normalizeRotation((pages[idx].rotation || 0) + 90);
+                updateCardRotationDisplay(idx);
+                if (previewOpen && previewIndex === idx) {
+                    syncPreviewRotateUi(pages[idx].rotation);
+                    if (previewBitmap) drawPreviewFromBitmap(previewBitmap, pages[idx].rotation);
+                }
+                refreshIcons();
             });
         });
 
@@ -604,9 +629,78 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function drawPreviewFromBitmap(bitmap, rotation) {
+        if (!previewCanvas || !bitmap) return;
+        const rot = (normalizeRotation(rotation) * Math.PI) / 180;
+        const w = bitmap.width;
+        const h = bitmap.height;
+        const cos = Math.abs(Math.cos(rot));
+        const sin = Math.abs(Math.sin(rot));
+        const bw = Math.max(1, Math.ceil(w * cos + h * sin));
+        const bh = Math.max(1, Math.ceil(w * sin + h * cos));
+        previewCanvas.width = bw;
+        previewCanvas.height = bh;
+        const ctx = previewCanvas.getContext('2d', { alpha: false });
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, bw, bh);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.translate(bw / 2, bh / 2);
+        ctx.rotate(rot);
+        ctx.drawImage(bitmap, -w / 2, -h / 2);
+        previewCanvas.classList.remove('hidden');
+        previewImage?.classList.add('hidden');
+    }
+
+    function syncPreviewRotateUi(angle) {
+        const r = normalizeRotation(angle);
+        if (previewRotate) previewRotate.value = String(r);
+        if (previewRotateLabel) previewRotateLabel.textContent = formatRotation(r);
+    }
+
+    function updateCardRotationDisplay(index) {
+        const card = pageGrid.querySelector(`.page-card[data-index="${index}"]`);
+        const page = pages[index];
+        if (!card || !page) return;
+        const img = card.querySelector('.page-thumb img');
+        if (img) img.style.transform = `rotate(${page.rotation || 0}deg)`;
+        const btn = card.querySelector('.page-rotate');
+        if (btn) {
+            btn.innerHTML = `<i data-lucide="rotate-cw" class="w-3.5 h-3.5 inline"></i> ${formatRotation(page.rotation || 0)}`;
+        }
+    }
+
+    function setPreviewPageRotation(angle) {
+        if (!pages[previewIndex]) return;
+        pages[previewIndex].rotation = normalizeRotation(angle);
+        syncPreviewRotateUi(pages[previewIndex].rotation);
+        updateCardRotationDisplay(previewIndex);
+        if (previewBitmap) drawPreviewFromBitmap(previewBitmap, pages[previewIndex].rotation);
+        refreshIcons();
+    }
+
+    function queuePreviewPrefetch(index) {
+        clearTimeout(prefetchTimer);
+        if (!pages.length) return;
+        prefetchTimer = setTimeout(() => {
+            if (!previewOpen) return;
+            const seen = new Set([index]);
+            const neighbors = [];
+            [1, -1, 2, -2].forEach((delta) => {
+                const i = ((index + delta) % pages.length + pages.length) % pages.length;
+                if (seen.has(i)) return;
+                seen.add(i);
+                const spec = pageSpecs([pages[i]])[0];
+                if (spec?.bytes) neighbors.push(spec);
+            });
+            prefetchPageBitmaps(neighbors, { scale: previewScaleForDisplay(), passwordsStr: passwords() });
+        }, 30);
+    }
+
     function closePagePreview() {
         previewOpen = false;
         previewModal?.classList.add('hidden');
+        clearTimeout(prefetchTimer);
     }
 
     async function showPreviewPage(index) {
@@ -623,20 +717,22 @@ document.addEventListener('DOMContentLoaded', () => {
         if (previewCaption) {
             previewCaption.textContent = `${fileObj?.file.name || 'Page'} · ${idx + 1} of ${pages.length}`;
         }
-        if (previewImage) {
-            previewImage.src = page.previewUrl || page.thumbUrl || '';
-            previewImage.style.transform = page.previewUrl ? '' : `rotate(${page.rotation || 0}deg)`;
+        syncPreviewRotateUi(page.rotation || 0);
+
+        if (page.thumbUrl && previewImage && !previewBitmap) {
+            previewImage.src = page.thumbUrl;
+            previewImage.style.transform = `rotate(${page.rotation || 0}deg)`;
+            previewImage.classList.remove('hidden');
         }
+
         const specs = pageSpecs([page])[0];
         if (!specs?.bytes) return;
         try {
-            const url = page.previewUrl || await renderPagePreview(specs, { scale: 2, passwordsStr: passwords() });
+            const bitmap = await getPageBitmap(specs, { scale: previewScaleForDisplay(), passwordsStr: passwords() });
             if (token !== previewToken) return;
-            page.previewUrl = url;
-            if (previewImage) {
-                previewImage.src = url;
-                previewImage.style.transform = '';
-            }
+            previewBitmap = bitmap;
+            drawPreviewFromBitmap(bitmap, page.rotation || 0);
+            queuePreviewPrefetch(idx);
         } catch (err) {
             console.warn('Preview failed:', err);
         }
@@ -711,6 +807,8 @@ document.addEventListener('DOMContentLoaded', () => {
     async function replaceBayWithOutput(namedFiles, successLabel = 'Updated✅') {
         clearCompressUndo();
         closePagePreview();
+        previewBitmap = null;
+        clearPreviewCaches();
         files = [];
         pages = [];
         for (const entry of namedFiles) {
@@ -723,6 +821,8 @@ document.addEventListener('DOMContentLoaded', () => {
     async function replaceFilesWithOutputs(sourceIds, outputEntries, successLabel) {
         clearCompressUndo();
         closePagePreview();
+        previewBitmap = null;
+        clearPreviewCaches();
         const idSet = new Set(sourceIds);
         let insertAt = files.findIndex((f) => idSet.has(f.id));
         if (insertAt < 0) insertAt = files.length;
@@ -883,6 +983,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!confirm('Clear the holding bay?')) return;
         clearCompressUndo();
         closePagePreview();
+        previewBitmap = null;
+        clearPreviewCaches();
         files = [];
         pages = [];
         renderPages();
@@ -925,21 +1027,44 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('click', () => setActiveTool(btn.getAttribute('data-tool')));
     });
 
-    function splitRangesFromUi() {
-        return Array.from(document.querySelectorAll('.split-range-row')).map((row) => ({
-            from: Number(row.querySelector('.split-from').value) || 1,
-            to: Number(row.querySelector('.split-to').value) || 1,
-        }));
+    function splitPageCap() {
+        return Math.max(1, includedPages().length);
     }
 
-    function addSplitRange(from = 1, to = Math.max(1, includedPages().length)) {
+    function clampSplitRangeInputs() {
+        const cap = splitPageCap();
+        document.querySelectorAll('.split-from, .split-to').forEach((input) => {
+            input.min = '1';
+            input.max = String(cap);
+            if (includedPages().length) {
+                let n = Number(input.value) || 1;
+                if (n > cap) n = cap;
+                if (n < 1) n = 1;
+                input.value = String(n);
+            }
+        });
+    }
+
+    function splitRangesFromUi() {
+        const cap = splitPageCap();
+        return Array.from(document.querySelectorAll('.split-range-row')).map((row) => {
+            const from = Math.min(cap, Math.max(1, Number(row.querySelector('.split-from').value) || 1));
+            const to = Math.min(cap, Math.max(from, Number(row.querySelector('.split-to').value) || from));
+            return { from, to };
+        });
+    }
+
+    function addSplitRange(from = 1, to = splitPageCap()) {
         const wrap = document.getElementById('split-ranges');
+        const cap = splitPageCap();
+        const safeFrom = Math.min(cap, Math.max(1, from));
+        const safeTo = Math.min(cap, Math.max(safeFrom, to));
         const row = document.createElement('div');
         row.className = 'split-range-row flex items-center gap-2';
         row.innerHTML = `
-            <input type="number" min="1" class="split-from w-full px-2 py-1.5 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg" value="${from}">
+            <input type="number" min="1" max="${cap}" class="split-from w-full px-2 py-1.5 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg" value="${safeFrom}">
             <span class="text-xs text-slate-400">to</span>
-            <input type="number" min="1" class="split-to w-full px-2 py-1.5 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg" value="${to}">
+            <input type="number" min="1" max="${cap}" class="split-to w-full px-2 py-1.5 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg" value="${safeTo}">
             <button type="button" class="split-remove text-slate-400 hover:text-rose-500" title="Remove range">
                 <i data-lucide="x" class="w-4 h-4"></i>
             </button>
@@ -971,6 +1096,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         if (hint) hint.textContent = total ? `(max ${max})` : '';
+        clampSplitRangeInputs();
         if (!summary) return;
         if (splitMode === 'fixed') {
             const n = Math.max(1, Number(input?.value) || 1);
@@ -1437,6 +1563,22 @@ document.addEventListener('DOMContentLoaded', () => {
     previewInclude?.addEventListener('change', () => {
         if (!previewOpen) return;
         setPageIncluded(previewIndex, previewInclude.checked);
+    });
+    previewRotate?.addEventListener('input', () => {
+        if (!previewOpen) return;
+        setPreviewPageRotation(previewRotate.value);
+    });
+    previewRotate90?.addEventListener('click', () => {
+        if (!previewOpen) return;
+        setPreviewPageRotation((pages[previewIndex]?.rotation || 0) + 90);
+    });
+    previewRotateCcw?.addEventListener('click', () => {
+        if (!previewOpen) return;
+        setPreviewPageRotation((pages[previewIndex]?.rotation || 0) - 1);
+    });
+    previewRotateCw?.addEventListener('click', () => {
+        if (!previewOpen) return;
+        setPreviewPageRotation((pages[previewIndex]?.rotation || 0) + 1);
     });
     document.addEventListener('keydown', (e) => {
         if (pickModal && !pickModal.classList.contains('hidden')) {

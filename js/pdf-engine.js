@@ -384,6 +384,11 @@ export async function imagesToPdf(imageEntries) {
     }
 }
 
+function isCardinalAngle(angle) {
+    const r = ((Number(angle) || 0) % 360 + 360) % 360;
+    return r === 0 || r === 90 || r === 180 || r === 270;
+}
+
 export async function buildPdfFromPages(pageItems, passwordsStr = '') {
     try {
         await ensurePdfEngine();
@@ -392,14 +397,72 @@ export async function buildPdfFromPages(pageItems, passwordsStr = '') {
         const passwords = parsePasswords(passwordsStr);
         const docCache = new Map();
 
+        const addCardinalRotatedPage = (copied, angle) => {
+            const current = copied.getRotation().angle || 0;
+            copied.setRotation(degrees((((current + angle) % 360) + 360) % 360));
+            out.addPage(copied);
+        };
+
+        const addArbitraryRotatedPage = async (copied, angle) => {
+            const existing = copied.getRotation().angle || 0;
+            copied.setRotation(degrees(0));
+            const total = ((existing + angle) % 360 + 360) % 360;
+            const embedded = await out.embedPage(copied);
+            const width = embedded.width;
+            const height = embedded.height;
+            const rad = (total * Math.PI) / 180;
+            const cosA = Math.abs(Math.cos(rad));
+            const sinA = Math.abs(Math.sin(rad));
+            const bw = width * cosA + height * sinA;
+            const bh = width * sinA + height * cosA;
+            const page = out.addPage([bw, bh]);
+            const x0 = -width / 2;
+            const y0 = -height / 2;
+            const cos = Math.cos(rad);
+            const sin = Math.sin(rad);
+            page.drawPage(embedded, {
+                x: bw / 2 + x0 * cos - y0 * sin,
+                y: bh / 2 + x0 * sin + y0 * cos,
+                width,
+                height,
+                rotate: degrees(total),
+            });
+        };
+
         for (const item of pageItems) {
+            const angle = item.rotation || 0;
             if (item.kind === 'image') {
                 const image = await embedImageInPdf(out, item.bytes, item.mime);
-                const page = out.addPage([image.width, image.height]);
-                page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
-                if (item.rotation) {
-                    page.setRotation(degrees(((item.rotation % 360) + 360) % 360));
+                const width = image.width;
+                const height = image.height;
+                if (!angle) {
+                    const page = out.addPage([width, height]);
+                    page.drawImage(image, { x: 0, y: 0, width, height });
+                    continue;
                 }
+                if (isCardinalAngle(angle)) {
+                    const page = out.addPage([width, height]);
+                    page.drawImage(image, { x: 0, y: 0, width, height });
+                    page.setRotation(degrees(((angle % 360) + 360) % 360));
+                    continue;
+                }
+                const rad = (angle * Math.PI) / 180;
+                const cosA = Math.abs(Math.cos(rad));
+                const sinA = Math.abs(Math.sin(rad));
+                const bw = width * cosA + height * sinA;
+                const bh = width * sinA + height * cosA;
+                const page = out.addPage([bw, bh]);
+                const x0 = -width / 2;
+                const y0 = -height / 2;
+                const cos = Math.cos(rad);
+                const sin = Math.sin(rad);
+                page.drawImage(image, {
+                    x: bw / 2 + x0 * cos - y0 * sin,
+                    y: bh / 2 + x0 * sin + y0 * cos,
+                    width,
+                    height,
+                    rotate: degrees(((angle % 360) + 360) % 360),
+                });
                 continue;
             }
 
@@ -409,11 +472,13 @@ export async function buildPdfFromPages(pageItems, passwordsStr = '') {
                 docCache.set(item.fileId, src);
             }
             const [copied] = await out.copyPages(src, [item.pageIndex]);
-            if (item.rotation) {
-                const current = copied.getRotation().angle || 0;
-                copied.setRotation(degrees((((current + item.rotation) % 360) + 360) % 360));
+            if (!angle) {
+                out.addPage(copied);
+            } else if (isCardinalAngle(angle)) {
+                addCardinalRotatedPage(copied, angle);
+            } else {
+                await addArbitraryRotatedPage(copied, angle);
             }
-            out.addPage(copied);
         }
 
         return { success: true, bytes: await out.save({ useObjectStreams: false }) };
@@ -453,18 +518,22 @@ export async function splitPageItems(pageItems, ranges, passwordsStr = '') {
     }
 }
 
-async function renderPdfPageToCanvas(bytes, pageIndex, { scale = 1.4, rotation = 0, passwords = [] } = {}) {
-    const pdf = await openPdfJs(bytes, passwords);
+async function renderPdfPageToCanvas(bytes, pageIndex, { scale = 1.4, rotation = 0, passwords = [], pdf } = {}) {
+    const owned = !pdf;
+    const doc = pdf || await openPdfJs(bytes, passwords);
     try {
-        const page = await pdf.getPage(pageIndex + 1);
+        const page = await doc.getPage(pageIndex + 1);
         const viewport = page.getViewport({ scale, rotation });
         const canvas = document.createElement('canvas');
         canvas.width = Math.max(1, Math.floor(viewport.width));
         canvas.height = Math.max(1, Math.floor(viewport.height));
-        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+        const ctx = canvas.getContext('2d', { alpha: false });
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        await page.render({ canvasContext: ctx, viewport }).promise;
         return canvas;
     } finally {
-        await pdf.destroy();
+        if (owned) await doc.destroy();
     }
 }
 
@@ -526,34 +595,98 @@ function clamp(n, min, max) {
     return Math.min(max, Math.max(min, x));
 }
 
-export async function renderPagePreview(item, { scale = 2, passwordsStr = '' } = {}) {
+const previewPdfCache = new Map();
+const previewBitmapCache = new Map();
+const PREVIEW_BITMAP_LIMIT = 10;
+
+function previewBitmapKey(item) {
+    return `${item.fileId}:${item.pageIndex}`;
+}
+
+async function getCachedPreviewPdf(fileId, bytes, passwords) {
+    const hit = previewPdfCache.get(fileId);
+    if (hit && hit.bytes === bytes) return hit.pdf;
+    if (hit) {
+        try { await hit.pdf.destroy(); } catch (_) {}
+        previewPdfCache.delete(fileId);
+    }
+    const pdf = await openPdfJs(bytes, passwords);
+    previewPdfCache.set(fileId, { pdf, bytes });
+    return pdf;
+}
+
+function rememberBitmap(key, bitmap) {
+    if (previewBitmapCache.has(key)) {
+        try { previewBitmapCache.get(key).close?.(); } catch (_) {}
+        previewBitmapCache.delete(key);
+    }
+    previewBitmapCache.set(key, bitmap);
+    while (previewBitmapCache.size > PREVIEW_BITMAP_LIMIT) {
+        const oldest = previewBitmapCache.keys().next().value;
+        const bm = previewBitmapCache.get(oldest);
+        previewBitmapCache.delete(oldest);
+        try { bm?.close?.(); } catch (_) {}
+    }
+}
+
+export function previewScaleForDisplay() {
+    const dpr = window.devicePixelRatio || 1;
+    return clamp(1.8 * Math.max(1, dpr), 2.5, 4);
+}
+
+export async function getPageBitmap(item, { scale, passwordsStr = '' } = {}) {
+    const key = previewBitmapKey(item);
+    if (previewBitmapCache.has(key)) return previewBitmapCache.get(key);
     await ensurePdfEngine();
+    const renderScale = scale || previewScaleForDisplay();
+    let bitmap;
     if (item.kind === 'image') {
-        const url = bytesToObjectUrl(item.bytes, item.mime || 'image/jpeg');
+        const blob = new Blob([toUint8(item.bytes)], { type: item.mime || 'image/jpeg' });
+        bitmap = await createImageBitmap(blob);
+    } else {
+        const passwords = parsePasswords(passwordsStr);
+        const pdf = await getCachedPreviewPdf(item.fileId, item.bytes, passwords);
+        const canvas = await renderPdfPageToCanvas(item.bytes, item.pageIndex, {
+            scale: renderScale,
+            rotation: 0,
+            passwords,
+            pdf,
+        });
+        bitmap = await createImageBitmap(canvas);
+    }
+    rememberBitmap(key, bitmap);
+    return bitmap;
+}
+
+export async function prefetchPageBitmaps(items, opts = {}) {
+    for (const item of items) {
+        if (!item?.bytes) continue;
         try {
-            const img = await loadImageElement(url);
-            const rot = ((item.rotation || 0) % 360 + 360) % 360;
-            const canvas = document.createElement('canvas');
-            const swap = rot === 90 || rot === 270;
-            canvas.width = swap ? img.height : img.width;
-            canvas.height = swap ? img.width : img.height;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.translate(canvas.width / 2, canvas.height / 2);
-            ctx.rotate((rot * Math.PI) / 180);
-            ctx.drawImage(img, -img.width / 2, -img.height / 2);
-            return canvas.toDataURL('image/jpeg', 0.92);
-        } finally {
-            URL.revokeObjectURL(url);
+            await getPageBitmap(item, opts);
+        } catch (err) {
+            console.warn('Preview prefetch failed:', err);
         }
     }
-    const canvas = await renderPdfPageToCanvas(item.bytes, item.pageIndex, {
-        scale,
-        rotation: item.rotation || 0,
-        passwords: parsePasswords(passwordsStr),
-    });
-    return canvas.toDataURL('image/jpeg', 0.92);
+}
+
+export async function clearPreviewCaches() {
+    for (const bitmap of previewBitmapCache.values()) {
+        try { bitmap.close?.(); } catch (_) {}
+    }
+    previewBitmapCache.clear();
+    for (const hit of previewPdfCache.values()) {
+        try { await hit.pdf.destroy(); } catch (_) {}
+    }
+    previewPdfCache.clear();
+}
+
+export async function renderPagePreview(item, { scale, passwordsStr = '' } = {}) {
+    const bitmap = await getPageBitmap(item, { scale, passwordsStr });
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    canvas.getContext('2d').drawImage(bitmap, 0, 0);
+    return canvas.toDataURL('image/png');
 }
 
 export async function compressPages(pageItems, {
