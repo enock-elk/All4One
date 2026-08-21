@@ -238,11 +238,17 @@ document.addEventListener('DOMContentLoaded', () => {
         viewThumbsBtn?.classList.toggle('bg-slate-800', thumbsOn);
         viewThumbsBtn?.classList.toggle('text-white', thumbsOn);
         viewThumbsBtn?.classList.toggle('text-slate-600', !thumbsOn);
+        viewThumbsBtn?.classList.toggle('dark:text-slate-300', !thumbsOn);
+        viewThumbsBtn?.classList.toggle('hover:bg-slate-100', !thumbsOn);
+        viewThumbsBtn?.classList.toggle('dark:hover:bg-slate-700', !thumbsOn);
+        viewThumbsBtn?.setAttribute('aria-pressed', thumbsOn ? 'true' : 'false');
         viewTableBtn?.classList.toggle('bg-slate-800', !thumbsOn);
         viewTableBtn?.classList.toggle('text-white', !thumbsOn);
         viewTableBtn?.classList.toggle('text-slate-600', thumbsOn);
         viewTableBtn?.classList.toggle('dark:text-slate-300', thumbsOn);
-        viewThumbsBtn?.classList.toggle('dark:text-slate-300', !thumbsOn);
+        viewTableBtn?.classList.toggle('hover:bg-slate-100', thumbsOn);
+        viewTableBtn?.classList.toggle('dark:hover:bg-slate-700', thumbsOn);
+        viewTableBtn?.setAttribute('aria-pressed', thumbsOn ? 'false' : 'true');
         renderPages();
     }
 
@@ -682,11 +688,15 @@ document.addEventListener('DOMContentLoaded', () => {
     viewTableBtn?.addEventListener('click', () => setBayView('table'));
 
     const toolMeta = {
+        unlock: { title: 'Unlock PDF', hint: 'Try passwords against encrypted PDFs in the bay. Unlocked files stay available for the next tool.' },
         merge: { title: 'Merge PDF', hint: 'Merge included pages into the bay (then split or compress), or Download a copy.' },
         split: { title: 'Split PDF', hint: 'Split stays in the bay as new files. Download saves a PDF or zip.' },
         compress: { title: 'Compress PDF', hint: 'Compress into the bay if smaller. Download saves a copy.' },
         convert: { title: 'Convert', hint: 'Left button applies into the bay. Download saves without replacing.' },
+        extract: { title: 'Extract to Excel', hint: 'Bank Statements profile only. Included pages from each PDF are sent to the AI assembly line.' },
     };
+
+    const toolNames = ['unlock', 'merge', 'split', 'compress', 'convert', 'extract'];
 
     function setActiveTool(tool) {
         activeTool = tool;
@@ -701,7 +711,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         document.getElementById('pdf-tool-title').textContent = toolMeta[tool].title;
         document.getElementById('pdf-tool-hint').textContent = toolMeta[tool].hint;
-        ['merge', 'split', 'compress', 'convert'].forEach((name) => {
+        toolNames.forEach((name) => {
             document.getElementById(`panel-${name}`).classList.toggle('hidden', name !== tool);
         });
         refreshIcons();

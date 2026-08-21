@@ -236,61 +236,34 @@
                 <div id="tab-pdf-manager" class="tab-content block h-full w-full overflow-y-auto p-4 lg:p-6">
                     <div class="max-w-[90rem] mx-auto space-y-4 pb-16">
 
-                        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
-                            <div>
-                                <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100">Holding Bay</h2>
-                                <p class="text-sm text-slate-500 dark:text-slate-400">Preview, rotate, reorder, then Apply a tool to keep working — or Download when you are done.</p>
-                            </div>
-                            <div class="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
-                                <div class="flex rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
-                                    <button type="button" id="pdf-view-thumbs" class="px-3 py-2 text-xs font-bold bg-slate-800 text-white" title="Thumbnail preview">Thumbnails</button>
-                                    <button type="button" id="pdf-view-table" class="px-3 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" title="Unique files and dates">File table</button>
-                                </div>
-                                <div class="flex flex-col w-full sm:w-56">
-                                    <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Document Type Profile</label>
-                                    <select id="pdf-doc-type" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 outline-none">
-                                        <option value="generic">Auto-Detect / Generic</option>
-                                        <option value="bank">Bank Statements (Standard Bank)</option>
-                                        <option value="payslip">Payslips</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        <nav id="pdf-tool-strip" class="flex flex-wrap gap-2 bg-white dark:bg-slate-800 p-3 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
-                            <button type="button" data-tool="merge" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-slate-800">
+                        <nav id="pdf-tool-strip" class="flex flex-wrap items-center gap-2 bg-white dark:bg-slate-800 p-3 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+                            <button type="button" data-tool="unlock" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
+                                <i data-lucide="unlock" class="w-4 h-4"></i> Unlock PDF
+                            </button>
+                            <button type="button" data-tool="merge" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap text-white bg-slate-800">
                                 <i data-lucide="layers" class="w-4 h-4"></i> Merge PDF
                             </button>
-                            <button type="button" data-tool="split" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
+                            <button type="button" data-tool="split" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
                                 <i data-lucide="scissors" class="w-4 h-4"></i> Split PDF
                             </button>
-                            <button type="button" data-tool="compress" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
+                            <button type="button" data-tool="compress" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
                                 <i data-lucide="minimize-2" class="w-4 h-4"></i> Compress PDF
                             </button>
-                            <button type="button" data-tool="convert" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
+                            <button type="button" data-tool="convert" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
                                 <i data-lucide="refresh-cw" class="w-4 h-4"></i> Convert
                             </button>
+                            <button type="button" data-tool="extract" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
+                                <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Extract to Excel
+                            </button>
+                            <div class="flex flex-col ml-auto w-full sm:w-56 shrink-0">
+                                <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Document Type Profile</label>
+                                <select id="pdf-doc-type" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 outline-none">
+                                    <option value="generic">Auto-Detect / Generic</option>
+                                    <option value="bank">Bank Statements (Standard Bank)</option>
+                                    <option value="payslip">Payslips</option>
+                                </select>
+                            </div>
                         </nav>
-
-                        <div class="flex flex-col xl:flex-row flex-wrap gap-3 bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
-                            <div class="flex items-center gap-2 mr-auto w-full xl:w-auto">
-                                <input type="text" id="pdf-password-input" placeholder="Passwords (comma separated)" class="w-full xl:w-64 px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 dark:text-slate-200" title="Passwords to try for unlocking">
-                                <button id="btn-unlock-pdf" class="flex items-center justify-center shrink-0 gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                                    <i data-lucide="unlock" class="w-4 h-4"></i>
-                                    <span class="hidden sm:inline">Unlock</span>
-                                </button>
-                            </div>
-                            <div class="flex flex-wrap items-center gap-2 w-full xl:w-auto">
-                                <button id="btn-scan-pdf" class="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                                    <i data-lucide="calendar-search" class="w-4 h-4"></i>
-                                    <span>Scan Dates & Sort</span>
-                                </button>
-                                <button id="btn-extract-excel" class="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed" title="Requires Bank Statements profile and PIN" disabled>
-                                    <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
-                                    <span>Extract to Excel (AI)</span>
-                                </button>
-                            </div>
-                        </div>
 
                         <div class="flex flex-col xl:flex-row gap-4 items-start">
                             <div class="flex-1 min-w-0 space-y-4 w-full">
@@ -306,14 +279,28 @@
 
                                 <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
                                     <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3">
-                                        <label class="flex items-center gap-2 text-xs font-medium text-slate-500">
-                                            <input type="checkbox" id="pdf-select-all" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" disabled>
-                                            Include all pages
-                                        </label>
+                                        <div class="flex items-center gap-2">
+                                            <button id="btn-scan-pdf" class="flex items-center justify-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed" title="Scan dates and sort files">
+                                                <i data-lucide="calendar-search" class="w-4 h-4"></i>
+                                                <span>Scan Dates &amp; Sort</span>
+                                            </button>
+                                            <div class="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden" role="group" aria-label="Preview layout">
+                                                <button type="button" id="pdf-view-thumbs" class="p-1.5 bg-slate-800 text-white" title="Thumbnails" aria-pressed="true">
+                                                    <i data-lucide="layout-grid" class="w-4 h-4"></i>
+                                                </button>
+                                                <button type="button" id="pdf-view-table" class="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" title="File table" aria-pressed="false">
+                                                    <i data-lucide="table" class="w-4 h-4"></i>
+                                                </button>
+                                            </div>
+                                        </div>
                                         <span id="pdf-stats-count" class="text-xs text-slate-500">0 pages</span>
-                                        <div class="flex items-center gap-3">
-                                            <button id="btn-download-current" class="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed" disabled title="Build a PDF from included pages and rotations">Download current</button>
+                                        <div class="flex items-center gap-3 ml-auto">
                                             <button id="btn-clear-bay" class="text-xs text-rose-500 hover:text-rose-600 font-medium disabled:opacity-50 disabled:cursor-not-allowed" disabled>Clear Bay</button>
+                                            <label class="flex items-center gap-2 text-xs font-medium text-slate-500">
+                                                <input type="checkbox" id="pdf-select-all" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" disabled>
+                                                Include all pages
+                                            </label>
+                                            <button id="btn-download-current" class="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed" disabled title="Build a PDF from included pages and rotations">Download current</button>
                                         </div>
                                     </div>
                                     <p id="pdf-bay-banner" class="hidden px-4 py-2 text-xs bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-b border-emerald-100 dark:border-emerald-800"></p>
@@ -345,6 +332,15 @@
                                 <div>
                                     <h3 id="pdf-tool-title" class="text-lg font-bold text-slate-800 dark:text-slate-100">Merge PDF</h3>
                                     <p id="pdf-tool-hint" class="text-sm text-slate-500 dark:text-slate-400 mt-1">Merge included pages into the bay (then split or compress), or Download a copy.</p>
+                                </div>
+
+                                <div id="panel-unlock" class="hidden space-y-3">
+                                    <p class="text-xs text-slate-500 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-xl p-3">Enter one or more passwords to try. Unlocked files stay in the bay so you can merge, split, or compress next.</p>
+                                    <input type="text" id="pdf-password-input" placeholder="Passwords (comma separated)" class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 dark:text-slate-200" title="Passwords to try for unlocking">
+                                    <button id="btn-unlock-pdf" class="w-full flex items-center justify-center gap-2 px-3 py-3 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed">
+                                        <i data-lucide="unlock" class="w-4 h-4"></i>
+                                        <span>Unlock</span>
+                                    </button>
                                 </div>
 
                                 <div id="panel-merge" class="space-y-3">
@@ -418,6 +414,14 @@
                                         <button id="btn-word-to-pdf-download" class="flex items-center justify-center gap-2 px-3 py-3 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-xl disabled:opacity-50">Download</button>
                                     </div>
                                     <p class="text-xs text-slate-500 pt-1">The left button applies the conversion into the Holding Bay. Download saves a copy without replacing the bay. Word layout is approximate.</p>
+                                </div>
+
+                                <div id="panel-extract" class="hidden space-y-3">
+                                    <p class="text-xs text-slate-500 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-xl p-3">Choose Document Type Profile: Bank Statements. A PIN is required. Included pages from each PDF are sent to the assembly line.</p>
+                                    <button id="btn-extract-excel" class="w-full flex items-center justify-center gap-2 px-3 py-3 bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed" title="Requires Bank Statements profile and PIN" disabled>
+                                        <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                                        <span>Extract to Excel (AI)</span>
+                                    </button>
                                 </div>
                             </aside>
                         </div>
