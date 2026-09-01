@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { registerReactTabs } from './react/mount.jsx';
-import { getDefaultTab, initWorkspacePrefs } from './ui-prefs.js';
+import { getDefaultTab, initWorkspacePrefs, onWorkspaceTabActivated, expandSidebar } from './ui-prefs.js';
 import './pdf-manager.js';
 import './trello.js';
 
@@ -178,12 +178,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Notify React island modules to lazy-mount on first visit
         document.dispatchEvent(new CustomEvent('tab-activated', { detail: targetTabId }));
+        onWorkspaceTabActivated(targetTabId);
     }
 
     // Attach click listeners to all sidebar tab buttons
         tabButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 const targetTab = btn.getAttribute('data-tab');
+                expandSidebar();
                 if (targetTab !== 'dashboard' && typeof window.exitTrelloWatcherFullscreen === 'function') {
                     window.exitTrelloWatcherFullscreen();
                 }

@@ -22,7 +22,9 @@ async function mountAffidavit() {
 export function registerReactTabs() {
     document.addEventListener('tab-activated', (e) => {
         const tab = e.detail;
-        if (tab === 'emails') void mountEmail();
-        if (tab === 'affidavits') void mountAffidavit();
+        requestAnimationFrame(() => {
+            if (tab === 'emails') void mountEmail();
+            if (tab === 'affidavits') void mountAffidavit();
+        });
     });
 }

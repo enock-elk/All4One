@@ -4,6 +4,7 @@
 
 import { createTrelloWatcher } from './trello-poller.js';
 import { showActionToast, showAppToast } from './ui-prefs.js';
+import { createBoardPip } from './trello-board-pip.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const API_KEY = '4a2f87929257d1557d800be137588c07';
@@ -73,15 +74,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const volumeHud = document.getElementById('trello-volume-hud');
     const modeWake = document.getElementById('trello-mode-wake');
     const modeNotify = document.getElementById('trello-mode-notify');
-    const floatPanel = document.getElementById('trello-float-panel');
-    const floatGrid = document.getElementById('trello-float-grid');
-    const floatTotal = document.getElementById('trello-float-total');
-    const floatDragHandle = document.getElementById('trello-float-drag-handle');
-    const floatGotoBtn = document.getElementById('trello-float-goto');
-    const floatMinimizeBtn = document.getElementById('trello-float-minimize');
     const btnFloatOpen = document.getElementById('btn-trello-float-open');
 
     let latestBuckets = [];
+    const boardPip = createBoardPip({
+        escapeHtml,
+        onFocusApp: () => {
+            if (typeof window.activateWorkspaceTab === 'function') {
+                window.activateWorkspaceTab('dashboard');
+            }
+            window.focus();
+        },
+        onClose: () => localStorage.setItem(PREF_FLOAT_POPUP, 'false'),
+    });
 
     let worker = null;
     let mainWatcher = null;
@@ -436,105 +441,41 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="trello-bucket-name">${escapeHtml(b.name)}</div>
             </div>
         `).join('');
-        renderFloatGrid(buckets);
+        latestBuckets = buckets || [];
     }
 
-    function renderFloatGrid(buckets) {
+    function syncBoardPip(buckets) {
         latestBuckets = buckets || [];
-        if (!floatGrid) return;
-        if (!latestBuckets.length) {
-            floatGrid.innerHTML = '<div class="trello-float-empty">No lists selected yet.</div>';
-            if (floatTotal) floatTotal.textContent = '0';
+        if (boardPip.isOpen()) boardPip.render(latestBuckets);
+    }
+
+    async function showBoardPip() {
+        const result = await boardPip.open(latestBuckets);
+        if (result === 'blocked') {
+            showAppToast('Popup blocked — allow pop-ups for this site, then try again.');
             return;
         }
-        const total = latestBuckets.reduce((sum, b) => sum + (Number(b.count) || 0), 0);
-        if (floatTotal) floatTotal.textContent = String(total);
-        floatGrid.innerHTML = latestBuckets.map((bucket) => {
-            const cards = Array.isArray(bucket.cards) ? bucket.cards : [];
-            const cardItems = cards.length
-                ? cards.map((name) => `<li class="trello-float-card" title="${escapeHtml(name)}">${escapeHtml(name)}</li>`).join('')
-                : '<li class="trello-float-empty">No active cases</li>';
-            return `
-                <div class="trello-float-column">
-                    <div class="trello-float-column-header">
-                        ${escapeHtml(bucket.name)}
-                        <span class="trello-float-column-count">${escapeHtml(String(bucket.count ?? cards.length))}</span>
-                    </div>
-                    <ul class="trello-float-cards custom-scroll">${cardItems}</ul>
-                </div>
-            `;
-        }).join('');
-    }
-
-    function showFloatPanel() {
-        if (!floatPanel) return;
-        floatPanel.classList.remove('is-hidden');
         localStorage.setItem(PREF_FLOAT_POPUP, 'true');
-        renderFloatGrid(latestBuckets);
     }
 
-    function hideFloatPanel() {
-        floatPanel?.classList.add('is-hidden');
-        localStorage.setItem(PREF_FLOAT_POPUP, 'false');
+    function hideBoardPip() {
+        boardPip.close();
     }
 
     function promptFloatPopup() {
         showActionToast({
-            message: 'Trello Watcher is running. Open the live board popup to see buckets and cases while you work in other tools?',
-            primaryLabel: 'Open popup',
+            message: 'Open a floating Trello board window? It stays on top and can be moved outside All4One (like YouTube PiP).',
+            primaryLabel: 'Open board',
             secondaryLabel: 'Not now',
-            onPrimary: () => showFloatPanel(),
+            onPrimary: () => { void showBoardPip(); },
             onSecondary: () => {
                 localStorage.setItem(PREF_FLOAT_POPUP, 'false');
-                showAppToast('You can open the board popup from Trello Watcher anytime.');
+                showAppToast('Re-open anytime from the Board button on Trello Watcher.');
             },
         });
     }
 
-    function initFloatPanelDrag() {
-        if (!floatPanel || !floatDragHandle) return;
-        let dragging = false;
-        let offsetX = 0;
-        let offsetY = 0;
-
-        floatDragHandle.addEventListener('mousedown', (e) => {
-            if (e.target.closest('button')) return;
-            dragging = true;
-            const rect = floatPanel.getBoundingClientRect();
-            offsetX = e.clientX - rect.left;
-            offsetY = e.clientY - rect.top;
-            floatPanel.style.right = 'auto';
-            floatPanel.style.bottom = 'auto';
-            floatPanel.style.left = `${rect.left}px`;
-            floatPanel.style.top = `${rect.top}px`;
-            document.body.style.userSelect = 'none';
-        });
-
-        document.addEventListener('mousemove', (e) => {
-            if (!dragging) return;
-            const maxX = window.innerWidth - floatPanel.offsetWidth - 8;
-            const maxY = window.innerHeight - floatPanel.offsetHeight - 8;
-            const nextX = Math.max(8, Math.min(e.clientX - offsetX, maxX));
-            const nextY = Math.max(8, Math.min(e.clientY - offsetY, maxY));
-            floatPanel.style.left = `${nextX}px`;
-            floatPanel.style.top = `${nextY}px`;
-        });
-
-        document.addEventListener('mouseup', () => {
-            if (!dragging) return;
-            dragging = false;
-            document.body.style.userSelect = '';
-        });
-    }
-
-    floatGotoBtn?.addEventListener('click', () => {
-        if (typeof window.activateWorkspaceTab === 'function') {
-            window.activateWorkspaceTab('dashboard');
-        }
-    });
-    floatMinimizeBtn?.addEventListener('click', hideFloatPanel);
-    btnFloatOpen?.addEventListener('click', showFloatPanel);
-    initFloatPanelDrag();
+    btnFloatOpen?.addEventListener('click', () => { void showBoardPip(); });
 
     async function fetchLists(boardId) {
         if (!boardId) {
@@ -627,7 +568,7 @@ document.addEventListener('DOMContentLoaded', () => {
         monitorSection?.classList.add('hidden');
         parkLog(logHome);
         renderBucketGrid([]);
-        hideFloatPanel();
+        hideBoardPip();
         addLog('Disconnected from Trello.', 'error');
     }
 
@@ -646,7 +587,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             case 'stats':
                 if (totalCards) totalCards.textContent = String(data.total ?? 0);
-                if (data.buckets) renderBucketGrid(data.buckets);
+                if (data.buckets) {
+                    renderBucketGrid(data.buckets);
+                    syncBoardPip(data.buckets);
+                }
                 break;
             case 'auth_fail':
                 addLog('CRITICAL: Trello authentication failed. Please authorize again.', 'error');
@@ -897,7 +841,7 @@ document.addEventListener('DOMContentLoaded', () => {
         consoleCard?.classList.remove('hidden');
         monitorSection?.classList.add('hidden');
         parkLog(logHome);
-        hideFloatPanel();
+        hideBoardPip();
         if (btnStart) btnStart.disabled = selectedTargets().length === 0;
         if (btnStop) btnStop.disabled = true;
         addLog('Watcher stopped by user.', 'error');

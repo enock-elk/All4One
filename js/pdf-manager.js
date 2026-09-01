@@ -161,6 +161,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function setHeaderStatus(label, tone = 'ok') {
+        if (typeof window.setAppStatus === 'function') {
+            window.setAppStatus(label, tone);
+            return;
+        }
         if (headerStatusText) headerStatusText.textContent = label;
         if (!headerStatusDot) return;
         headerStatusDot.classList.remove('bg-emerald-500', 'bg-amber-500', 'bg-rose-500');

@@ -23,13 +23,49 @@
 /* --- Sidebar ------------------------------------------------------------- */
 
 #app-sidebar {
+  width: 15.5rem;
   background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
   box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
+  transition: width 0.25s ease, padding 0.25s ease;
+}
+
+#app-sidebar.is-collapsed {
+  width: 4.75rem;
+  padding-left: 0.55rem;
+  padding-right: 0.55rem;
+}
+
+#app-sidebar.is-collapsed .sidebar-brand-text,
+#app-sidebar.is-collapsed .sidebar-nav-label,
+#app-sidebar.is-collapsed .sidebar-nav-sub {
+  display: none;
+}
+
+#app-sidebar.is-collapsed .sidebar-brand {
+  justify-content: center;
+  padding-left: 0.65rem;
+  padding-right: 0.65rem;
+}
+
+#app-sidebar.is-collapsed .sidebar-nav-btn {
+  justify-content: center;
+  padding-left: 0.55rem;
+  padding-right: 0.55rem;
+}
+
+#app-sidebar.is-collapsed .sidebar-nav-btn.is-active::before {
+  left: -0.35rem;
 }
 
 .sidebar-brand {
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(245, 158, 11, 0.04));
   border: 1px solid rgba(245, 158, 11, 0.22);
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.sidebar-brand:hover {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.22), rgba(245, 158, 11, 0.08));
 }
 
 .sidebar-nav-btn {
@@ -130,7 +166,57 @@
   background: linear-gradient(90deg, rgba(2, 6, 23, 0.92), rgba(15, 23, 42, 0.78));
 }
 
-/* --- Workspace default preference ---------------------------------------- */
+.sidebar-nav-btn.is-pinned-tab::after {
+  content: "";
+  position: absolute;
+  top: 0.45rem;
+  right: 0.45rem;
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 999px;
+  background: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.9);
+}
+
+/* --- Header pin ---------------------------------------------------------- */
+
+.header-pin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  color: #64748b;
+  background: rgba(248, 250, 252, 0.8);
+  transition: all 0.2s ease;
+}
+
+.dark .header-pin-btn {
+  background: rgba(15, 23, 42, 0.65);
+  border-color: rgba(71, 85, 105, 0.65);
+  color: #94a3b8;
+}
+
+.header-pin-btn:hover {
+  color: #b45309;
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.header-pin-btn.is-pinned {
+  color: #b45309;
+  border-color: rgba(245, 158, 11, 0.55);
+  background: rgba(245, 158, 11, 0.16);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
+}
+
+.dark .header-pin-btn.is-pinned {
+  color: #fbbf24;
+}
+
+/* --- Workspace default preference (legacy — removed from tabs) ------------ */
 
 .workspace-prefs {
   margin-top: 1rem;

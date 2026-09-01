@@ -1,6 +1,7 @@
-// Shared workspace UI: default tab preference + toast helpers
+// Shared workspace UI: pin/default tab, sidebar collapse, status badge, toasts
 
 export const PREF_DEFAULT_TAB = 'all4one_default_tab';
+export const PREF_SIDEBAR_COLLAPSED = 'all4one_sidebar_collapsed';
 
 export const TAB_META = {
     'pdf-manager': { label: 'Document Manager', short: 'PDF tools & file bay' },
@@ -10,6 +11,10 @@ export const TAB_META = {
     emails: { label: 'Draft Email Generator', short: 'Client email templates' },
 };
 
+export const NAV_TAB_ORDER = Object.keys(TAB_META);
+
+let activeTabId = 'pdf-manager';
+
 export function getDefaultTab() {
     const saved = localStorage.getItem(PREF_DEFAULT_TAB);
     return saved && TAB_META[saved] ? saved : 'pdf-manager';
@@ -18,55 +23,121 @@ export function getDefaultTab() {
 export function setDefaultTab(tabId) {
     if (!TAB_META[tabId]) return;
     localStorage.setItem(PREF_DEFAULT_TAB, tabId);
-    syncDefaultTabButtons();
+    reorderSidebarNav(tabId);
+    syncHeaderPin(tabId);
+    syncSidebarPinMarkers();
 }
 
-export function syncDefaultTabButtons() {
-    const current = getDefaultTab();
-    document.querySelectorAll('[data-default-tab-btn]').forEach((btn) => {
-        const tabId = btn.getAttribute('data-default-tab-btn');
-        const isDefault = tabId === current;
-        btn.classList.toggle('is-default', isDefault);
-        const label = TAB_META[tabId]?.label || tabId;
-        btn.innerHTML = isDefault
-            ? `<i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i><span>Default workspace</span>`
-            : `<i data-lucide="star" class="w-3.5 h-3.5"></i><span>Set ${label} as default</span>`;
+export function reorderSidebarNav(pinnedTabId = getDefaultTab()) {
+    const nav = document.getElementById('sidebar-nav');
+    if (!nav) return;
+    const buttons = [...nav.querySelectorAll('.tab-btn')];
+    const order = [pinnedTabId, ...NAV_TAB_ORDER.filter((id) => id !== pinnedTabId)];
+    order.forEach((id) => {
+        const btn = buttons.find((b) => b.getAttribute('data-tab') === id);
+        if (btn) nav.appendChild(btn);
     });
+}
+
+export function syncHeaderPin(tabId = activeTabId) {
+    const btn = document.getElementById('header-pin-btn');
+    const icon = document.getElementById('header-pin-icon');
+    if (!btn || !icon) return;
+    const isPinned = getDefaultTab() === tabId;
+    btn.classList.toggle('is-pinned', isPinned);
+    btn.title = isPinned ? 'Pinned as default workspace' : 'Pin as default workspace';
+    icon.setAttribute('data-lucide', isPinned ? 'pin' : 'pin-off');
     if (window.lucide) window.lucide.createIcons();
 }
 
-function workspacePrefsMarkup(tabId) {
-    const meta = TAB_META[tabId];
-    if (!meta) return '';
-    return `
-        <div class="workspace-prefs" data-workspace-prefs="${tabId}">
-            <div class="workspace-prefs-copy">
-                <div class="workspace-prefs-title">Startup workspace</div>
-                <div class="workspace-prefs-desc">Choose which tool opens automatically when you sign in.</div>
-            </div>
-            <button type="button" class="workspace-prefs-btn" data-default-tab-btn="${tabId}" aria-label="Set ${meta.label} as default workspace"></button>
-        </div>
-    `;
+export function syncSidebarPinMarkers() {
+    const pinned = getDefaultTab();
+    document.querySelectorAll('#sidebar-nav .tab-btn').forEach((btn) => {
+        const tabId = btn.getAttribute('data-tab');
+        btn.classList.toggle('is-pinned-tab', tabId === pinned);
+    });
 }
 
-export function mountWorkspacePrefs() {
-    document.querySelectorAll('[data-workspace-prefs-slot]').forEach((slot) => {
-        const tabId = slot.getAttribute('data-workspace-prefs-slot');
-        slot.innerHTML = workspacePrefsMarkup(tabId);
+export function setAppStatus(label = 'SYSTEM ONLINE', tone = 'ok') {
+    const headerStatusText = document.getElementById('header-status-text');
+    const headerStatusDot = document.getElementById('header-status-dot');
+    const headerStatusBadge = document.getElementById('header-status-badge');
+    if (headerStatusText) headerStatusText.textContent = label;
+
+    if (!headerStatusDot || !headerStatusBadge) return;
+
+    headerStatusDot.classList.remove('bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'animate-pulse');
+    headerStatusBadge.classList.remove(
+        'bg-emerald-500/10', 'border-emerald-500/20',
+        'bg-amber-500/10', 'border-amber-500/20',
+        'bg-rose-500/10', 'border-rose-500/20',
+    );
+    headerStatusText.classList.remove(
+        'text-emerald-600', 'dark:text-emerald-400',
+        'text-amber-600', 'dark:text-amber-400',
+        'text-rose-600', 'dark:text-rose-400',
+    );
+
+    if (tone === 'error') {
+        headerStatusDot.classList.add('bg-rose-500');
+        headerStatusBadge.classList.add('bg-rose-500/10', 'border-rose-500/20');
+        headerStatusText.classList.add('text-rose-600', 'dark:text-rose-400');
+    } else if (tone === 'busy') {
+        headerStatusDot.classList.add('bg-amber-500', 'animate-pulse');
+        headerStatusBadge.classList.add('bg-amber-500/10', 'border-amber-500/20');
+        headerStatusText.classList.add('text-amber-600', 'dark:text-amber-400');
+    } else {
+        headerStatusDot.classList.add('bg-emerald-500', 'animate-pulse');
+        headerStatusBadge.classList.add('bg-emerald-500/10', 'border-emerald-500/20');
+        headerStatusText.classList.add('text-emerald-600', 'dark:text-emerald-400');
+    }
+}
+
+export function isSidebarCollapsed() {
+    return localStorage.getItem(PREF_SIDEBAR_COLLAPSED) === 'true';
+}
+
+export function setSidebarCollapsed(collapsed) {
+    localStorage.setItem(PREF_SIDEBAR_COLLAPSED, collapsed ? 'true' : 'false');
+    document.getElementById('app-sidebar')?.classList.toggle('is-collapsed', collapsed);
+}
+
+export function expandSidebar() {
+    setSidebarCollapsed(false);
+}
+
+export function collapseSidebar() {
+    setSidebarCollapsed(true);
+}
+
+export function initHeaderPin() {
+    const btn = document.getElementById('header-pin-btn');
+    btn?.addEventListener('click', () => {
+        if (getDefaultTab() === activeTabId) return;
+        setDefaultTab(activeTabId);
+        showAppToast(`${TAB_META[activeTabId].label} pinned — opens first on login.`);
     });
+    syncHeaderPin(activeTabId);
+}
+
+export function initSidebarCollapse() {
+    const brand = document.getElementById('sidebar-brand-toggle');
+    brand?.addEventListener('click', () => collapseSidebar());
+
+    setSidebarCollapsed(isSidebarCollapsed());
+    syncSidebarPinMarkers();
+    reorderSidebarNav(getDefaultTab());
+}
+
+export function onWorkspaceTabActivated(tabId) {
+    activeTabId = tabId;
+    syncHeaderPin(tabId);
+    setAppStatus('SYSTEM ONLINE', 'ok');
 }
 
 export function initWorkspacePrefs() {
-    mountWorkspacePrefs();
-    document.querySelectorAll('[data-default-tab-btn]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-            const tabId = btn.getAttribute('data-default-tab-btn');
-            if (getDefaultTab() === tabId) return;
-            setDefaultTab(tabId);
-            showAppToast(`${TAB_META[tabId].label} will open on login.`);
-        });
-    });
-    syncDefaultTabButtons();
+    initHeaderPin();
+    initSidebarCollapse();
 }
 
 let toastTimer = null;
@@ -119,3 +190,5 @@ export function showActionToast({ message, primaryLabel, onPrimary, secondaryLab
 export function hideActionToast() {
     document.getElementById('app-toast-actions')?.classList.add('hidden');
 }
+
+window.setAppStatus = setAppStatus;
