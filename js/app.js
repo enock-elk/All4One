@@ -2,6 +2,12 @@
 // ALL4ONE COMMAND CENTER - MAIN APP LOGIC
 // ============================================================================
 
+import { registerReactTabs } from './react/mount.jsx';
+import './pdf-manager.js';
+import './trello.js';
+
+registerReactTabs();
+
 document.addEventListener('DOMContentLoaded', () => {
     // --- GUARDIAN: FIREBASE INITIALIZATION ---
     // ⚠️ ACTION REQUIRED: Replace the apiKey and appId with your actual Firebase Project Settings

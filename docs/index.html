@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>All4One Command Center</title>
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="apple-touch-icon" href="./icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+    <!-- Favicon (Inherited from original React build) -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f59e0b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 19.5v.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8.5L18 5.5'/%3E%3Cpath d='m15 5 3 3'/%3E%3Cpath d='m11.5 11.5 3 3L22 4c-.5-.5-1.5-.5-2 0l-8.5 8.5Z'/%3E%3Cpath d='M8 10h.01'/%3E%3Cpath d='M8 14h.01'/%3E%3Cpath d='M8 18h.01'/%3E%3C/svg%3E" />
+    
+    <!-- Tailwind CSS (via CDN for Zero-Build Architecture) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class', // Enables class-based dark mode toggling
+            theme: { extend: {} }
+        }
+    </script>
+
+    <!-- Lucide Icons (via CDN) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Firebase SDK (Compat Version for Vanilla JS Zero-Build Architecture) -->
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
+
+    <!-- Application Logic (relative paths so GitHub Pages /All4One/ can resolve them) -->
+    <link rel="modulepreload" href="./assets/pdf-engine-_6Pcmq9H.js">
+    <style>
+        .trello-lockscreen {
+            background-color: #0f172a;
+            background-size: cover;
+            background-position: center;
+        }
+        .trello-lockscreen::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: rgba(2, 6, 23, 0.45);
+            pointer-events: none;
+        }
+        .trello-clock-time {
+            font-size: 4.5rem;
+            font-weight: 200;
+            line-height: 1;
+            letter-spacing: -0.03em;
+            color: #fff;
+            text-shadow: 0 4px 18px rgba(0,0,0,0.55);
+        }
+        .trello-clock-date {
+            font-size: 1.15rem;
+            color: rgba(255,255,255,0.9);
+            margin-top: 4px;
+        }
+        .trello-glass {
+            background: rgba(15, 23, 42, 0.78);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(255,255,255,0.12);
+        }
+        .trello-mode-active {
+            background: rgba(56, 189, 248, 0.18) !important;
+            border-color: rgb(56, 189, 248) !important;
+            color: #fff !important;
+        }
+        .trello-bucket-card {
+            width: 31%;
+            min-width: 90px;
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 12px;
+            padding: 8px;
+            text-align: center;
+        }
+        .trello-bucket-count {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: #38bdf8;
+            line-height: 1;
+        }
+        .trello-bucket-name {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #cbd5e1;
+            margin-top: 4px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        @media (max-width: 640px) {
+            .trello-clock-time { font-size: 3.2rem; }
+            .trello-bucket-card { width: 47%; }
+        }
+        body.trello-fullscreen #app-sidebar,
+        body.trello-fullscreen #app-header {
+            display: none !important;
+        }
+        body.trello-fullscreen #trello-hero,
+        body.trello-fullscreen #trello-setup-card,
+        body.trello-fullscreen #trello-console-card {
+            display: none !important;
+        }
+        body.trello-fullscreen #tab-dashboard {
+            position: fixed;
+            inset: 0;
+            z-index: 40;
+        }
+        body.trello-fullscreen #trello-monitor {
+            position: relative;
+            bottom: auto;
+            left: auto;
+            transform: none;
+            width: min(960px, 94%);
+            max-width: 960px;
+            margin: 10vh auto 0;
+        }
+        body.trello-fullscreen .trello-bucket-card {
+            width: 22%;
+            min-width: 120px;
+            padding: 16px 10px;
+        }
+        body.trello-fullscreen .trello-bucket-count { font-size: 2rem; }
+        body.trello-fullscreen .trello-bucket-name { font-size: 0.85rem; }
+        #app-toast {
+            transition: opacity 0.2s ease;
+        }
+    </style>
+  <script type="module" crossorigin src="./assets/index-B3XX1PA9.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BcTwU3o1.css">
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
+
+    <!-- ========================================== -->
+    <!-- LOGIN VIEW (Hidden if authenticated)         -->
+    <!-- ========================================== -->
+    <div id="login-view" class="min-h-screen flex items-center justify-center p-4">
+        <div class="max-w-md w-full bg-white dark:bg-slate-800 rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700 p-8 text-center transition-colors duration-300">
+            <div class="bg-slate-100 dark:bg-slate-900 rounded-2xl p-6 mb-8 shadow-inner inline-block transition-colors duration-300">
+                <i data-lucide="building-2" class="w-12 h-12 text-amber-500 mx-auto mb-2"></i>
+                <h2 class="text-3xl font-serif text-amber-600 dark:text-amber-500 tracking-wide leading-none mb-1">ALL4ONE</h2>
+                <p class="text-[0.65rem] font-sans text-slate-500 tracking-[0.3em] uppercase">Command Center</p>
+            </div>
+            
+            <h1 class="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">Secure Workspace</h1>
+            <p class="text-slate-500 dark:text-slate-400 text-sm mb-8">
+                Please enter your full name to access unified tools and maintain an audit trail.
+            </p>
+            
+            <form id="login-form" class="space-y-4">
+                <input 
+                    type="text" 
+                    id="username-input"
+                    placeholder="Enter your Full Name" 
+                    required
+                    class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white dark:placeholder-slate-500"
+                />
+                <button 
+                    type="submit"
+                    class="w-full flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-blue-600/20 transition-all active:scale-95"
+                >
+                    <i data-lucide="shield-check" class="w-5 h-5"></i>
+                    <span>Enter Workspace</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MAIN APP VIEW (Hidden until authenticated) -->
+    <!-- ========================================== -->
+    <div id="app-view" class="hidden flex h-screen w-full text-slate-800 dark:text-slate-100 overflow-hidden">
+        
+        <!-- SIDEBAR -->
+        <div id="app-sidebar" class="w-20 shrink-0 flex flex-col items-center py-6 border-r border-slate-200 dark:border-slate-800 bg-slate-900 dark:bg-slate-950 text-slate-400 z-20 transition-colors duration-300">
+            <!-- Logo -->
+            <div class="mb-8 hover:scale-105 transition-transform duration-300 cursor-pointer text-amber-500">
+                <i data-lucide="building-2" class="w-10 h-10"></i>
+            </div>
+            
+            <!-- Navigation -->
+            <nav id="sidebar-nav" class="flex-1 flex flex-col gap-4 w-full px-3">
+                <!-- PDF Manager -->
+                <button data-tab="pdf-manager" class="tab-btn p-3 rounded-xl transition-all flex justify-center w-full text-white bg-slate-800" title="Document Manager">
+                    <i data-lucide="file-signature" class="w-6 h-6"></i>
+                </button>
+
+                <!-- Trello Watcher -->
+                <button data-tab="dashboard" class="tab-btn p-3 rounded-xl transition-all flex justify-center w-full hover:text-white hover:bg-slate-800/50" title="Trello Watcher">
+                    <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
+                </button>
+                
+                <!-- Case Maker -->
+                <button data-tab="casemaker" class="tab-btn p-3 rounded-xl transition-all flex justify-center w-full hover:text-white hover:bg-slate-800/50" title="Case Maker">
+                    <i data-lucide="briefcase" class="w-6 h-6"></i>
+                </button>
+
+                <!-- Affidavit Automation -->
+                <button data-tab="affidavits" class="tab-btn p-3 rounded-xl transition-all flex justify-center w-full hover:text-white hover:bg-slate-800/50" title="Affidavit Automation">
+                    <i data-lucide="scroll-text" class="w-6 h-6"></i>
+                </button>
+
+                <!-- Draft Email Generator -->
+                <button data-tab="emails" class="tab-btn p-3 rounded-xl transition-all flex justify-center w-full hover:text-white hover:bg-slate-800/50" title="Draft Email Generator">
+                    <i data-lucide="mail" class="w-6 h-6"></i>
+                </button>
+            </nav>
+
+            <!-- Bottom Actions -->
+            <div class="mt-auto flex flex-col gap-4 w-full px-3">
+                <button id="dark-mode-toggle" class="p-3 hover:text-white hover:bg-slate-800/50 rounded-xl transition-all flex justify-center w-full" title="Toggle Dark Mode">
+                    <i data-lucide="moon" id="dark-mode-icon" class="w-6 h-6"></i>
+                </button>
+                
+                <button id="logout-btn" class="p-3 text-rose-400 hover:text-white hover:bg-rose-500/20 rounded-xl transition-all flex justify-center w-full" title="Secure Logout">
+                    <i data-lucide="log-out" class="w-6 h-6"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- MAIN CONTENT AREA -->
+        <div class="flex-1 relative flex flex-col h-full bg-slate-50 dark:bg-slate-900/50 transition-colors duration-300">
+            
+            <!-- Dynamic Header -->
+            <header id="app-header" class="h-16 shrink-0 flex items-center justify-between px-8 border-b border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-950/50 backdrop-blur-md z-10">
+                <h1 id="header-title" class="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                    Document Manager
+                </h1>
+                
+                <div class="flex items-center gap-3">
+                    <!-- Status Badge -->
+                    <div id="header-status-badge" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 transition-all duration-300">
+                        <div id="header-status-dot" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                        <span id="header-status-text" class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">System Online</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Tab Containers -->
+            <main class="flex-1 overflow-hidden relative">
+                
+                <!-- PDF MANAGER TAB -->
+                <div id="tab-pdf-manager" class="tab-content block h-full w-full overflow-y-auto p-4 lg:p-6">
+                    <div class="max-w-[90rem] mx-auto space-y-4 pb-16">
+
+                        <nav id="pdf-tool-strip" class="flex flex-wrap items-center gap-2 bg-white dark:bg-slate-800 p-3 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+                            <button type="button" data-tool="unlock" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
+                                <i data-lucide="unlock" class="w-4 h-4"></i> Unlock PDF
+                            </button>
+                            <button type="button" data-tool="merge" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap text-white bg-slate-800">
+                                <i data-lucide="layers" class="w-4 h-4"></i> Merge PDF
+                            </button>
+                            <button type="button" data-tool="split" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
+                                <i data-lucide="scissors" class="w-4 h-4"></i> Split PDF
+                            </button>
+                            <button type="button" data-tool="compress" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
+                                <i data-lucide="minimize-2" class="w-4 h-4"></i> Compress PDF
+                            </button>
+                            <button type="button" data-tool="convert" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
+                                <i data-lucide="refresh-cw" class="w-4 h-4"></i> Convert
+                            </button>
+                            <button type="button" data-tool="extract" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
+                                <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Extract to Excel
+                            </button>
+                            <div class="flex flex-col ml-auto w-full sm:w-56 shrink-0">
+                                <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Document Type Profile</label>
+                                <select id="pdf-doc-type" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 outline-none">
+                                    <option value="generic">Auto-Detect / Generic</option>
+                                    <option value="bank">Bank Statements</option>
+                                    <option value="payslip">Payslips</option>
+                                </select>
+                            </div>
+                        </nav>
+
+                        <div class="flex flex-col xl:flex-row gap-4 items-start">
+                            <div class="flex-1 min-w-0 space-y-4 w-full">
+                                <div id="pdf-dropzone" class="w-full border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-blue-500 rounded-2xl p-8 text-center cursor-pointer bg-slate-50/50 dark:bg-slate-800/30 flex flex-col items-center justify-center min-h-[140px] group">
+                                    <i data-lucide="upload-cloud" class="w-10 h-10 text-slate-400 group-hover:text-blue-500 mb-3"></i>
+                                    <p class="text-slate-600 dark:text-slate-300 font-medium mb-1">Drag &amp; drop PDF, JPG, PNG, or Word files</p>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">or click to browse</p>
+                                    <input type="file" id="pdf-file-input" multiple accept=".pdf,.jpg,.jpeg,.png,.docx,application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.wordprocessingml.document" class="hidden">
+                                    <span class="px-6 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-medium rounded-lg pointer-events-none">Browse Files</span>
+                                </div>
+
+                                <div id="pdf-file-strip" class="hidden flex flex-wrap gap-2"></div>
+
+                                <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                                    <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3">
+                                        <div class="flex items-center gap-2">
+                                            <button id="btn-scan-pdf" class="flex items-center justify-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed" title="Scan dates and sort files">
+                                                <i data-lucide="calendar-search" class="w-4 h-4"></i>
+                                                <span>Scan Dates &amp; Sort</span>
+                                            </button>
+                                            <div class="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden" role="group" aria-label="Preview layout">
+                                                <button type="button" id="pdf-view-thumbs" class="p-1.5 bg-slate-800 text-white" title="Thumbnails" aria-pressed="true">
+                                                    <i data-lucide="layout-grid" class="w-4 h-4"></i>
+                                                </button>
+                                                <button type="button" id="pdf-view-table" class="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" title="File table" aria-pressed="false">
+                                                    <i data-lucide="table" class="w-4 h-4"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <span id="pdf-stats-count" class="text-xs text-slate-500">0 pages</span>
+                                        <div class="flex items-center gap-3 ml-auto">
+                                            <button id="btn-clear-bay" class="text-xs text-rose-500 hover:text-rose-600 font-medium disabled:opacity-50 disabled:cursor-not-allowed" disabled>Clear Bay</button>
+                                            <label class="flex items-center gap-2 text-xs font-medium text-slate-500">
+                                                <input type="checkbox" id="pdf-select-all" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" disabled>
+                                                Include all pages
+                                            </label>
+                                            <button id="btn-download-current" class="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed" disabled title="Build a PDF from included pages and rotations">Download current</button>
+                                        </div>
+                                    </div>
+                                    <p id="pdf-bay-banner" class="hidden px-4 py-2 text-xs bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-b border-emerald-100 dark:border-emerald-800"></p>
+                                    <div id="pdf-bay-stage" class="grid min-h-[28rem]">
+                                    <div id="pdf-page-grid" class="col-start-1 row-start-1 p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4 content-start items-start z-10">
+                                        <div id="pdf-empty-state" class="col-span-full py-12 text-center text-slate-400 dark:text-slate-500">
+                                            <i data-lucide="file-box" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
+                                            <p>No files in the Holding Bay.</p>
+                                            <p class="text-xs mt-1">Rotate pages, then Apply a tool to keep the result in the bay, or Download current to save it.</p>
+                                        </div>
+                                    </div>
+                                    <div id="pdf-file-table-wrap" class="col-start-1 row-start-1 overflow-auto min-h-[28rem] invisible pointer-events-none">
+                                        <table class="w-full text-left text-sm text-slate-600 dark:text-slate-300">
+                                            <thead class="bg-slate-50 dark:bg-slate-900/50 text-xs uppercase text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+                                                <tr>
+                                                    <th scope="col" class="px-4 py-3 w-12 text-center">Incl.</th>
+                                                    <th scope="col" class="px-4 py-3">Filename</th>
+                                                    <th scope="col" class="px-4 py-3 w-32">Status</th>
+                                                    <th scope="col" class="px-4 py-3 w-48">Detected Date</th>
+                                                    <th scope="col" class="px-4 py-3 w-24 text-center">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="pdf-file-table-body" class="divide-y divide-slate-200 dark:border-slate-700"></tbody>
+                                        </table>
+                                    </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <aside id="pdf-tool-panel" class="w-full xl:w-80 shrink-0 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 space-y-4 xl:sticky xl:top-4">
+                                <div>
+                                    <h3 id="pdf-tool-title" class="text-lg font-bold text-slate-800 dark:text-slate-100">Merge PDF</h3>
+                                    <p id="pdf-tool-hint" class="text-sm text-slate-500 dark:text-slate-400 mt-1">Merge included pages into the bay (then split or compress), or Download a copy.</p>
+                                </div>
+
+                                <div id="panel-unlock" class="hidden space-y-3">
+                                    <p class="text-xs text-slate-500 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-xl p-3">Enter one or more passwords to try. Unlocked files stay in the bay so you can merge, split, or compress next.</p>
+                                    <input type="text" id="pdf-password-input" placeholder="Passwords (comma separated)" class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 dark:text-slate-200" title="Passwords to try for unlocking">
+                                    <button id="btn-unlock-pdf" class="w-full flex items-center justify-center gap-2 px-3 py-3 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed">
+                                        <i data-lucide="unlock" class="w-4 h-4"></i>
+                                        <span>Unlock</span>
+                                    </button>
+                                </div>
+
+                                <div id="panel-merge" class="space-y-3">
+                                    <div class="text-xs text-slate-500 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl p-3">Drag page cards or filenames to reorder. Merge keeps the result in the bay so you can split or compress next. Download saves a copy.</div>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <button id="btn-merge-pdf" class="flex items-center justify-center gap-2 px-3 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed">
+                                            <i data-lucide="layers" class="w-4 h-4"></i>
+                                            <span>Merge</span>
+                                        </button>
+                                        <button id="btn-merge-download" class="flex items-center justify-center gap-2 px-3 py-3 bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed">
+                                            <i data-lucide="download" class="w-4 h-4"></i>
+                                            <span>Download</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div id="panel-split" class="hidden space-y-4">
+                                    <div class="flex gap-2">
+                                        <button type="button" data-split-mode="custom" class="split-mode-btn flex-1 px-3 py-2 text-sm rounded-lg border border-blue-500 bg-blue-50 dark:bg-blue-900/20 font-medium">Custom</button>
+                                        <button type="button" data-split-mode="fixed" class="split-mode-btn flex-1 px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-600 font-medium">Fixed</button>
+                                    </div>
+                                    <div id="split-custom-wrap" class="space-y-3">
+                                        <div id="split-ranges" class="space-y-2"></div>
+                                        <button type="button" id="btn-add-range" class="text-sm text-blue-600 hover:text-blue-700 font-medium">+ Add Range</button>
+                                    </div>
+                                    <div id="split-fixed-wrap" class="hidden space-y-2">
+                                        <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Split into page ranges of <span id="split-fixed-max-hint" class="normal-case tracking-normal font-medium text-slate-400"></span></label>
+                                        <input type="number" id="split-fixed-length" min="1" max="1" value="4" class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg">
+                                    </div>
+                                    <p id="split-summary" class="text-xs text-slate-500 bg-slate-50 dark:bg-slate-900/50 rounded-xl p-3"></p>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <button id="btn-split-pdf" class="flex items-center justify-center gap-2 px-3 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl disabled:opacity-50">
+                                            <i data-lucide="scissors" class="w-4 h-4"></i>
+                                            <span>Split</span>
+                                        </button>
+                                        <button id="btn-split-download" class="flex items-center justify-center gap-2 px-3 py-3 bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold rounded-xl disabled:opacity-50">
+                                            <i data-lucide="download" class="w-4 h-4"></i>
+                                            <span>Download</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div id="panel-compress" class="hidden space-y-4">
+                                    <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500">JPEG quality <span id="compress-quality-label">80%</span></label>
+                                    <input type="range" id="compress-quality" min="50" max="95" value="80" class="w-full">
+                                    <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Raster resolution <span id="compress-scale-label">2.0× · ~144 DPI</span></label>
+                                    <input type="range" id="compress-scale" min="10" max="35" value="20" class="w-full" title="How many pixels are sampled from each page">
+                                    <p class="text-xs text-slate-500">Compression rasterizes pages into JPEG. Quality controls softness; raster resolution controls sharpness. If the result would be larger than the original, the original is kept.</p>
+                                    <p id="compress-size-readout" class="text-xs text-slate-500 bg-slate-50 dark:bg-slate-900/50 rounded-xl p-3 hidden"></p>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <button id="btn-compress-pdf" class="flex items-center justify-center gap-2 px-3 py-3 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-xl disabled:opacity-50">
+                                            <i data-lucide="minimize-2" class="w-4 h-4"></i>
+                                            <span>Compress</span>
+                                        </button>
+                                        <button id="btn-compress-download" class="flex items-center justify-center gap-2 px-3 py-3 bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold rounded-xl disabled:opacity-50">
+                                            <i data-lucide="download" class="w-4 h-4"></i>
+                                            <span>Download</span>
+                                        </button>
+                                    </div>
+                                    <button type="button" id="btn-undo-compress" class="hidden w-full flex items-center justify-center gap-2 px-3 py-2.5 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-xl disabled:opacity-50" disabled>
+                                        <i data-lucide="undo-2" class="w-4 h-4"></i>
+                                        <span>Undo compress</span>
+                                    </button>
+                                </div>
+
+                                <div id="panel-convert" class="hidden space-y-2">
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <button id="btn-jpg-to-pdf" class="flex items-center justify-center gap-2 px-3 py-3 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-xl disabled:opacity-50">JPG → PDF</button>
+                                        <button id="btn-jpg-to-pdf-download" class="flex items-center justify-center gap-2 px-3 py-3 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-xl disabled:opacity-50">Download</button>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <button id="btn-pdf-to-jpg" class="flex items-center justify-center gap-2 px-3 py-3 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-xl disabled:opacity-50">PDF → JPG</button>
+                                        <button id="btn-pdf-to-jpg-download" class="flex items-center justify-center gap-2 px-3 py-3 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-xl disabled:opacity-50">Download</button>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <button id="btn-word-to-pdf" class="flex items-center justify-center gap-2 px-3 py-3 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-xl disabled:opacity-50">Word → PDF</button>
+                                        <button id="btn-word-to-pdf-download" class="flex items-center justify-center gap-2 px-3 py-3 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-xl disabled:opacity-50">Download</button>
+                                    </div>
+                                    <p class="text-xs text-slate-500 pt-1">Converts only the matching files and leaves everything else in the bay. If more than one source file matches, you will be asked which to convert. Download saves a copy without changing the bay. Word layout is approximate.</p>
+                                </div>
+
+                                <div id="panel-extract" class="hidden space-y-3">
+                                    <p class="text-xs text-slate-500 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-xl p-3">Choose Document Type Profile: Bank Statements. A PIN is required. Included pages from each PDF are sent to the assembly line.</p>
+                                    <button id="btn-extract-excel" class="w-full flex items-center justify-center gap-2 px-3 py-3 bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed" title="Requires Bank Statements profile and PIN" disabled>
+                                        <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                                        <span>Extract to Excel (AI)</span>
+                                    </button>
+                                </div>
+                            </aside>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TRELLO WATCHER TAB -->
+                <div id="tab-dashboard" class="tab-content hidden h-full w-full overflow-hidden relative">
+                    <div id="trello-lockscreen" class="trello-lockscreen absolute inset-0 flex flex-col items-center overflow-y-auto text-white">
+                        <div class="relative z-10 w-full max-w-xl px-4 pt-10 pb-40 flex flex-col items-center">
+                            <div id="trello-hero" class="text-center mb-6">
+                                <div id="trello-clock-time" class="trello-clock-time">--:--</div>
+                                <div id="trello-clock-date" class="trello-clock-date">loading...</div>
+                                <h2 class="text-2xl font-semibold tracking-wide mt-6">TrelloWatcher</h2>
+                                <p class="text-sm text-white/70">List Activity Monitor</p>
+                            </div>
+
+                            <div id="trello-setup-card" class="trello-glass w-full rounded-2xl p-5 space-y-4 shadow-2xl">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                    <h3 class="font-bold flex items-center gap-2">
+                                        <i data-lucide="settings-2" class="w-5 h-5 text-sky-400"></i> Board &amp; lists
+                                    </h3>
+                                    <div class="flex items-center gap-2">
+                                        <button type="button" id="trello-wallpaper-btn" class="text-xs px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20" title="Upload background">Wallpaper</button>
+                                        <button type="button" id="trello-reset-bg" class="text-xs px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20" title="Reset background">Reset</button>
+                                        <input type="file" id="trello-bg-input" accept="image/*" class="hidden">
+                                    </div>
+                                </div>
+
+                                <div id="trello-auth-panel" class="space-y-3">
+                                    <p class="text-sm text-white/70">Connect your Trello account to load boards. The app key is already configured.</p>
+                                    <button id="btn-trello-authorize" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl">
+                                        <i data-lucide="key-round" class="w-4 h-4"></i>
+                                        Authorize with Trello
+                                    </button>
+                                </div>
+
+                                <div id="trello-setup-panel" class="hidden space-y-4">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <p id="trello-user-label" class="text-sm text-white/70">Connected</p>
+                                        <button id="btn-trello-disconnect" class="text-xs text-rose-300 hover:text-rose-200 font-medium">Disconnect</button>
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-bold uppercase tracking-wider text-white/50 mb-1 block">Board</label>
+                                        <select id="trello-board-select" class="w-full bg-black/30 border border-white/15 text-white text-sm rounded-lg p-2.5 outline-none">
+                                            <option value="">Loading boards...</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-bold uppercase tracking-wider text-white/50 mb-1 block">Lists to watch (max 10)</label>
+                                        <div id="trello-list-checkboxes" class="max-h-48 overflow-y-auto space-y-1 rounded-xl border border-white/15 p-2 bg-black/20">
+                                            <p class="text-xs text-white/50 p-2">Select a board.</p>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label class="text-[10px] font-bold uppercase tracking-wider text-white/50 mb-2 block">Alert type</label>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <button type="button" id="trello-mode-wake" class="trello-mode-active rounded-xl border border-white/15 px-3 py-2 text-left">
+                                                <div class="text-sm font-bold">Wake Me Up</div>
+                                                <div class="text-[10px] text-white/60">Continuous loop</div>
+                                            </button>
+                                            <button type="button" id="trello-mode-notify" class="rounded-xl border border-white/15 px-3 py-2 text-left">
+                                                <div class="text-sm font-bold">Notification</div>
+                                                <div class="text-[10px] text-white/60">One-time chime</div>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-sm">Sound enabled</span>
+                                        <label class="inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" id="trello-sound-toggle" class="sr-only peer" checked>
+                                            <span class="w-10 h-5 bg-white/20 rounded-full peer-checked:bg-sky-500 relative after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full peer-checked:after:translate-x-5 after:transition"></span>
+                                        </label>
+                                    </div>
+
+                                    <div class="flex items-center gap-2">
+                                        <label class="text-sm shrink-0">Alert sound</label>
+                                        <select id="trello-tone-select" class="flex-1 bg-black/30 border border-white/15 text-white text-sm rounded-lg p-2 outline-none"></select>
+                                        <button type="button" id="trello-test-sound" class="w-10 h-10 rounded-lg bg-sky-500 text-white font-bold" title="Test sound">▶</button>
+                                    </div>
+                                    <p id="trello-custom-sound-status" class="hidden text-xs text-sky-300">Custom loaded</p>
+                                    <input type="file" id="trello-sound-input" accept="audio/*" class="hidden">
+
+                                    <div class="flex items-start justify-between gap-3 pt-1 border-t border-white/10">
+                                        <div>
+                                            <div class="text-sm font-medium">Stealth keep-alive</div>
+                                            <p class="text-[11px] text-white/60">Plays a silent 30Hz tone so the browser keeps the tab active in the background.</p>
+                                        </div>
+                                        <label class="inline-flex items-center cursor-pointer mt-1">
+                                            <input type="checkbox" id="trello-stealth-toggle" class="sr-only peer" checked>
+                                            <span class="w-10 h-5 bg-white/20 rounded-full peer-checked:bg-sky-500 relative after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full peer-checked:after:translate-x-5 after:transition"></span>
+                                        </label>
+                                    </div>
+
+                                    <div class="flex gap-2">
+                                        <button id="btn-trello-start" class="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl disabled:opacity-50" disabled>
+                                            <i data-lucide="play" class="w-4 h-4"></i> Start Watching
+                                        </button>
+                                        <button id="btn-trello-stop" class="flex items-center justify-center gap-2 px-4 py-3 bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold rounded-xl disabled:opacity-50" disabled>
+                                            <i data-lucide="square" class="w-4 h-4"></i> Stop
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="trello-console-card" class="trello-glass w-full rounded-2xl p-4 mt-4 shadow-2xl">
+                                <h3 class="font-bold text-sm mb-2 flex items-center gap-2"><i data-lucide="terminal" class="w-4 h-4 text-sky-400"></i> Console</h3>
+                                <div id="trello-log-home">
+                                    <div id="trello-log-container" class="bg-slate-950/80 text-emerald-400 p-3 rounded-xl font-mono text-[11px] overflow-y-auto h-36 whitespace-pre-wrap border border-white/10"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="trello-monitor" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-20 w-[95%] max-w-xl trello-glass rounded-2xl p-4 shadow-2xl">
+                            <div class="flex items-center justify-between gap-3">
+                                <div class="flex items-center gap-2 text-emerald-400 text-xs font-extrabold tracking-wider uppercase">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Active
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <label class="flex items-center gap-2 text-xs text-white/70">
+                                        Sound
+                                        <input type="checkbox" id="trello-sound-toggle-active" class="rounded border-white/30 text-sky-500" checked>
+                                    </label>
+                                    <button type="button" id="btn-trello-fullscreen" class="text-xs font-bold uppercase tracking-wide text-sky-200 border border-sky-400/50 px-3 py-1 rounded-md hover:bg-sky-500/20">Fullscreen</button>
+                                    <button type="button" id="btn-trello-exit-fs" class="hidden text-xs font-bold uppercase tracking-wide text-white/80 border border-white/30 px-3 py-1 rounded-md hover:bg-white/10">Exit</button>
+                                    <button type="button" class="text-xs font-bold uppercase tracking-wide text-rose-300 border border-rose-400/50 px-3 py-1 rounded-md" onclick="document.getElementById('btn-trello-stop').click()">Stop</button>
+                                </div>
+                            </div>
+                            <p class="text-center text-sm text-white/80 mt-2 uppercase tracking-wide">
+                                <span id="trello-total-cards" class="text-sky-400 font-extrabold text-base">0</span> cases in total in:
+                            </p>
+                            <div id="trello-bucket-grid" class="flex flex-wrap justify-center gap-2 mt-3 max-h-[50vh] overflow-y-auto"></div>
+                            <details id="trello-log-accordion" class="mt-4 rounded-xl border border-white/10 bg-black/20">
+                                <summary class="cursor-pointer select-none px-3 py-2 text-sm font-medium text-white/80">Console log</summary>
+                                <div id="trello-log-fs" class="p-2"></div>
+                            </details>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CASE MAKER TAB -->
+                <div id="tab-casemaker" class="tab-content hidden h-full w-full">
+                    <iframe 
+                        src="https://script.google.com/macros/s/AKfycbxDKB-wWAd-BDOdfqe-sr6RRgrakIM5qhqfQy-2mvF9hQ7-xJAk8NhZcdPSPeHFFfGZ/exec"
+                        class="w-full h-full border-0"
+                        title="RyanGPT Case Maker"
+                        allow="clipboard-write"
+                        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads"
+                    ></iframe>
+                </div>
+
+                <!-- AFFIDAVIT AUTOMATION TAB -->
+                <div id="tab-affidavits" class="tab-content hidden h-full w-full overflow-hidden">
+                    <div id="affidavit-root" class="h-full"></div>
+                </div>
+
+                <!-- DRAFT EMAIL GENERATOR TAB -->
+                <div id="tab-emails" class="tab-content hidden h-full w-full overflow-hidden">
+                    <div id="email-root" class="h-full"></div>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+    <div id="app-toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] px-4 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-medium shadow-2xl border border-white/10 max-w-[90vw]"></div>
+
+    <div id="trello-alarm-overlay" class="hidden fixed inset-0 z-[60] flex flex-col items-center justify-center p-6 bg-slate-950 text-white">
+        <div class="text-4xl font-bold mb-3">Alert</div>
+        <div class="text-slate-300 mb-2">Incoming to: <span id="trello-alarm-list" class="text-sky-400 font-bold">List</span></div>
+        <div id="trello-alarm-card" class="text-2xl font-semibold text-center mb-8 max-w-lg">Card Name</div>
+        <button id="trello-ack-alarm" class="px-8 py-3 rounded-xl bg-rose-600 hover:bg-rose-700 font-bold">Acknowledge</button>
+    </div>
+    <div id="trello-volume-hud" class="hidden fixed bottom-8 right-8 z-[61] bg-slate-900/90 text-white rounded-2xl px-5 py-4 shadow-2xl border border-white/10">
+        <div class="font-bold">Is sound on?</div>
+        <div class="text-xs text-white/60">Check system volume</div>
+    </div>
+
+    <div id="excel-pin-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+        <div class="w-full max-w-sm bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6">
+            <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-1">Extract to Excel</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Enter the PIN to run the bank-statement assembly line.</p>
+            <input id="excel-pin-input" type="password" inputmode="numeric" maxlength="8" placeholder="PIN" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm outline-none focus:ring-2 focus:ring-purple-500 dark:text-white mb-2">
+            <p id="excel-pin-error" class="hidden text-sm text-rose-500 mb-3">Incorrect PIN.</p>
+            <div class="flex gap-2">
+                <button type="button" id="excel-pin-cancel" class="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 text-sm font-medium">Cancel</button>
+                <button type="button" id="excel-pin-submit" class="flex-1 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold">Unlock</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="pdf-pick-modal" class="hidden fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+        <div class="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6">
+            <h3 id="pdf-pick-title" class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-1">Choose files</h3>
+            <p id="pdf-pick-hint" class="text-sm text-slate-500 dark:text-slate-400 mb-4">Select which files to convert. Other files stay in the bay.</p>
+            <div id="pdf-pick-list" class="max-h-64 overflow-y-auto space-y-2 mb-4"></div>
+            <div class="flex flex-wrap gap-2">
+                <button type="button" id="pdf-pick-all" class="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 text-sm font-medium">Select all</button>
+                <button type="button" id="pdf-pick-cancel" class="ml-auto px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 text-sm font-medium">Cancel</button>
+                <button type="button" id="pdf-pick-confirm" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold">Convert</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="pdf-page-preview" class="hidden fixed inset-0 z-[80] bg-slate-950/80 backdrop-blur-sm">
+        <button type="button" id="pdf-preview-close" class="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center" title="Close preview" aria-label="Close preview">
+            <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+        <div class="flex items-center justify-center h-full w-full px-2 sm:px-6 gap-2">
+            <button type="button" id="pdf-preview-prev" class="shrink-0 w-11 h-11 sm:w-14 sm:h-14 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center" title="Previous page" aria-label="Previous page">
+                <i data-lucide="chevron-left" class="w-7 h-7"></i>
+            </button>
+            <div class="relative max-w-5xl w-full flex flex-col items-center">
+                <div class="w-full min-h-[50vh] flex items-center justify-center">
+                    <canvas id="pdf-preview-canvas" class="max-h-[80vh] max-w-full h-auto w-auto rounded-lg shadow-2xl bg-white"></canvas>
+                    <img id="pdf-preview-image" alt="" class="hidden max-h-[80vh] max-w-full object-contain rounded-lg shadow-2xl bg-white">
+                </div>
+                <div class="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 px-4 text-sm text-white/90">
+                    <span id="pdf-preview-caption"></span>
+                    <label class="flex items-center gap-2 whitespace-nowrap">
+                        <input type="checkbox" id="pdf-preview-include" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                        Include page
+                    </label>
+                </div>
+                <div class="mt-2 flex flex-wrap items-center justify-center gap-2 px-4 text-xs text-white/80">
+                    <button type="button" id="pdf-preview-rotate-90" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 font-medium" title="Rotate 90°">90°</button>
+                    <button type="button" id="pdf-preview-rotate-ccw" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20" title="Rotate 1° left" aria-label="Rotate 1 degree left">−1°</button>
+                    <input type="range" id="pdf-preview-rotate" min="0" max="359" step="1" value="0" class="w-40 sm:w-56">
+                    <button type="button" id="pdf-preview-rotate-cw" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20" title="Rotate 1° right" aria-label="Rotate 1 degree right">+1°</button>
+                    <span id="pdf-preview-rotate-label" class="tabular-nums w-12 text-center">0°</span>
+                </div>
+            </div>
+            <button type="button" id="pdf-preview-next" class="shrink-0 w-11 h-11 sm:w-14 sm:h-14 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center" title="Next page" aria-label="Next page">
+                <i data-lucide="chevron-right" class="w-7 h-7"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
