@@ -14,8 +14,8 @@
     </script>
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-    <!-- Favicon (Inherited from original React build) -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f59e0b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 19.5v.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8.5L18 5.5'/%3E%3Cpath d='m15 5 3 3'/%3E%3Cpath d='m11.5 11.5 3 3L22 4c-.5-.5-1.5-.5-2 0l-8.5 8.5Z'/%3E%3Cpath d='M8 10h.01'/%3E%3Cpath d='M8 14h.01'/%3E%3Cpath d='M8 18h.01'/%3E%3C/svg%3E" />
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+    <link rel="icon" type="image/svg+xml" href="icons/all4one.svg">
     
     <!-- Tailwind CSS (via CDN for Zero-Build Architecture) -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -260,8 +260,8 @@
     <div id="app-view" class="hidden flex h-screen w-full text-slate-800 dark:text-slate-100 overflow-hidden">
         
         <!-- SIDEBAR -->
-        <aside id="app-sidebar" class="shrink-0 flex flex-col py-5 px-3 border-r border-slate-800 text-slate-400 z-20 transition-all duration-300">
-            <button type="button" id="sidebar-brand-toggle" class="sidebar-brand rounded-2xl px-3 py-3 mb-5 flex items-center gap-3 w-full text-left" title="Collapse sidebar">
+        <aside id="app-sidebar" class="shrink-0 flex flex-col py-5 px-3 border-r border-slate-800 text-slate-400 z-20">
+            <button type="button" id="sidebar-brand-toggle" class="sidebar-brand rounded-2xl px-3 py-3 mb-5 flex items-center gap-3 w-full text-left" title="Collapse sidebar" aria-expanded="true">
                 <div class="text-amber-500 shrink-0">
                     <i data-lucide="layers-3" class="w-8 h-8"></i>
                 </div>

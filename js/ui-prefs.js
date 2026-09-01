@@ -99,7 +99,16 @@ export function isSidebarCollapsed() {
 
 export function setSidebarCollapsed(collapsed) {
     localStorage.setItem(PREF_SIDEBAR_COLLAPSED, collapsed ? 'true' : 'false');
-    document.getElementById('app-sidebar')?.classList.toggle('is-collapsed', collapsed);
+    const sidebar = document.getElementById('app-sidebar');
+    if (!sidebar) return;
+
+    sidebar.classList.toggle('is-collapsed', collapsed);
+
+    const brand = document.getElementById('sidebar-brand-toggle');
+    if (brand) {
+        brand.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+        brand.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    }
 }
 
 export function expandSidebar() {
@@ -122,7 +131,9 @@ export function initHeaderPin() {
 
 export function initSidebarCollapse() {
     const brand = document.getElementById('sidebar-brand-toggle');
-    brand?.addEventListener('click', () => collapseSidebar());
+    brand?.addEventListener('click', () => {
+        setSidebarCollapsed(!isSidebarCollapsed());
+    });
 
     setSidebarCollapsed(isSidebarCollapsed());
     syncSidebarPinMarkers();

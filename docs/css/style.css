@@ -26,7 +26,10 @@
   width: 15.5rem;
   background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
   box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
-  transition: width 0.25s ease, padding 0.25s ease;
+  overflow: hidden;
+  contain: layout style;
+  transition: width 0.18s cubic-bezier(0.4, 0, 0.2, 1), padding 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: width;
 }
 
 #app-sidebar.is-collapsed {
@@ -35,10 +38,22 @@
   padding-right: 0.55rem;
 }
 
+.sidebar-brand-text,
+.sidebar-nav-label,
+.sidebar-nav-sub {
+  opacity: 1;
+  max-width: 11rem;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: opacity 0.12s ease, max-width 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 #app-sidebar.is-collapsed .sidebar-brand-text,
 #app-sidebar.is-collapsed .sidebar-nav-label,
 #app-sidebar.is-collapsed .sidebar-nav-sub {
-  display: none;
+  opacity: 0;
+  max-width: 0;
+  pointer-events: none;
 }
 
 #app-sidebar.is-collapsed .sidebar-brand {
@@ -77,7 +92,7 @@
   padding: 0.7rem 0.85rem;
   border-radius: 0.9rem;
   color: #94a3b8;
-  transition: all 0.2s ease;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
   text-align: left;
 }
 

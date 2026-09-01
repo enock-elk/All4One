@@ -112,6 +112,10 @@ export default function AffidavitAutomation() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const isDragging = useRef(false);
 
+  // Editable preview — manual edits persist until reset; copy/export use live DOM
+  const [previewEdited, setPreviewEdited] = useState(false);
+  const [previewKey, setPreviewKey] = useState(0);
+
   // GUARDIAN: Telemetry State (Silent Audit)
   const [feedbackText, setFeedbackText] = useState('');
 
@@ -655,6 +659,22 @@ export default function AffidavitAutomation() {
     );
   }, [form, rules, activeFirm, dependents, docCategory, signDate, renderAffidavitContent]);
 
+  const previewDeps = useMemo(
+    () => JSON.stringify({ form, rules, dependents, docCategory, signDate, reportSubject, isRecalc, complexity, calcAmount }),
+    [form, rules, dependents, docCategory, signDate, reportSubject, isRecalc, complexity, calcAmount]
+  );
+
+  useEffect(() => {
+    if (!previewEdited) {
+      setPreviewKey((k) => k + 1);
+    }
+  }, [previewDeps, previewEdited]);
+
+  const resetPreview = () => {
+    setPreviewEdited(false);
+    setPreviewKey((k) => k + 1);
+  };
+
   return (
     <div className="h-full flex overflow-hidden bg-slate-50 dark:bg-slate-900/50">
       
@@ -940,8 +960,23 @@ export default function AffidavitAutomation() {
           <div className="flex items-center gap-2">
             <RefreshCw className="w-4 h-4 text-slate-400 animate-spin-slow" />
             <span className="text-xs font-bold tracking-wide uppercase text-slate-500 dark:text-slate-400">Live Render</span>
+            {previewEdited && (
+              <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                Edited
+              </span>
+            )}
           </div>
           <div className="flex gap-3">
+            {previewEdited && (
+              <button
+                type="button"
+                onClick={resetPreview}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold border border-amber-300 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-all"
+                title="Discard manual edits and regenerate from form"
+              >
+                <RefreshCw className="w-4 h-4" /> Reset preview
+              </button>
+            )}
             <a 
               href="https://docs.google.com/spreadsheets/d/1twLeKxFlNOjD5HmCqIqdTPg5qd_34twgOetm6AD5AYc/edit?gid=432356199#gid=432356199" 
               target="_blank" 
@@ -967,8 +1002,19 @@ export default function AffidavitAutomation() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-8 custom-scroll">
+          <p className="text-center text-xs text-slate-500 dark:text-slate-400 mb-3 max-w-[800px] mx-auto">
+            Click anywhere in the document to edit text. Copy and Export Word use your edited version.
+          </p>
           <div className="w-full max-w-[800px] min-h-[1050px] mx-auto p-16 bg-white shadow-2xl transition-colors">
-            <div id="doc-preview" className="outline-none text-black">
+            <div
+              key={previewKey}
+              id="doc-preview"
+              className="outline-none text-black focus:ring-2 focus:ring-amber-400/40 rounded min-h-[200px]"
+              contentEditable
+              suppressContentEditableWarning
+              onInput={() => setPreviewEdited(true)}
+              spellCheck
+            >
               {generatedDocument}
             </div>
           </div>

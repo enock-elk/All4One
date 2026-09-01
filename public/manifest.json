@@ -5,7 +5,7 @@
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
-  "description": "PDF tools and Trello list activity monitor.",
+  "description": "Command center for PDF tools, Trello monitoring, affidavits, and client emails.",
   "orientation": "portrait-primary",
   "icons": [
     {

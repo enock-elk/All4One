@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="All4One Command Center">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="108" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="168" fill="none" stroke="rgba(245,158,11,0.18)" stroke-width="10"/>
+  <circle cx="256" cy="256" r="118" fill="none" stroke="rgba(245,158,11,0.28)" stroke-width="8"/>
+  <g stroke="url(#gold)" stroke-width="14" stroke-linecap="round">
+    <line x1="256" y1="96" x2="256" y2="156"/>
+    <line x1="256" y1="356" x2="256" y2="416"/>
+    <line x1="96" y1="256" x2="156" y2="256"/>
+    <line x1="356" y1="256" x2="416" y2="256"/>
+  </g>
+  <circle cx="256" cy="256" r="34" fill="url(#gold)"/>
+  <circle cx="256" cy="256" r="14" fill="#0f172a"/>
+  <g fill="url(#gold)">
+    <circle cx="256" cy="118" r="16"/>
+    <circle cx="256" cy="394" r="16"/>
+    <circle cx="118" cy="256" r="16"/>
+    <circle cx="394" cy="256" r="16"/>
+  </g>
+  <text x="256" y="278" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="88" font-weight="800" fill="#f8fafc">4</text>
+</svg>

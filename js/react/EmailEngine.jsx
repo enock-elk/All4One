@@ -8,36 +8,34 @@ import {
   AlertCircle,
   FileText
 } from 'lucide-react';
+import { AC_LOGO_DATA_URI } from './ac-logo-b64.js';
 
 // --- CONFIGURATION & ASSETS ---
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbw-M9kVkSSXKuJ49tohaconx99-l5VcbU1xSNeUTccX2gs0prok3LltyTyO7mdNKtm8/exec";
 
 // Signature matched to official Actuary Consulting email footer (sig.docx / Gmail format)
-const SIGNATURE_HTML = `
+const getSignatureHtml = () => `
 <br>
-<div style="font-family: 'Times New Roman', Times, serif; line-height: 1.35; color: #9d8456;">
-  <p style="margin: 0; font-size: 12pt; font-weight: bold; color: #9d8456;">Namir Waisberg</p>
-  <p style="margin: 0; font-size: 10pt; font-weight: normal; color: #9d8456;">Managing Director</p>
-  <p style="margin: 0; font-size: 9pt; font-weight: normal; color: #9d8456;">BEconSc (Cum Laude) BSc Hons (Cum Laude) (Wits) Actuary CFA</p>
+<div style="font-family: Verdana, Geneva, sans-serif; line-height: 1.35; color: #B08D57;">
+  <p style="margin: 0; font-size: 12pt; font-weight: bold; color: #B08D57;">Namir Waisberg</p>
+  <p style="margin: 0; font-size: 10pt; font-weight: normal; color: #B08D57;">Managing Director</p>
+  <p style="margin: 0; font-size: 9pt; font-weight: normal; color: #B08D57;">BEconSc (Cum Laude) BSc Hons (Cum Laude) (Wits) Actuary CFA</p>
 </div>
-<div style="font-family: Arial, Helvetica, sans-serif; font-size: 9pt; line-height: 1.55; margin-top: 10px;">
+<div style="font-family: Verdana, Geneva, sans-serif; font-size: 9pt; line-height: 1.55; margin-top: 10px;">
   <p style="margin: 0; color: #5f5f5f;">
     <strong style="color: #333333;">T</strong>&nbsp;011 463 0313&nbsp;&nbsp;&nbsp;
     <strong style="color: #333333;">M</strong>&nbsp;082 374 5552
   </p>
   <p style="margin: 0; color: #5f5f5f;">
     <strong style="color: #333333;">E</strong>&nbsp;<a href="mailto:namir@actuaryconsulting.co.za" style="color: #1155cc; text-decoration: underline;">namir@actuaryconsulting.co.za</a>&nbsp;&nbsp;&nbsp;
-    <strong style="color: #333333;">W</strong>&nbsp;<a href="https://actuaryconsulting.co.za" style="color: #1155cc; text-decoration: underline;">actuaryconsulting.co.za</a>
+    <strong style="color: #333333;">W</strong>&nbsp;<a href="https://actuaryconsulting.co.za" target="_blank" rel="noopener noreferrer" style="color: #1155cc; text-decoration: underline;">actuaryconsulting.co.za</a>
   </p>
   <p style="margin: 0;">
-    <strong style="color: #333333;">A</strong>&nbsp;<span style="color: #9d8456;">Corner 5th &amp; Maude Street, Sandown, Sandton, 2031</span>
+    <strong style="color: #333333;">A</strong>&nbsp;<span style="color: #B08D57;">Corner 5th &amp; Maude Street, Sandown, Sandton, 2031</span>
   </p>
 </div>
-<div style="margin: 14px 0 12px; line-height: 1.1;">
-  <div style="font-family: 'Times New Roman', Times, serif; font-size: 20pt; font-weight: bold; color: #9d8456; letter-spacing: 0.02em;">ACTUARY</div>
-  <div style="font-family: Arial, Helvetica, sans-serif; font-size: 7pt; font-weight: normal; color: #666666; letter-spacing: 0.38em; margin-top: 2px;">CONSULTING</div>
-</div>
-<p style="margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 7.5pt; color: #999999; text-align: justify; line-height: 1.35;">
+<img src="${AC_LOGO_DATA_URI}" alt="Actuary Consulting" width="200" style="display: block; max-width: 200px; height: auto; margin: 12px 0;" />
+<p style="margin: 0; font-family: Verdana, Geneva, sans-serif; font-size: 7.5pt; color: #999999; text-align: justify; line-height: 1.35;">
   The information contained in this email is confidential and may be subject to legal privilege. The content of this email, which may include one or more attachments, is strictly confidential, and is intended solely for the use of the named recipient/s. If you are not the intended recipient, you cannot use, copy, distribute, disclose or retain the email or any part of its contents or take any action in reliance on it. If you have received this email in error, please email the sender by replying to this message and to permanently delete it and all attachments from your computer. All reasonable precautions have been taken to ensure that no viruses are present in this email and the company cannot accept responsibility for any loss or damage arising from the use of this email or attachments.
 </p>
 `;
@@ -112,7 +110,7 @@ export default function EmailEngine() {
       compBody = compBody.replace(replaceRegex, val);
     });
 
-    const htmlBody = compBody.replace(/\n/g, '<br/>') + SIGNATURE_HTML;
+    const htmlBody = `<div style="font-family: Verdana, Geneva, sans-serif; font-size: 13px; color: #000; line-height: 1.5;">${compBody.replace(/\n/g, '<br/>')}${getSignatureHtml()}</div>`;
 
     return { subject: compSubject, htmlBody };
   }, [selectedTemplateId, variables]);
