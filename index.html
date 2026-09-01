@@ -28,10 +28,12 @@
     <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
 
     <!-- Application Logic (relative paths so GitHub Pages /All4One/ can resolve them) -->
+    <link rel="stylesheet" href="public/css/style.css">
     <link rel="modulepreload" href="js/pdf-engine.js">
     <script type="module" src="js/app.js"></script>
     <script type="module" src="js/pdf-manager.js"></script>
     <script type="module" src="js/trello.js"></script>
+    <script type="module" src="js/react-tools.js"></script>
     <style>
         .trello-lockscreen {
             background-color: #0f172a;
@@ -196,6 +198,16 @@
                 <!-- Case Maker -->
                 <button data-tab="casemaker" class="tab-btn p-3 rounded-xl transition-all flex justify-center w-full hover:text-white hover:bg-slate-800/50" title="Case Maker">
                     <i data-lucide="briefcase" class="w-6 h-6"></i>
+                </button>
+
+                <!-- Affidavit Automation -->
+                <button data-tab="affidavits" class="tab-btn p-3 rounded-xl transition-all flex justify-center w-full hover:text-white hover:bg-slate-800/50" title="Affidavit Automation">
+                    <i data-lucide="scroll-text" class="w-6 h-6"></i>
+                </button>
+
+                <!-- Draft Email Generator -->
+                <button data-tab="emails" class="tab-btn p-3 rounded-xl transition-all flex justify-center w-full hover:text-white hover:bg-slate-800/50" title="Draft Email Generator">
+                    <i data-lucide="mail" class="w-6 h-6"></i>
                 </button>
             </nav>
 
@@ -581,6 +593,16 @@
                         allow="clipboard-write"
                         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads"
                     ></iframe>
+                </div>
+
+                <!-- AFFIDAVIT AUTOMATION TAB -->
+                <div id="tab-affidavits" class="tab-content hidden h-full w-full overflow-hidden">
+                    <div id="affidavit-root" class="h-full"></div>
+                </div>
+
+                <!-- DRAFT EMAIL GENERATOR TAB -->
+                <div id="tab-emails" class="tab-content hidden h-full w-full overflow-hidden">
+                    <div id="email-root" class="h-full"></div>
                 </div>
 
             </main>

@@ -60,7 +60,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const tabTitles = {
         'pdf-manager': 'Document Manager',
         'dashboard': 'Trello Watcher',
-        'casemaker': 'Case Maker'
+        'casemaker': 'Case Maker',
+        'affidavits': 'Affidavit Automation',
+        'emails': 'Draft Email Generator'
     };
 
     // --- Dark Mode Initialization & Logic ---
@@ -173,6 +175,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (headerTitle && tabTitles[targetTabId]) {
             headerTitle.textContent = tabTitles[targetTabId];
         }
+
+        // Notify React island modules to lazy-mount on first visit
+        document.dispatchEvent(new CustomEvent('tab-activated', { detail: targetTabId }));
     }
 
     // Attach click listeners to all sidebar tab buttons

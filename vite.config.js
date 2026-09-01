@@ -1,23 +1,12 @@
 import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 export default defineConfig({
   base: './',
-  server: {
-    port: 5500,
-    strictPort: false,
-    open: false,
-  },
-  preview: {
-    port: 5500,
-    strictPort: false,
-  },
-  build: {
-    outDir: 'dist',
-    emptyOutDir: true,
-  },
   plugins: [
+    react(),
     {
       name: 'stable-pwa-urls',
       closeBundle() {
@@ -33,4 +22,17 @@ export default defineConfig({
       },
     },
   ],
+  server: {
+    port: 5500,
+    strictPort: false,
+    open: false,
+  },
+  preview: {
+    port: 5500,
+    strictPort: false,
+  },
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
+  },
 });
