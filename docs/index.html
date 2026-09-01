@@ -5,7 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>All4One Command Center</title>
     <link rel="manifest" href="./manifest.json">
-    <meta name="theme-color" content="#0f172a">
+    <meta name="theme-color" content="#f8fafc">
+    <script>
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.documentElement.classList.add('dark');
+            document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0f172a');
+        }
+    </script>
     <link rel="apple-touch-icon" href="./icons/icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
     <!-- Favicon (Inherited from original React build) -->
@@ -123,11 +129,92 @@
         }
         body.trello-fullscreen .trello-bucket-count { font-size: 2rem; }
         body.trello-fullscreen .trello-bucket-name { font-size: 0.85rem; }
+
+        /* Trello Watcher — light mode */
+        html:not(.dark) #trello-lockscreen {
+            color: #1e293b;
+            background-color: #e8edf4;
+        }
+        html:not(.dark) #trello-lockscreen::before {
+            background: rgba(255, 255, 255, 0.55);
+        }
+        html:not(.dark) .trello-clock-time {
+            color: #0f172a;
+            text-shadow: none;
+        }
+        html:not(.dark) .trello-clock-date {
+            color: #64748b;
+        }
+        html:not(.dark) .trello-glass {
+            background: rgba(255, 255, 255, 0.94);
+            border: 1px solid rgba(148, 163, 184, 0.45);
+            color: #334155;
+            box-shadow: 0 12px 40px rgba(15, 23, 42, 0.08);
+        }
+        html:not(.dark) #trello-lockscreen .text-white\/70,
+        html:not(.dark) #trello-monitor .text-white\/70 {
+            color: #64748b !important;
+        }
+        html:not(.dark) #trello-lockscreen .text-white\/50 {
+            color: #94a3b8 !important;
+        }
+        html:not(.dark) #trello-lockscreen .text-white\/60,
+        html:not(.dark) #trello-monitor .text-white\/60 {
+            color: #64748b !important;
+        }
+        html:not(.dark) #trello-lockscreen .text-white\/80,
+        html:not(.dark) #trello-monitor .text-white\/80 {
+            color: #475569 !important;
+        }
+        html:not(.dark) #trello-board-select,
+        html:not(.dark) #trello-tone-select {
+            background: #f8fafc !important;
+            border-color: #cbd5e1 !important;
+            color: #0f172a !important;
+        }
+        html:not(.dark) #trello-list-checkboxes {
+            background: #f8fafc !important;
+            border-color: #cbd5e1 !important;
+        }
+        html:not(.dark) #trello-list-checkboxes label {
+            color: #334155;
+        }
+        html:not(.dark) .trello-bucket-card {
+            background: rgba(255, 255, 255, 0.9);
+            border-color: #cbd5e1;
+        }
+        html:not(.dark) .trello-bucket-name {
+            color: #475569;
+        }
+        html:not(.dark) .trello-mode-active {
+            background: rgba(14, 165, 233, 0.12) !important;
+            border-color: #38bdf8 !important;
+            color: #0f172a !important;
+        }
+        html:not(.dark) #trello-log-container {
+            background: #f1f5f9 !important;
+            color: #047857 !important;
+            border-color: #cbd5e1 !important;
+        }
+        html:not(.dark) #trello-monitor .text-sky-400,
+        html:not(.dark) #trello-lockscreen .text-sky-400 {
+            color: #0284c7 !important;
+        }
+        html:not(.dark) #trello-monitor .text-emerald-200,
+        html:not(.dark) #trello-monitor .text-emerald-400 {
+            color: #059669 !important;
+        }
+        html:not(.dark) #trello-monitor .text-sky-200 {
+            color: #0369a1 !important;
+        }
+        html:not(.dark) #trello-monitor .text-rose-300 {
+            color: #e11d48 !important;
+        }
         #app-toast {
             transition: opacity 0.2s ease;
         }
     </style>
-  <script type="module" crossorigin src="./assets/index-BIZ8AkXY.js"></script>
+  <script type="module" crossorigin src="./assets/index-CL0hlkww.js"></script>
   <link rel="stylesheet" crossorigin href="./assets/index-H1RwDTHq.css">
 </head>
 <body class="bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
@@ -472,7 +559,7 @@
 
                 <!-- TRELLO WATCHER TAB -->
                 <div id="tab-dashboard" class="tab-content hidden h-full w-full overflow-hidden relative">
-                    <div id="trello-lockscreen" class="trello-lockscreen absolute inset-0 flex flex-col items-center overflow-y-auto text-white">
+                    <div id="trello-lockscreen" class="trello-lockscreen absolute inset-0 flex flex-col items-center overflow-y-auto dark:text-white text-slate-800">
                         <div class="relative z-10 w-full max-w-xl px-4 pt-10 pb-40 flex flex-col items-center">
                             <div id="trello-hero" class="text-center mb-6">
                                 <div id="trello-clock-time" class="trello-clock-time">--:--</div>

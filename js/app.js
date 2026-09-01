@@ -74,8 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Dark Mode Initialization & Logic ---
     function initDarkMode() {
-        const isDark = localStorage.getItem('darkMode') === 'true' || 
-                       (!('darkMode' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        const isDark = localStorage.getItem('darkMode') === 'true';
         
         if (isDark) {
             document.documentElement.classList.add('dark');
@@ -99,6 +98,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.documentElement.classList.toggle('dark');
         const isDark = document.documentElement.classList.contains('dark');
         localStorage.setItem('darkMode', isDark);
+        const themeMeta = document.querySelector('meta[name="theme-color"]');
+        if (themeMeta) themeMeta.setAttribute('content', isDark ? '#0f172a' : '#f8fafc');
         updateDarkModeIcon();
     });
 

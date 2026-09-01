@@ -12,27 +12,34 @@ import {
 // --- CONFIGURATION & ASSETS ---
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbw-M9kVkSSXKuJ49tohaconx99-l5VcbU1xSNeUTccX2gs0prok3LltyTyO7mdNKtm8/exec";
 
-// Updated Exact Signature Layout
+// Signature matched to official Actuary Consulting email footer (sig.docx / Gmail format)
 const SIGNATURE_HTML = `
-<br><br>
-<div style="font-family: Arial, sans-serif; font-size: 10pt; color: #333; line-height: 1.4;">
-  <p style="margin: 0; font-weight: bold; font-size: 11pt; color: #000;">Namir Waisberg</p>
-  <p style="margin: 0; color: #444;">Managing Director</p>
-  <p style="margin: 0; color: #444; font-size: 9pt;">BEconSc (Cum Laude) BSc Hons (Cum Laude) (Wits) Actuary CFA</p>
-  <br>
-  <p style="margin: 0; font-size: 9pt;">
-    <strong style="color: #b48c41;">T</strong> 011 463 0313 &nbsp;&nbsp; <strong style="color: #b48c41;">M</strong> 082 374 5552<br>
-    <strong style="color: #b48c41;">E</strong> <a href="mailto:namir@actuaryconsulting.co.za" style="color: #000; text-decoration: none;">namir@actuaryconsulting.co.za</a> &nbsp;&nbsp; <strong style="color: #b48c41;">W</strong> <a href="https://actuaryconsulting.co.za" style="color: #000; text-decoration: none;">actuaryconsulting.co.za</a><br>
-    <strong style="color: #b48c41;">A</strong> Corner 5th &amp; Maude Street, Sandown, Sandton, 2031
+<br>
+<div style="font-family: 'Times New Roman', Times, serif; line-height: 1.35; color: #9d8456;">
+  <p style="margin: 0; font-size: 12pt; font-weight: bold; color: #9d8456;">Namir Waisberg</p>
+  <p style="margin: 0; font-size: 10pt; font-weight: normal; color: #9d8456;">Managing Director</p>
+  <p style="margin: 0; font-size: 9pt; font-weight: normal; color: #9d8456;">BEconSc (Cum Laude) BSc Hons (Cum Laude) (Wits) Actuary CFA</p>
+</div>
+<div style="font-family: Arial, Helvetica, sans-serif; font-size: 9pt; line-height: 1.55; margin-top: 10px;">
+  <p style="margin: 0; color: #5f5f5f;">
+    <strong style="color: #333333;">T</strong>&nbsp;011 463 0313&nbsp;&nbsp;&nbsp;
+    <strong style="color: #333333;">M</strong>&nbsp;082 374 5552
   </p>
-  <br>
-  <!-- NOTE: Email images must be hosted online (absolute URL). Replace this src with your live website logo link if needed -->
-  <img src="https://actuaryconsulting.co.za/wp-content/uploads/2023/10/Actuary-Consulting-Logo.png" alt="ACTUARY CONSULTING" style="max-height: 45px; display: block; margin-top: 5px; margin-bottom: 10px;" onerror="this.style.display='none'" />
-  <br>
-  <p style="margin: 0; font-size: 7.5pt; color: #999; text-align: justify;">
-    The information contained in this email is confidential and may be subject to legal privilege. The content of this email, which may include one or more attachments, is strictly confidential, and is intended solely for the use of the named recipient/s. If you are not the intended recipient, you cannot use, copy, distribute, disclose or retain the email or any part of its contents or take any action in reliance on it. If you have received this email in error, please email the sender by replying to this message and to permanently delete it and all attachments from your computer. All reasonable precautions have been taken to ensure that no viruses are present in this email and the company cannot accept responsibility for any loss or damage arising from the use of this email or attachments.
+  <p style="margin: 0; color: #5f5f5f;">
+    <strong style="color: #333333;">E</strong>&nbsp;<a href="mailto:namir@actuaryconsulting.co.za" style="color: #1155cc; text-decoration: underline;">namir@actuaryconsulting.co.za</a>&nbsp;&nbsp;&nbsp;
+    <strong style="color: #333333;">W</strong>&nbsp;<a href="https://actuaryconsulting.co.za" style="color: #1155cc; text-decoration: underline;">actuaryconsulting.co.za</a>
+  </p>
+  <p style="margin: 0;">
+    <strong style="color: #333333;">A</strong>&nbsp;<span style="color: #9d8456;">Corner 5th &amp; Maude Street, Sandown, Sandton, 2031</span>
   </p>
 </div>
+<div style="margin: 14px 0 12px; line-height: 1.1;">
+  <div style="font-family: 'Times New Roman', Times, serif; font-size: 20pt; font-weight: bold; color: #9d8456; letter-spacing: 0.02em;">ACTUARY</div>
+  <div style="font-family: Arial, Helvetica, sans-serif; font-size: 7pt; font-weight: normal; color: #666666; letter-spacing: 0.38em; margin-top: 2px;">CONSULTING</div>
+</div>
+<p style="margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 7.5pt; color: #999999; text-align: justify; line-height: 1.35;">
+  The information contained in this email is confidential and may be subject to legal privilege. The content of this email, which may include one or more attachments, is strictly confidential, and is intended solely for the use of the named recipient/s. If you are not the intended recipient, you cannot use, copy, distribute, disclose or retain the email or any part of its contents or take any action in reliance on it. If you have received this email in error, please email the sender by replying to this message and to permanently delete it and all attachments from your computer. All reasonable precautions have been taken to ensure that no viruses are present in this email and the company cannot accept responsibility for any loss or damage arising from the use of this email or attachments.
+</p>
 `;
 
 const TEMPLATES = [
