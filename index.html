@@ -27,9 +27,8 @@
     <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
 
-    <!-- Application Logic (relative paths so GitHub Pages /All4One/ can resolve them) -->
+    <!-- Application Logic (Vite dev entry — production build uses bundled ./assets/index-*.js) -->
     <link rel="stylesheet" href="public/css/style.css">
-    <link rel="modulepreload" href="js/pdf-engine.js">
     <script type="module" src="js/app.js"></script>
     <style>
         .trello-lockscreen {
@@ -735,6 +734,16 @@
     </div>
 
     <script>
+        // If GitHub Pages serves the dev entry (js/app.js) from repo root, redirect to the built /docs bundle.
+        (function () {
+            const devEntry = document.querySelector('script[type="module"][src="js/app.js"]');
+            if (!devEntry || !location.hostname.endsWith('github.io')) return;
+            if (location.pathname.includes('/docs')) return;
+            const base = location.pathname.replace(/\/index\.html$/, '').replace(/\/?$/, '/');
+            fetch(base + 'docs/index.html', { method: 'HEAD' })
+                .then((res) => { if (res.ok) location.replace(base + 'docs/'); })
+                .catch(() => {});
+        })();
         lucide.createIcons();
     </script>
 </body>

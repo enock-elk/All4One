@@ -1,47 +1,48 @@
-const CACHE_NAME = 'all4one-watcher-v1';
-const urlsToCache = [
-  './',
-  './index.html',
-  './manifest.json',
-  './js/app.js',
-  './js/trello.js',
-  './js/trello-poller.js',
-  './js/trello-worker.js',
-  './public/workers/trello-worker.js',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  './sounds/bottle_opener.mp3',
-  './sounds/carlock.mp3',
-  './sounds/doorbell.mp3',
-  './sounds/email_notification.mp3',
-  './sounds/message_messaaaaaage.mp3',
-  './sounds/message_my_lord.mp3',
-  './sounds/message_tone.mp3',
-  './sounds/zap.mp3',
-  './sounds/just_calledf__k_u.mp3',
-  './sounds/ping.mp3',
-  './sounds/notification.mp3',
-  './sounds/sneeze.mp3',
-  './sounds/wahwahwahwahhh.mp3',
-];
+const CACHE_NAME = 'all4one-v2';
+const SHELL_URLS = ['./', './index.html', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(urlsToCache).catch(() => undefined)),
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_URLS).catch(() => undefined)),
   );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((names) => Promise.all(
-      names.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name)),
-    )).then(() => self.clients.claim()),
+    caches.keys()
+      .then((names) => Promise.all(names.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name))))
+      .then(() => self.clients.claim()),
   );
 });
 
+function isBundledAsset(url) {
+  return url.pathname.includes('/assets/') || url.pathname.endsWith('.js') || url.pathname.endsWith('.css');
+}
+
 self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  if (request.method !== 'GET') return;
+
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+
+  if (request.mode === 'navigate' || url.pathname.endsWith('.html') || isBundledAsset(url)) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok && request.mode === 'navigate') {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put('./index.html', copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request).then((cached) => cached || caches.match('./index.html'))),
+    );
+    return;
+  }
+
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request)),
+    caches.match(request).then((cached) => cached || fetch(request)),
   );
 });
