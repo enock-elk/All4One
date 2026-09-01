@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:react": "vite build --config vite.react.config.js",
     "preview": "vite preview",
     "firebase:emulators": "npx -y firebase-tools@latest emulators:start --only functions",
     "firebase:deploy:functions": "npx -y firebase-tools@latest deploy --only functions"
