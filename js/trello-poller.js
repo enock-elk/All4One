@@ -103,6 +103,7 @@ export function createTrelloWatcher(postMessage) {
                         id: target.id,
                         name: target.name,
                         count,
+                        cards: activeCards.map((c) => c.name),
                     });
                 }
 

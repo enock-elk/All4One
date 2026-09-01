@@ -118,6 +118,7 @@ async function startLoop(targets) {
                     id: target.id,
                     name: target.name,
                     count,
+                    cards: activeCards.map((c) => c.name),
                 });
             }
 

@@ -3,6 +3,7 @@
 // ============================================================================
 
 import { registerReactTabs } from './react/mount.jsx';
+import { getDefaultTab, initWorkspacePrefs } from './ui-prefs.js';
 import './pdf-manager.js';
 import './trello.js';
 
@@ -115,8 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function showApp() {
         loginView.classList.add('hidden');
         appView.classList.remove('hidden');
-        // Default tab
-        activateTab('pdf-manager');
+        activateTab(getDefaultTab());
     }
 
     function showLogin() {
@@ -159,15 +159,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         
         tabButtons.forEach(btn => {
-            // Reset to inactive state (Tailwind classes)
-            btn.classList.remove('text-white', 'bg-slate-800');
-            btn.classList.add('hover:text-white', 'hover:bg-slate-800/50');
-            
-            // Set active state
-            if (btn.getAttribute('data-tab') === targetTabId) {
-                btn.classList.remove('hover:text-white', 'hover:bg-slate-800/50');
-                btn.classList.add('text-white', 'bg-slate-800');
-            }
+            const isActive = btn.getAttribute('data-tab') === targetTabId;
+            btn.classList.toggle('is-active', isActive);
+            btn.setAttribute('aria-current', isActive ? 'page' : 'false');
         });
 
         // Show the targeted content
@@ -197,8 +191,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
+    // Expose for modules that need tab switching
+    window.activateWorkspaceTab = activateTab;
+
     // --- Initialization ---
     initDarkMode();
+    initWorkspacePrefs();
     checkLoginState();
 
     if ('serviceWorker' in navigator) {
