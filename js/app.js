@@ -86,10 +86,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateDarkModeIcon() {
         const icon = document.getElementById('dark-mode-icon');
-        if (document.documentElement.classList.contains('dark')) {
-            icon.setAttribute('data-lucide', 'sun');
-        } else {
-            icon.setAttribute('data-lucide', 'moon');
+        const label = document.getElementById('dark-mode-label');
+        const isDark = document.documentElement.classList.contains('dark');
+        if (icon) {
+            icon.setAttribute('data-lucide', isDark ? 'sun' : 'moon');
+        }
+        if (label) {
+            label.textContent = isDark ? 'Light Mode' : 'Dark Mode';
         }
         if (window.lucide) lucide.createIcons();
     }

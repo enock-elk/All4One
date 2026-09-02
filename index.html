@@ -314,12 +314,24 @@
             </nav>
 
             <div class="mt-auto flex flex-col gap-1.5 w-full pt-4 border-t border-slate-800/80">
-                <button id="dark-mode-toggle" class="sidebar-footer-btn" title="Toggle Dark Mode">
-                    <i data-lucide="moon" id="dark-mode-icon" class="w-5 h-5"></i>
+                <button type="button" id="dark-mode-toggle" class="sidebar-nav-btn w-full" title="Toggle Dark Mode">
+                    <span class="sidebar-nav-icon">
+                        <i data-lucide="moon" id="dark-mode-icon" class="w-5 h-5"></i>
+                    </span>
+                    <span class="min-w-0">
+                        <span class="sidebar-nav-label" id="dark-mode-label">Dark Mode</span>
+                        <span class="sidebar-nav-sub">Toggle appearance</span>
+                    </span>
                 </button>
-                
-                <button id="logout-btn" class="sidebar-footer-btn text-rose-400 hover:text-rose-200 hover:bg-rose-500/10" title="Secure Logout">
-                    <i data-lucide="log-out" class="w-5 h-5"></i>
+
+                <button type="button" id="logout-btn" class="sidebar-nav-btn w-full !text-rose-400 hover:!text-rose-200 hover:bg-rose-500/10" title="Secure Logout">
+                    <span class="sidebar-nav-icon !bg-rose-500/10">
+                        <i data-lucide="log-out" class="w-5 h-5"></i>
+                    </span>
+                    <span class="min-w-0">
+                        <span class="sidebar-nav-label">Sign Out</span>
+                        <span class="sidebar-nav-sub">Secure logout</span>
+                    </span>
                 </button>
             </div>
         </aside>
