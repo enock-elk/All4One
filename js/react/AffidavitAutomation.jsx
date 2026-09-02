@@ -229,7 +229,7 @@ export default function AffidavitAutomation() {
       await fetch(GOOGLE_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ firm: activeFirm.firm, rules })
+        body: JSON.stringify({ action: 'SYNC_RULES', firm: activeFirm.firm, rules })
       });
       setDatabase(prev =>
         prev.map(firm =>

@@ -9,6 +9,12 @@ import {
   FileText
 } from 'lucide-react';
 import { AC_LOGO_DATA_URI } from './ac-logo-b64.js';
+import {
+  createGmailDraft,
+  isGmailConnected,
+  requestGmailAccessToken,
+  clearGmailToken,
+} from '../gmail-draft.js';
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbw-M9kVkSSXKuJ49tohaconx99-l5VcbU1xSNeUTccX2gs0prok3LltyTyO7mdNKtm8/exec";
 
 // Brand colours from official Actuary Consulting signature
@@ -86,6 +92,7 @@ export default function EmailEngine() {
   const [parsedKeys, setParsedKeys] = useState({ subject: [], body: [] });
   const [status, setStatus] = useState({ msg: '', type: '' });
   const [isPushing, setIsPushing] = useState(false);
+  const [gmailLinked, setGmailLinked] = useState(() => isGmailConnected());
 
   useEffect(() => {
     const template = TEMPLATES.find(t => t.id === selectedTemplateId) || TEMPLATES[0];
@@ -150,53 +157,98 @@ export default function EmailEngine() {
     }
   };
 
+  const connectGmail = async () => {
+    setStatus({ msg: 'Connecting Google account for Gmail drafts...', type: 'info' });
+    try {
+      await requestGmailAccessToken();
+      setGmailLinked(true);
+      setStatus({ msg: 'Gmail connected. You can push drafts directly.', type: 'success' });
+    } catch (err) {
+      setStatus({ msg: err?.message || 'Gmail connection failed.', type: 'error' });
+    }
+  };
+
+  const disconnectGmail = () => {
+    clearGmailToken();
+    setGmailLinked(false);
+    setStatus({ msg: 'Gmail disconnected.', type: 'info' });
+  };
+
+  const pushDraftViaGmailApi = async () => {
+    await createGmailDraft({
+      subject: compiledContent.subject,
+      htmlBody: compiledContent.htmlBody,
+    });
+    setStatus({
+      msg: 'Draft created in your Gmail account. Open Gmail → Drafts to review and send.',
+      type: 'success',
+    });
+  };
+
   const pushToGmail = async () => {
     setIsPushing(true);
-    setStatus({ msg: 'Pushing draft to Gmail Backend...', type: 'info' });
+    setStatus({ msg: 'Pushing draft to Gmail...', type: 'info' });
 
     try {
       const payload = {
         action: 'CREATE_DRAFT',
         subject: compiledContent.subject,
-        htmlBody: compiledContent.htmlBody
+        htmlBody: compiledContent.htmlBody,
       };
 
       const res = await fetch(GAS_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       let result;
       try {
         result = await res.json();
       } catch {
-        setStatus({
-          msg: `Backend returned a non-JSON response (HTTP ${res.status}). Redeploy the Apps Script CREATE_DRAFT handler.`,
-          type: 'error'
-        });
-        return;
+        result = null;
       }
 
       const ok = String(result?.status || '').toLowerCase() === 'success';
       if (ok) {
         setStatus({
           msg: result.message || 'Draft created in your Gmail account!',
-          type: 'success'
+          type: 'success',
         });
-      } else {
-        const detail = result?.message || `HTTP ${res.status}`;
-        setStatus({
-          msg: `Failed to push draft via GAS: ${detail}`,
-          type: 'error'
-        });
+        return;
       }
+
+      const gasError = result?.message || `HTTP ${res.status}`;
+      const needsOAuthFallback =
+        /firm not found/i.test(gasError) ||
+        /unknown action/i.test(gasError) ||
+        !result;
+
+      if (needsOAuthFallback) {
+        setStatus({ msg: 'Backend draft handler unavailable — using Gmail OAuth...', type: 'info' });
+        await pushDraftViaGmailApi();
+        setGmailLinked(true);
+        return;
+      }
+
+      setStatus({
+        msg: `Failed to push draft via GAS: ${gasError}`,
+        type: 'error',
+      });
     } catch (err) {
       console.error(err);
-      setStatus({
-        msg: `Network error connecting to Backend: ${err?.message || 'unknown error'}`,
-        type: 'error'
-      });
+      const msg = err?.message || 'unknown error';
+      if (/oauth|gmail|token|configured/i.test(msg)) {
+        setStatus({
+          msg: `${msg} Click "Connect Gmail" first, or redeploy gas/Code.gs on Apps Script.`,
+          type: 'error',
+        });
+      } else {
+        setStatus({
+          msg: `Failed to create Gmail draft: ${msg}`,
+          type: 'error',
+        });
+      }
     } finally {
       setIsPushing(false);
     }
@@ -287,6 +339,24 @@ export default function EmailEngine() {
             <span className="text-xs font-bold tracking-wide uppercase text-slate-500 dark:text-slate-400">HTML Compiled</span>
           </div>
           <div className="flex gap-3">
+            {gmailLinked ? (
+              <button
+                type="button"
+                onClick={disconnectGmail}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300"
+                title="Disconnect Gmail OAuth"
+              >
+                <CheckCircle2 className="w-4 h-4" /> Gmail connected
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={connectGmail}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all active:scale-95"
+              >
+                <Mail className="w-4 h-4" /> Connect Gmail
+              </button>
+            )}
             <button 
               onClick={copyToClipboard} 
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all active:scale-95"
