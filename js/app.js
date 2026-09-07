@@ -5,6 +5,7 @@
 import { registerReactTabs } from './react/mount.jsx';
 import { getDefaultTab, initWorkspacePrefs, onWorkspaceTabActivated, expandSidebar } from './ui-prefs.js';
 import { initCaseMakerThemeSync, loadCaseMakerFrameIfNeeded, postCaseMakerTheme } from './casemaker-theme.js';
+import { isWorkspaceLocked, setWorkspaceLocked } from './workspace-identity.js';
 import './pdf-manager.js';
 import './trello.js';
 
@@ -59,7 +60,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginView = document.getElementById('login-view');
     const appView = document.getElementById('app-view');
     const loginForm = document.getElementById('login-form');
-    const usernameInput = document.getElementById('username-input');
     const logoutBtn = document.getElementById('logout-btn');
     const darkModeToggle = document.getElementById('dark-mode-toggle');
     const headerTitle = document.getElementById('header-title');
@@ -111,51 +111,43 @@ document.addEventListener('DOMContentLoaded', () => {
         postCaseMakerTheme();
     });
 
-    // --- Auth / Login Logic ---
-    async function checkLoginState() {
-        const savedUser = localStorage.getItem('username');
-        if (savedUser) {
-            showApp();
-            ensureFirebaseAuth();
-        } else {
-            showLogin();
+    // --- Workspace lock (no landing-name gate) ---
+    function checkLoginState() {
+        if (isWorkspaceLocked()) {
+            showLock();
+            return;
         }
+        showApp();
+        ensureFirebaseAuth();
     }
 
     function showApp() {
+        setWorkspaceLocked(false);
         loginView.classList.add('hidden');
         appView.classList.remove('hidden');
         activateTab(getDefaultTab());
     }
 
-    function showLogin() {
+    function showLock() {
         loginView.classList.remove('hidden');
         appView.classList.add('hidden');
     }
 
     loginForm.addEventListener('submit', (e) => {
         e.preventDefault();
-        const name = usernameInput.value.trim();
-        if (name.length > 2) {
-            localStorage.setItem('username', name);
-            showApp();
-            ensureFirebaseAuth();
-        }
+        showApp();
+        ensureFirebaseAuth();
     });
 
     logoutBtn.addEventListener('click', async () => {
         if (confirm("Are you sure you want to lock the workspace?")) {
-            localStorage.removeItem('username');
-            usernameInput.value = '';
-            
-            // Sign out of Firebase to destroy the token
+            setWorkspaceLocked(true);
             try {
                 await firebase.auth().signOut();
             } catch (err) {
                 console.error("Firebase signout error", err);
             }
-
-            showLogin();
+            showLock();
         }
     });
 

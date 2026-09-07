@@ -5,6 +5,7 @@
 import { createTrelloWatcher } from './trello-poller.js';
 import { showActionToast, showAppToast } from './ui-prefs.js';
 import { createBoardPip } from './trello-board-pip.js';
+import { rememberWorkspaceName } from './workspace-identity.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const API_KEY = '4a2f87929257d1557d800be137588c07';
@@ -531,6 +532,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showSetup();
         try {
             const me = await trelloFetch('https://api.trello.com/1/members/me');
+            rememberWorkspaceName(me.fullName || me.username || '');
             if (userLabel) userLabel.textContent = `Connected as ${me.fullName || me.username || 'Trello user'}`;
             await fetchBoards();
             addLog('Trello session ready. Select lists and start watching.', 'success');

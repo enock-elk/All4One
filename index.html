@@ -220,9 +220,9 @@
 <body class="bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
 
     <!-- ========================================== -->
-    <!-- LOGIN VIEW (Hidden if authenticated)         -->
+    <!-- OPTIONAL LOCK SCREEN (after Sign Out only) -->
     <!-- ========================================== -->
-    <div id="login-view" class="min-h-screen flex items-center justify-center p-4">
+    <div id="login-view" class="hidden min-h-screen flex items-center justify-center p-4">
         <div class="max-w-md w-full bg-white dark:bg-slate-800 rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700 p-8 text-center transition-colors duration-300">
             <div class="bg-slate-100 dark:bg-slate-900 rounded-2xl p-6 mb-8 shadow-inner inline-block transition-colors duration-300">
                 <i data-lucide="building-2" class="w-12 h-12 text-amber-500 mx-auto mb-2"></i>
@@ -230,19 +230,12 @@
                 <p class="text-[0.65rem] font-sans text-slate-500 tracking-[0.3em] uppercase">Command Center</p>
             </div>
             
-            <h1 class="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">Secure Workspace</h1>
+            <h1 class="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">Workspace Locked</h1>
             <p class="text-slate-500 dark:text-slate-400 text-sm mb-8">
-                Please enter your full name to access unified tools and maintain an audit trail.
+                Continue into the command center. Your saved name is kept for affidavit logs.
             </p>
             
             <form id="login-form" class="space-y-4">
-                <input 
-                    type="text" 
-                    id="username-input"
-                    placeholder="Enter your Full Name" 
-                    required
-                    class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white dark:placeholder-slate-500"
-                />
                 <button 
                     type="submit"
                     class="w-full flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-blue-600/20 transition-all active:scale-95"
@@ -254,10 +247,30 @@
         </div>
     </div>
 
+    <div id="identity-prompt" class="hidden fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-950/55">
+        <form id="identity-prompt-form" class="w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 shadow-2xl">
+            <p class="text-[0.65rem] font-bold uppercase tracking-[0.18em] text-amber-600 dark:text-amber-400 mb-2">Affidavit log</p>
+            <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">Who is generating this affidavit?</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mb-5">This name is saved on this browser and reused for future affidavit logs.</p>
+            <input
+                type="text"
+                id="identity-prompt-input"
+                placeholder="Enter your full name"
+                required
+                minlength="2"
+                class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm focus:ring-2 focus:ring-amber-500 outline-none transition-all dark:text-white dark:placeholder-slate-500 mb-4"
+            />
+            <div class="flex items-center justify-end gap-2">
+                <button type="button" id="identity-prompt-cancel" class="px-4 py-2.5 rounded-xl text-sm font-bold border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">Cancel</button>
+                <button type="submit" class="px-4 py-2.5 rounded-xl text-sm font-bold bg-amber-500 hover:bg-amber-600 text-slate-900">Save and continue</button>
+            </div>
+        </form>
+    </div>
+
     <!-- ========================================== -->
-    <!-- MAIN APP VIEW (Hidden until authenticated) -->
+    <!-- MAIN APP VIEW -->
     <!-- ========================================== -->
-    <div id="app-view" class="hidden flex h-screen w-full text-slate-800 dark:text-slate-100 overflow-hidden">
+    <div id="app-view" class="flex h-screen w-full text-slate-800 dark:text-slate-100 overflow-hidden">
         
         <!-- SIDEBAR -->
         <aside id="app-sidebar" class="shrink-0 flex flex-col pt-0 pb-5 px-3 border-r border-slate-800 text-slate-400 z-20">

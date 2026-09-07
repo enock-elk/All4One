@@ -1,8 +1,17 @@
-export const APP_VERSION = '1.3.4';
+export const APP_VERSION = '1.3.5';
 export const APP_RELEASE_DATE = '7 September 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.5',
+    date: '7 Sep 2026',
+    items: [
+      'The workspace opens immediately without a landing-name gate.',
+      'Affidavit export asks for a name only when none is saved, then keeps that name on this browser.',
+      'Trello and Gmail connections reuse their existing sign-in screens and supply the saved name for affidavit logs when available.',
+    ],
+  },
   {
     version: '1.3.4',
     date: '7 Sep 2026',
