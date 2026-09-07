@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { ensureWorkspaceName, getWorkspaceName } from '../workspace-identity.js';
 import { 
   Building2, 
   FileSignature, 
@@ -297,6 +298,9 @@ export default function AffidavitAutomation() {
 
   // GUARDIAN: Intercepts export and logs it to the shared All4One audit sheet.
   const handleFeedbackSubmit = async (skipped = false) => {
+    const userName = await ensureWorkspaceName();
+    if (!userName) return;
+
     // 1. Download immediately to avoid blocking the user's workflow
     exportToWord();
 
@@ -307,7 +311,7 @@ export default function AffidavitAutomation() {
       const payload = {
         action: 'LOG_FEEDBACK',
         source: 'ALL4ONE',
-        userName: localStorage.getItem('username') || 'Unknown User',
+        userName: userName || getWorkspaceName() || 'Unknown User',
         // GUARDIAN: Smart Case Name Formatting (Omits case number if empty)
         caseName: `${form.plaintiff || '[PLAINTIFF]'} v ${form.defendent || '[DEFENDANT]'}${form.case ? ` (Case: ${form.case})` : ''}`,
         feedback: finalFeedback

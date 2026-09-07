@@ -3,7 +3,10 @@
 // give the Gmail API an access token — especially on GitHub Pages, where COOP
 // breaks the Firebase popup helper.
 
+import { captureGoogleIdentity, rememberWorkspaceName } from './workspace-identity.js';
+
 const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.compose';
+const GMAIL_IDENTITY_SCOPE = 'https://www.googleapis.com/auth/userinfo.profile';
 const TOKEN_KEY = 'all4one_gmail_access_token';
 const TOKEN_EXP_KEY = 'all4one_gmail_token_exp';
 const CLIENT_ID_CACHE_KEY = 'all4one_google_web_client_id';
@@ -150,7 +153,7 @@ function requestGmailAccessTokenViaGis(clientId) {
   return loadGisScript().then(() => new Promise((resolve, reject) => {
     const client = window.google.accounts.oauth2.initTokenClient({
       client_id: clientId,
-      scope: GMAIL_SCOPE,
+      scope: `${GMAIL_SCOPE} ${GMAIL_IDENTITY_SCOPE}`,
       callback: (resp) => {
         if (resp.error) {
           reject(new Error(resp.error_description || resp.error));
@@ -161,6 +164,7 @@ function requestGmailAccessTokenViaGis(clientId) {
           return;
         }
         cacheToken(resp.access_token, Number(resp.expires_in) || 3500);
+        captureGoogleIdentity(resp.access_token);
         resolve(resp.access_token);
       },
       error_callback: (err) => {
@@ -179,6 +183,7 @@ async function requestGmailAccessTokenViaFirebase() {
 
   const provider = new fb.auth.GoogleAuthProvider();
   provider.addScope(GMAIL_SCOPE);
+  provider.addScope(GMAIL_IDENTITY_SCOPE);
   provider.setCustomParameters({ prompt: 'consent', include_granted_scopes: 'true' });
 
   const current = fb.auth().currentUser;
@@ -212,7 +217,9 @@ async function requestGmailAccessTokenViaFirebase() {
     await fb.auth().signInAnonymously();
   }
 
+  rememberWorkspaceName(result?.user?.displayName || result?.user?.email || '');
   cacheToken(accessToken);
+  captureGoogleIdentity(accessToken);
   return accessToken;
 }
 

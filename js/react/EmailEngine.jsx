@@ -11,6 +11,7 @@ import {
   Minus
 } from 'lucide-react';
 import { AC_LOGO_DATA_URI } from './ac-logo-b64.js';
+import { getWorkspaceName } from '../workspace-identity.js';
 import {
   createGmailDraft,
   isGmailConnected,
@@ -549,7 +550,7 @@ export default function EmailEngine() {
   const logEmailUsage = (action, deliveryChannel) => {
     const payload = {
       action: 'LOG_EMAIL_USAGE',
-      userName: localStorage.getItem('username') || 'Unknown User',
+      userName: getWorkspaceName() || 'Unknown User',
       templateId: selectedTemplate.id,
       templateName: selectedTemplate.name,
       claimant: variables.claimantFullName || variables['Claimant Name'] || '',
