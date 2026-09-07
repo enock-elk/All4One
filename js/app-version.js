@@ -1,8 +1,16 @@
-export const APP_VERSION = '1.3.5';
+export const APP_VERSION = '1.3.6';
 export const APP_RELEASE_DATE = '7 September 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.6',
+    date: '7 Sep 2026',
+    items: [
+      'The ALL4ONE corner glow is a softer, more gradual yellow wash to match the header’s right-side light.',
+      'The sidebar collapse control is a quieter, taller <| glyph instead of a boxed panel icon.',
+    ],
+  },
   {
     version: '1.3.5',
     date: '7 Sep 2026',
