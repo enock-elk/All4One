@@ -24,13 +24,13 @@ const INPUT_CLASS = "w-full p-3 rounded-xl border border-slate-200 dark:border-s
 
 // Brand colours from official Actuary Consulting signature
 const SIG = {
-  tan: '#A98C68',
+  tan: '#B6946A',
   logoTan: '#B6946A',
   logoGrey: '#8D8D8D',
-  label: '#555555',
-  text: '#777777',
+  label: '#8D8D8D',
+  text: '#8D8D8D',
   link: '#1155cc',
-  disclaimer: '#999999',
+  disclaimer: '#C8B9AA',
 };
 
 // Logo native 930×268 — width tracks address line via table layout below
@@ -40,7 +40,7 @@ const getSignatureHtml = () => `
 <br>
 <br>
 <div style="font-family: Verdana, Geneva, sans-serif; line-height: 1.35; color: ${SIG.tan};">
-  <p style="margin: 0; font-size: 12pt; font-weight: bold; color: ${SIG.tan};">Namir Waisberg</p>
+  <p style="margin: 0; font-size: 10pt; font-weight: bold; color: ${SIG.tan};">Namir Waisberg</p>
   <p style="margin: 0; font-size: 10pt; font-weight: normal; color: ${SIG.tan};">Managing Director</p>
   <p style="margin: 0; font-size: 9pt; font-weight: normal; color: ${SIG.tan};">BEconSc (Cum Laude) BSc Hons (Cum Laude) (Wits) Actuary CFA</p>
 </div>
@@ -62,7 +62,7 @@ const getSignatureHtml = () => `
   </tr>
   <tr>
     <td style="padding-top: 10px; line-height: 0; font-size: 0;">
-      <img src="${AC_LOGO_DATA_URI}" alt="Actuary Consulting" width="302" style="display: block; width: 100%; max-width: 100%; height: auto; border: 0;" />
+      <img src="${AC_LOGO_DATA_URI}" alt="Actuary Consulting" width="302" style="display: block; width: 302px; max-width: 100%; height: auto; border: 0;" />
     </td>
   </tr>
 </table>
@@ -161,7 +161,7 @@ function orIdDocumentLine(gender) {
 function wrapCompiledEmail(subject, bodyHtml) {
   return {
     subject,
-    htmlBody: `<div style="font-family: Verdana, Geneva, sans-serif; font-size: 13px; color: #000; line-height: 1.5;">${bodyHtml}${getSignatureHtml()}</div>`,
+    htmlBody: `<div style="font-family: Verdana, Geneva, sans-serif; font-size: 13px; color: #000; line-height: 1.2;">${bodyHtml}${getSignatureHtml()}</div>`,
   };
 }
 
