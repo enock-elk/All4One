@@ -214,8 +214,8 @@
             transition: opacity 0.2s ease;
         }
     </style>
-  <script type="module" crossorigin src="./assets/index-DT1T_DyT.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-BVhI0AGG.css">
+  <script type="module" crossorigin src="./assets/index-Vcy2tu9N.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-r_TX5OJ7.css">
 </head>
 <body class="bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
 
@@ -270,47 +270,75 @@
                     <div class="text-[0.62rem] uppercase tracking-[0.22em] text-slate-500 mt-1">Command Center</div>
                 </div>
             </button>
+            <button type="button" id="sidebar-collapse-btn" class="sidebar-collapse-btn" title="Minimise sidebar" aria-label="Minimise sidebar">
+                <i data-lucide="panel-left-close" class="w-4 h-4"></i>
+            </button>
             
             <nav id="sidebar-nav" class="flex-1 flex flex-col gap-1.5 w-full">
-                <button data-tab="pdf-manager" class="tab-btn sidebar-nav-btn is-active" title="Document Manager" aria-current="page">
-                    <span class="sidebar-nav-icon"><i data-lucide="files" class="w-5 h-5"></i></span>
-                    <span class="min-w-0">
-                        <span class="sidebar-nav-label">Document Manager</span>
-                        <span class="sidebar-nav-sub">PDF tools &amp; file bay</span>
-                    </span>
-                </button>
+                <div class="sidebar-nav-item">
+                    <button data-tab="pdf-manager" class="tab-btn sidebar-nav-btn is-active" title="Document Manager" aria-current="page">
+                        <span class="sidebar-nav-icon"><i data-lucide="files" class="w-5 h-5"></i></span>
+                        <span class="min-w-0">
+                            <span class="sidebar-nav-label">Document Manager</span>
+                            <span class="sidebar-nav-sub">PDF tools &amp; file bay</span>
+                        </span>
+                    </button>
+                    <button type="button" class="sidebar-item-pin" data-pin-tab="pdf-manager" title="Pin Document Manager as default" aria-label="Pin Document Manager as default">
+                        <i data-lucide="pin" class="w-3 h-3"></i>
+                    </button>
+                </div>
 
-                <button data-tab="dashboard" class="tab-btn sidebar-nav-btn" title="Trello Watcher">
-                    <span class="sidebar-nav-icon"><i data-lucide="radar" class="w-5 h-5"></i></span>
-                    <span class="min-w-0">
-                        <span class="sidebar-nav-label">Trello Watcher</span>
-                        <span class="sidebar-nav-sub">Live board monitor</span>
-                    </span>
-                </button>
+                <div class="sidebar-nav-item">
+                    <button data-tab="dashboard" class="tab-btn sidebar-nav-btn" title="Trello Watcher">
+                        <span class="sidebar-nav-icon"><i data-lucide="radar" class="w-5 h-5"></i></span>
+                        <span class="min-w-0">
+                            <span class="sidebar-nav-label">Trello Watcher</span>
+                            <span class="sidebar-nav-sub">Live board monitor</span>
+                        </span>
+                    </button>
+                    <button type="button" class="sidebar-item-pin" data-pin-tab="dashboard" title="Pin Trello Watcher as default" aria-label="Pin Trello Watcher as default">
+                        <i data-lucide="pin" class="w-3 h-3"></i>
+                    </button>
+                </div>
                 
-                <button data-tab="casemaker" class="tab-btn sidebar-nav-btn" title="Case Maker">
-                    <span class="sidebar-nav-icon"><i data-lucide="sparkles" class="w-5 h-5"></i></span>
-                    <span class="min-w-0">
-                        <span class="sidebar-nav-label">Case Maker</span>
-                        <span class="sidebar-nav-sub">RyanGPT builder</span>
-                    </span>
-                </button>
+                <div class="sidebar-nav-item">
+                    <button data-tab="casemaker" class="tab-btn sidebar-nav-btn" title="Case Maker">
+                        <span class="sidebar-nav-icon"><i data-lucide="sparkles" class="w-5 h-5"></i></span>
+                        <span class="min-w-0">
+                            <span class="sidebar-nav-label">Case Maker</span>
+                            <span class="sidebar-nav-sub">RyanGPT builder</span>
+                        </span>
+                    </button>
+                    <button type="button" class="sidebar-item-pin" data-pin-tab="casemaker" title="Pin Case Maker as default" aria-label="Pin Case Maker as default">
+                        <i data-lucide="pin" class="w-3 h-3"></i>
+                    </button>
+                </div>
 
-                <button data-tab="affidavits" class="tab-btn sidebar-nav-btn" title="Affidavit Automation">
-                    <span class="sidebar-nav-icon"><i data-lucide="scroll-text" class="w-5 h-5"></i></span>
-                    <span class="min-w-0">
-                        <span class="sidebar-nav-label">Affidavit Automation</span>
-                        <span class="sidebar-nav-sub">Expert affidavits</span>
-                    </span>
-                </button>
+                <div class="sidebar-nav-item">
+                    <button data-tab="affidavits" class="tab-btn sidebar-nav-btn" title="Affidavit Automation">
+                        <span class="sidebar-nav-icon"><i data-lucide="scroll-text" class="w-5 h-5"></i></span>
+                        <span class="min-w-0">
+                            <span class="sidebar-nav-label">Affidavit Automation</span>
+                            <span class="sidebar-nav-sub">Expert affidavits</span>
+                        </span>
+                    </button>
+                    <button type="button" class="sidebar-item-pin" data-pin-tab="affidavits" title="Pin Affidavit Automation as default" aria-label="Pin Affidavit Automation as default">
+                        <i data-lucide="pin" class="w-3 h-3"></i>
+                    </button>
+                </div>
 
-                <button data-tab="emails" class="tab-btn sidebar-nav-btn" title="Draft Email Generator">
-                    <span class="sidebar-nav-icon"><i data-lucide="mail-plus" class="w-5 h-5"></i></span>
-                    <span class="min-w-0">
-                        <span class="sidebar-nav-label">Email Generator</span>
-                        <span class="sidebar-nav-sub">Client draft emails</span>
-                    </span>
-                </button>
+                <div class="sidebar-nav-item">
+                    <button data-tab="emails" class="tab-btn sidebar-nav-btn" title="Draft Email Generator">
+                        <span class="sidebar-nav-icon"><i data-lucide="mail-plus" class="w-5 h-5"></i></span>
+                        <span class="min-w-0">
+                            <span class="sidebar-nav-label">Email Generator</span>
+                            <span class="sidebar-nav-sub">Client draft emails</span>
+                        </span>
+                    </button>
+                    <button type="button" class="sidebar-item-pin" data-pin-tab="emails" title="Pin Email Generator as default" aria-label="Pin Email Generator as default">
+                        <i data-lucide="pin" class="w-3 h-3"></i>
+                    </button>
+                </div>
             </nav>
 
             <div class="mt-auto flex flex-col gap-1.5 w-full pt-4 border-t border-slate-800/80">
@@ -349,9 +377,6 @@
                         <h1 id="header-title" class="font-bold text-slate-100">
                             Document Manager
                         </h1>
-                        <button type="button" id="header-pin-btn" class="header-pin-btn" title="Pin as default workspace" aria-label="Pin as default workspace">
-                            <i data-lucide="pin-off" id="header-pin-icon" class="w-4 h-4"></i>
-                        </button>
                     </div>
                 </div>
                 
