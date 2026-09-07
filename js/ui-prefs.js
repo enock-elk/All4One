@@ -17,6 +17,11 @@ export const NAV_TAB_ORDER = Object.keys(TAB_META);
 
 let activeTabId = 'pdf-manager';
 
+export function hasExplicitPinnedTab() {
+    const saved = localStorage.getItem(PREF_DEFAULT_TAB);
+    return !!(saved && TAB_META[saved]);
+}
+
 export function getDefaultTab() {
     const saved = localStorage.getItem(PREF_DEFAULT_TAB);
     return saved && TAB_META[saved] ? saved : 'pdf-manager';

@@ -6,6 +6,8 @@ import { registerReactTabs } from './react/mount.jsx';
 import { getDefaultTab, initWorkspacePrefs, onWorkspaceTabActivated, expandSidebar } from './ui-prefs.js';
 import { initCaseMakerThemeSync, loadCaseMakerFrameIfNeeded, postCaseMakerTheme } from './casemaker-theme.js';
 import { isWorkspaceLocked, setWorkspaceLocked } from './workspace-identity.js';
+import { applyFirstVisitPin, bindTabHistory, resolveIncomingTab, syncTabUrl } from './deep-links.js';
+import { beginLazyTabLoad } from './workspace-loader.js';
 import './pdf-manager.js';
 import './trello.js';
 
@@ -112,6 +114,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Workspace lock (no landing-name gate) ---
+    const incomingTab = resolveIncomingTab();
+    if (incomingTab) applyFirstVisitPin(incomingTab);
+
     function checkLoginState() {
         if (isWorkspaceLocked()) {
             showLock();
@@ -125,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setWorkspaceLocked(false);
         loginView.classList.add('hidden');
         appView.classList.remove('hidden');
-        activateTab(getDefaultTab());
+        activateTab(incomingTab || getDefaultTab(), { replaceUrl: true });
     }
 
     function showLock() {
@@ -152,7 +157,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Tab Navigation Logic ---
-    function activateTab(targetTabId) {
+    function activateTab(targetTabId, { replaceUrl = false, skipHistory = false } = {}) {
+        if (!tabTitles[targetTabId]) targetTabId = getDefaultTab();
+
         // Hide all contents and reset button active states
         tabContents.forEach(content => {
             content.classList.add('hidden');
@@ -177,6 +184,12 @@ document.addEventListener('DOMContentLoaded', () => {
             headerTitle.textContent = tabTitles[targetTabId];
         }
 
+        if (targetTabId === 'casemaker' || targetTabId === 'affidavits' || targetTabId === 'emails') {
+            beginLazyTabLoad(targetTabId, targetTabId === 'casemaker'
+                ? 'Opening Case Maker…'
+                : `Opening ${tabTitles[targetTabId]}…`);
+        }
+
         // Notify React island modules to lazy-mount on first visit
         document.dispatchEvent(new CustomEvent('tab-activated', { detail: targetTabId }));
         onWorkspaceTabActivated(targetTabId);
@@ -184,6 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
             loadCaseMakerFrameIfNeeded();
             postCaseMakerTheme();
         }
+        if (!skipHistory) syncTabUrl(targetTabId, { replace: replaceUrl });
     }
 
     // Attach click listeners to all sidebar tab buttons
@@ -200,6 +214,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Expose for modules that need tab switching
     window.activateWorkspaceTab = activateTab;
+    bindTabHistory(activateTab);
+
+    document.querySelector('[data-tab="casemaker"]')?.addEventListener('pointerenter', () => {
+        loadCaseMakerFrameIfNeeded();
+    }, { once: true });
 
     // --- Initialization ---
     initDarkMode();

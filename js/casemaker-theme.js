@@ -2,6 +2,8 @@
 // The widget is cross-origin, so the parent can only request a theme change.
 // Case Maker must apply it — paste gas/casemaker-theme-sync.js into that project.
 
+import { markTabReady, showWorkspaceLoader, updateWorkspaceLoader } from './workspace-loader.js';
+
 const CASEMAKER_HOST_SUFFIXES = ['script.google.com', 'script.googleusercontent.com'];
 
 function isCaseMakerOrigin(origin) {
@@ -19,6 +21,7 @@ export function getAll4OneTheme() {
 
 let caseMakerSource = null;
 let caseMakerOrigin = '';
+let caseMakerReady = false;
 
 export function postCaseMakerTheme() {
     if (!caseMakerSource) return;
@@ -38,7 +41,10 @@ function onHostMessage(event) {
     if (type !== 'casemaker:ready') return;
     caseMakerSource = event.source;
     caseMakerOrigin = event.origin;
+    caseMakerReady = true;
+    markTabReady('casemaker');
     postCaseMakerTheme();
+    document.dispatchEvent(new CustomEvent('casemaker-ready'));
 }
 
 // Register immediately — Case Maker announces ready on a timer, but the first
@@ -49,7 +55,13 @@ export function loadCaseMakerFrameIfNeeded() {
     const iframe = document.getElementById('casemaker-frame');
     if (!iframe) return;
     const base = iframe.getAttribute('data-src');
-    if (!base || iframe.getAttribute('src')) return;
+    if (!base) return;
+    if (caseMakerReady && iframe.getAttribute('src')) {
+        markTabReady('casemaker');
+        return;
+    }
+    if (iframe.getAttribute('src')) return;
+    showWorkspaceLoader('casemaker', 16, 'Connecting to RyanGPT…');
     iframe.src = `${base}?theme=${encodeURIComponent(getAll4OneTheme())}`;
 }
 
@@ -57,7 +69,13 @@ export function initCaseMakerThemeSync() {
     const iframe = document.getElementById('casemaker-frame');
     if (iframe) {
         iframe.addEventListener('load', () => {
+            if (!caseMakerReady) {
+                updateWorkspaceLoader('casemaker', 78, 'Finishing Case Maker…');
+            }
             window.setTimeout(postCaseMakerTheme, 400);
+            window.setTimeout(() => {
+                if (!caseMakerReady) markTabReady('casemaker');
+            }, 12000);
         });
     }
 }

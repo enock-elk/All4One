@@ -750,7 +750,7 @@
                 </div>
 
                 <!-- CASE MAKER TAB -->
-                <div id="tab-casemaker" class="tab-content hidden h-full w-full flex flex-col">
+                <div id="tab-casemaker" class="tab-content hidden h-full w-full flex flex-col relative">
                     <iframe
                         id="casemaker-frame"
                         data-src="https://script.google.com/macros/s/AKfycbxDKB-wWAd-BDOdfqe-sr6RRgrakIM5qhqfQy-2mvF9hQ7-xJAk8NhZcdPSPeHFFfGZ/exec"
@@ -762,12 +762,12 @@
                 </div>
 
                 <!-- AFFIDAVIT AUTOMATION TAB -->
-                <div id="tab-affidavits" class="tab-content hidden h-full w-full overflow-hidden">
+                <div id="tab-affidavits" class="tab-content hidden h-full w-full overflow-hidden relative">
                     <div id="affidavit-root" class="h-full"></div>
                 </div>
 
                 <!-- DRAFT EMAIL GENERATOR TAB -->
-                <div id="tab-emails" class="tab-content hidden h-full w-full overflow-hidden">
+                <div id="tab-emails" class="tab-content hidden h-full w-full overflow-hidden relative">
                     <div id="email-root" class="h-full"></div>
                 </div>
 
@@ -861,11 +861,47 @@
         // Vite *source* app and will not run there — send visitors to docs/, the
         // built snapshot CI refreshes on every main push.
         (function () {
+            const aliases = {
+                documentmanager: 'pdf-manager', 'document-manager': 'pdf-manager', 'pdf-manager': 'pdf-manager',
+                trelowatcher: 'dashboard', 'trello-watcher': 'dashboard', dashboard: 'dashboard', trello: 'dashboard',
+                casemaker: 'casemaker', 'case-maker': 'casemaker',
+                affidavitautomation: 'affidavits', 'affidavit-automation': 'affidavits', affidavits: 'affidavits',
+                emailgenerator: 'emails', 'email-generator': 'emails', emails: 'emails'
+            };
+            const compact = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+            const lastSeg = (path) => {
+                const parts = String(path || '').split('/').filter(Boolean);
+                const last = parts.pop() || '';
+                if (!last || /^(index\.html|docs|all4one)$/i.test(last)) return '';
+                return last;
+            };
+            let stored = '';
+            try { stored = sessionStorage.getItem('all4one_deep_link') || ''; } catch (e) {}
+            const token = new URLSearchParams(location.search).get('tab')
+                || location.hash.replace(/^#\/?/, '').split(/[/?#]/)[0]
+                || lastSeg(stored)
+                || lastSeg(location.pathname);
+            const tab = aliases[compact(token)] || aliases[String(token || '').toLowerCase()] || '';
+            if (tab) {
+                document.querySelectorAll('.tab-content').forEach((el) => {
+                    el.classList.add('hidden');
+                    el.classList.remove('block');
+                });
+                const target = document.getElementById('tab-' + tab);
+                if (target) {
+                    target.classList.remove('hidden');
+                    target.classList.add('block');
+                }
+            }
+
             const devEntry = document.querySelector('script[type="module"][src="js/app.js"]');
             if (!devEntry || !location.hostname.endsWith('github.io')) return;
             if (location.pathname.includes('/docs')) return;
-            const base = location.pathname.replace(/\/index\.html$/, '').replace(/\/?$/, '/');
-            location.replace(base + 'docs/');
+            const parts = location.pathname.split('/').filter(Boolean);
+            const repo = parts[0] || 'All4One';
+            try { sessionStorage.setItem('all4one_deep_link', location.pathname + location.search + location.hash); } catch (e) {}
+            const slug = token && !/^(docs|all4one)$/i.test(token) ? token : '';
+            location.replace('/' + repo + '/docs/' + slug + location.search + location.hash);
         })();
         lucide.createIcons();
     </script>

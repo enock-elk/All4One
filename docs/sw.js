@@ -1,4 +1,4 @@
-const CACHE_NAME = 'all4one-v3';
+const CACHE_NAME = 'all4one-v4';
 const SHELL_URLS = ['./', './index.html', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -28,10 +28,14 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   // Always prefer network for HTML and hashed bundles so deploys are not stuck on stale JS.
+  // Unknown tab paths ( /TrelloWatcher ) fall back to the app shell so deep links keep working.
   if (request.mode === 'navigate' || url.pathname.endsWith('.html') || isBundledAsset(url)) {
     event.respondWith(
       fetch(request)
         .then((response) => {
+          if (request.mode === 'navigate' && !response.ok) {
+            return caches.match('./index.html').then((cached) => cached || fetch('./index.html'));
+          }
           if (response.ok && request.mode === 'navigate') {
             const copy = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put('./index.html', copy));

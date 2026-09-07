@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>All4One</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script>
+        (function () {
+            var path = location.pathname + location.search + location.hash;
+            try { sessionStorage.setItem('all4one_deep_link', path); } catch (e) {}
+            var parts = location.pathname.split('/').filter(Boolean);
+            var dest = '/';
+            if (parts[0] && parts[0].toLowerCase() === 'all4one') dest = '/All4One/docs/';
+            location.replace(dest);
+        })();
+    </script>
+</head>
+<body>
+    <p style="font-family:ui-sans-serif,system-ui,sans-serif;padding:2rem;color:#64748b;">Opening All4One…</p>
+</body>
+</html>

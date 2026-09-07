@@ -1,8 +1,17 @@
-export const APP_VERSION = '1.3.6';
+export const APP_VERSION = '1.3.7';
 export const APP_RELEASE_DATE = '7 September 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.7',
+    date: '7 Sep 2026',
+    items: [
+      'Shareable tab links such as /TrelloWatcher and /AffidavitAutomation open that workspace directly.',
+      'A first visit from a deep link pins that tab; existing pins are left alone.',
+      'Case Maker and Affidavit Automation show loading progress instead of a blank panel.',
+    ],
+  },
   {
     version: '1.3.6',
     date: '7 Sep 2026',
