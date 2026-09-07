@@ -214,6 +214,11 @@ function compilePlaceholderTemplate(template, variables) {
 const ATTORNEY_FIELD = { key: 'attorneyFirstName', label: 'Attorney first name', type: 'text', placeholder: 'e.g. Ntembeko' };
 const CLAIMANT_FIELD = { key: 'claimantFullName', label: 'Claimant full name', type: 'text', placeholder: 'e.g. Arnold Moses Monashane' };
 const GENDER_FIELD = { key: 'gender', label: 'Gender', type: 'select', options: GENDER_OPTIONS };
+const EARNINGS_DOCUMENT_PRESETS = [
+  { label: 'Payslips', value: 'Payslips dated: ' },
+  { label: 'Bank statements', value: 'Bank statements for the period: ' },
+  { label: 'Affidavit', value: 'Affidavit confirming earnings' },
+];
 
 const TEMPLATES = [
   {
@@ -242,7 +247,13 @@ const TEMPLATES = [
       CLAIMANT_FIELD,
       GENDER_FIELD,
       { key: 'attorneyFirm', label: 'Attorney firm', type: 'text', placeholder: 'e.g. Yonela Bodlani Attorneys' },
-      { key: 'documentLines', label: 'Documents requested', type: 'lines', placeholder: 'Payslips dated: 2024 - 25th June; \u2026' },
+      {
+        key: 'documentLines',
+        label: 'Documents requested',
+        type: 'lines',
+        placeholder: 'Type a custom earnings document…',
+        presets: EARNINGS_DOCUMENT_PRESETS,
+      },
     ],
     compile(vars) {
       const attorney = htmlField(vars, 'attorneyFirstName', '[Attorney]');
@@ -267,14 +278,14 @@ const TEMPLATES = [
       ATTORNEY_FIELD,
       CLAIMANT_FIELD,
       GENDER_FIELD,
-      { key: 'dateA', label: 'Date A', type: 'text', placeholder: 'e.g. 14 July 2020' },
-      { key: 'dateASource', label: 'Date A source', type: 'text', placeholder: 'e.g. RAF report' },
-      { key: 'dateB', label: 'Date B', type: 'text', placeholder: 'e.g. 13 July 2020' },
-      { key: 'dateBSource', label: 'Date B source', type: 'text', placeholder: 'e.g. IP report' },
-      { key: 'nameA', label: 'Spelling A', type: 'text', placeholder: 'e.g. Rofhiwa' },
-      { key: 'nameASource', label: 'Spelling A source', type: 'text', placeholder: 'e.g. Instruction letter' },
-      { key: 'nameB', label: 'Spelling B', type: 'text', placeholder: 'e.g. Rofhiwe' },
-      { key: 'nameBSource', label: 'Spelling B source', type: 'text', placeholder: 'e.g. IP report' },
+      { key: 'dateA', label: 'Date A', type: 'text', placeholder: 'e.g. 14 July 2020', row: 'date-a' },
+      { key: 'dateASource', label: 'Source A', type: 'text', placeholder: 'e.g. RAF report', row: 'date-a' },
+      { key: 'dateB', label: 'Date B', type: 'text', placeholder: 'e.g. 13 July 2020', row: 'date-b' },
+      { key: 'dateBSource', label: 'Source B', type: 'text', placeholder: 'e.g. IP report', row: 'date-b' },
+      { key: 'nameA', label: 'Spelling A', type: 'text', placeholder: 'e.g. Rofhiwa', row: 'name-a' },
+      { key: 'nameASource', label: 'Source A', type: 'text', placeholder: 'e.g. Instruction letter', row: 'name-a' },
+      { key: 'nameB', label: 'Spelling B', type: 'text', placeholder: 'e.g. Rofhiwe', row: 'name-b' },
+      { key: 'nameBSource', label: 'Source B', type: 'text', placeholder: 'e.g. IP report', row: 'name-b' },
     ],
     compile(vars) {
       const attorney = htmlField(vars, 'attorneyFirstName', '[Attorney]');
@@ -344,10 +355,10 @@ const TEMPLATES = [
       ATTORNEY_FIELD,
       CLAIMANT_FIELD,
       GENDER_FIELD,
-      { key: 'surnameA', label: 'Surname A', type: 'text', placeholder: 'e.g. Sethlabane' },
-      { key: 'surnameASource', label: 'Surname A source', type: 'text', placeholder: 'e.g. OT report' },
-      { key: 'surnameB', label: 'Surname B', type: 'text', placeholder: 'e.g. Setlhabane' },
-      { key: 'surnameBSource', label: 'Surname B source', type: 'text', placeholder: 'e.g. IP report' },
+      { key: 'surnameA', label: 'Surname A', type: 'text', placeholder: 'e.g. Sethlabane', row: 'surname-a' },
+      { key: 'surnameASource', label: 'Source A', type: 'text', placeholder: 'e.g. OT report', row: 'surname-a' },
+      { key: 'surnameB', label: 'Surname B', type: 'text', placeholder: 'e.g. Setlhabane', row: 'surname-b' },
+      { key: 'surnameBSource', label: 'Source B', type: 'text', placeholder: 'e.g. IP report', row: 'surname-b' },
     ],
     compile(vars) {
       const attorney = htmlField(vars, 'attorneyFirstName', '[Attorney]');
@@ -372,10 +383,10 @@ const TEMPLATES = [
       ATTORNEY_FIELD,
       CLAIMANT_FIELD,
       GENDER_FIELD,
-      { key: 'nameA', label: 'Spelling A', type: 'text', placeholder: 'e.g. Sipiwe' },
-      { key: 'nameASource', label: 'Spelling A source', type: 'text', placeholder: 'e.g. Email' },
-      { key: 'nameB', label: 'Spelling B', type: 'text', placeholder: 'e.g. Simphiwe' },
-      { key: 'nameBSource', label: 'Spelling B source', type: 'text', placeholder: 'e.g. IP report' },
+      { key: 'nameA', label: 'Spelling A', type: 'text', placeholder: 'e.g. Sipiwe', row: 'name-a' },
+      { key: 'nameASource', label: 'Source A', type: 'text', placeholder: 'e.g. Email', row: 'name-a' },
+      { key: 'nameB', label: 'Spelling B', type: 'text', placeholder: 'e.g. Simphiwe', row: 'name-b' },
+      { key: 'nameBSource', label: 'Source B', type: 'text', placeholder: 'e.g. IP report', row: 'name-b' },
     ],
     compile(vars) {
       const attorney = htmlField(vars, 'attorneyFirstName', '[Attorney]');
@@ -418,10 +429,10 @@ const TEMPLATES = [
       ATTORNEY_FIELD,
       CLAIMANT_FIELD,
       GENDER_FIELD,
-      { key: 'dateA', label: 'Date A', type: 'text', placeholder: 'e.g. 15 January 2015' },
-      { key: 'dateAPage', label: 'Date A page', type: 'text', placeholder: 'e.g. 6' },
-      { key: 'dateB', label: 'Date B', type: 'text', placeholder: 'e.g. 15 January 2020' },
-      { key: 'dateBPage', label: 'Date B page', type: 'text', placeholder: 'e.g. 8' },
+      { key: 'dateA', label: 'Date A', type: 'text', placeholder: 'e.g. 15 January 2015', row: 'date-a' },
+      { key: 'dateAPage', label: 'Page A', type: 'text', placeholder: 'e.g. 6', row: 'date-a' },
+      { key: 'dateB', label: 'Date B', type: 'text', placeholder: 'e.g. 15 January 2020', row: 'date-b' },
+      { key: 'dateBPage', label: 'Page B', type: 'text', placeholder: 'e.g. 8', row: 'date-b' },
     ],
     compile(vars) {
       const attorney = htmlField(vars, 'attorneyFirstName', '[Attorney]');
@@ -510,6 +521,14 @@ export default function EmailEngine() {
     setVariables((prev) => ({ ...prev, [key]: [...(prev[key] || ['']), ''] }));
   };
 
+  const addPresetLines = (key, values) => {
+    setVariables((prev) => {
+      const current = [...(prev[key] || [''])];
+      const retained = current.filter((line) => String(line || '').trim());
+      return { ...prev, [key]: [...retained, ...values] };
+    });
+  };
+
   const removeLine = (key, index) => {
     setVariables((prev) => {
       const curr = [...(prev[key] || [''])];
@@ -527,6 +546,27 @@ export default function EmailEngine() {
     return compilePlaceholderTemplate(template, variables);
   }, [selectedTemplateId, variables]);
 
+  const logEmailUsage = (action, deliveryChannel) => {
+    const payload = {
+      action: 'LOG_EMAIL_USAGE',
+      userName: localStorage.getItem('username') || 'Unknown User',
+      templateId: selectedTemplate.id,
+      templateName: selectedTemplate.name,
+      claimant: variables.claimantFullName || variables['Claimant Name'] || '',
+      subject: compiledContent.subject,
+      usageAction: action,
+      status: 'Success',
+      deliveryChannel,
+      appVersion: window.ALL4ONE_APP_VERSION || '',
+    };
+
+    fetch(GAS_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+    }).catch((err) => console.warn('Email usage log failed', err));
+  };
+
   const copyToClipboard = () => {
     try {
       const blobHtml = new Blob([compiledContent.htmlBody], { type: "text/html" });
@@ -535,11 +575,13 @@ export default function EmailEngine() {
 
       navigator.clipboard.write(data).then(() => {
         setStatus({ msg: 'Rich text copied! Paste directly into Gmail.', type: 'success' });
+        logEmailUsage('Copy HTML', 'Clipboard');
         setTimeout(() => setStatus({ msg: '', type: '' }), 3000);
       });
     } catch (err) {
       navigator.clipboard.writeText(compiledContent.htmlBody.replace(/<br\/>/g, '\n').replace(/<[^>]*>?/gm, ''));
       setStatus({ msg: 'Plain text copied to clipboard.', type: 'success' });
+      logEmailUsage('Copy plain text', 'Clipboard');
     }
   };
 
@@ -565,6 +607,7 @@ export default function EmailEngine() {
       subject: compiledContent.subject,
       htmlBody: compiledContent.htmlBody,
     });
+    logEmailUsage('Push to Gmail', 'Gmail OAuth');
     setStatus({
       msg: 'Draft created in your Gmail account. Open Gmail → Drafts to review and send.',
       type: 'success',
@@ -605,6 +648,7 @@ export default function EmailEngine() {
 
       const ok = String(result?.status || '').toLowerCase() === 'success';
       if (ok) {
+        logEmailUsage('Push to Gmail', 'Apps Script');
         setStatus({
           msg: result.message || 'Draft created in your Gmail account!',
           type: 'success',
@@ -650,6 +694,17 @@ export default function EmailEngine() {
 
   const allUniqueKeys = [...new Set([...parsedKeys.subject, ...parsedKeys.body])];
   const structuredFields = selectedTemplate.fields || null;
+  const structuredRows = structuredFields
+    ? structuredFields.reduce((rows, field) => {
+        const previous = rows[rows.length - 1];
+        if (field.row && previous?.[0]?.row === field.row) {
+          previous.push(field);
+        } else {
+          rows.push([field]);
+        }
+        return rows;
+      }, [])
+    : null;
   const fieldCount = structuredFields ? structuredFields.length : allUniqueKeys.length;
 
   const renderStructuredField = (field) => {
@@ -672,6 +727,32 @@ export default function EmailEngine() {
       const lines = Array.isArray(variables[field.key]) ? variables[field.key] : [''];
       return (
         <div className="space-y-2">
+          {field.presets?.length ? (
+            <div className="rounded-xl border border-amber-200/80 dark:border-amber-700/50 bg-amber-50/70 dark:bg-amber-950/20 p-2.5 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">Quick add</span>
+                <button
+                  type="button"
+                  onClick={() => addPresetLines(field.key, field.presets.map((preset) => preset.value))}
+                  className="text-[10px] font-bold text-amber-700 dark:text-amber-300 hover:underline"
+                >
+                  + Common set
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {field.presets.map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => addPresetLines(field.key, [preset.value])}
+                    className="px-2 py-1 rounded-lg text-[10px] font-bold border border-amber-200 dark:border-amber-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:border-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-all"
+                  >
+                    + {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
           {lines.map((line, idx) => (
             <div key={`${field.key}-${idx}`} className="flex items-center gap-2">
               <input
@@ -696,7 +777,7 @@ export default function EmailEngine() {
             onClick={() => addLine(field.key)}
             className="flex items-center justify-center gap-2 w-full text-xs font-bold px-4 py-2.5 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 transition-all"
           >
-            <Plus className="w-4 h-4" /> Add document line
+            <Plus className="w-4 h-4" /> Add custom line
           </button>
         </div>
       );
@@ -758,10 +839,17 @@ export default function EmailEngine() {
 
             {structuredFields ? (
               <div className="space-y-4">
-                {structuredFields.map((field) => (
-                  <div key={field.key}>
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">{field.label}</label>
-                    {renderStructuredField(field)}
+                {structuredRows.map((row) => (
+                  <div
+                    key={row.map((field) => field.key).join('-')}
+                    className={row.length > 1 ? 'grid grid-cols-2 gap-2' : ''}
+                  >
+                    {row.map((field) => (
+                      <div key={field.key} className="min-w-0">
+                        <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">{field.label}</label>
+                        {renderStructuredField(field)}
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>

@@ -1,8 +1,33 @@
-export const APP_VERSION = '1.2.4';
+export const APP_VERSION = '1.3.2';
 export const APP_RELEASE_DATE = '7 September 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.2',
+    date: '7 Sep 2026',
+    items: [
+      'Sidebar and top header now read as one continuous L-shaped gradient shell with a joined inner accent edge.',
+      'Navigation items use raised glass-button surfaces, borders, and shadows for clearer interaction affordance.',
+    ],
+  },
+  {
+    version: '1.3.1',
+    date: '7 Sep 2026',
+    items: [
+      'Sidebar and workspace header now use a more intentional layered navy, amber, and blue gradient system.',
+      'Navigation states, icon tiles, brand treatment, status badge, and header controls have clearer visual depth without changing behavior.',
+    ],
+  },
+  {
+    version: '1.3.0',
+    date: '7 Sep 2026',
+    items: [
+      'Discrepancy values and their matching sources now share one input row.',
+      'Claimant earnings requests can add Payslips, Bank statements, and Affidavit entries individually or as one common set, while keeping custom lines editable.',
+      'Email usage and affidavit exports are routed to the All4One-Email and All4One-Affidavits tabs in the shared command queue sheet.',
+    ],
+  },
   {
     version: '1.2.4',
     date: '7 Sep 2026',
