@@ -1,12 +1,20 @@
 name: Deploy to GitHub Pages
 
+# GitHub Pages is still "legacy / publish the whole repo from main".
+# The live app is therefore the committed docs/ snapshot (root index.html
+# redirects github.io visitors there). Rebuild docs/ here so a source push
+# is enough — nobody has to remember npm run build locally.
+#
+# Later: Settings → Pages → Source = GitHub Actions, then docs/ can go.
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -15,10 +23,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  publish-docs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -28,16 +38,20 @@ jobs:
       - run: npm ci
       - run: npm run build
 
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
+      - name: Commit docs snapshot for branch-based Pages
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs
+          if git diff --staged --quiet; then
+            echo "docs/ already matches this build"
+            exit 0
+          fi
+          git commit -m "Rebuild GitHub Pages bundle from source"
+          git pull --rebase origin main
+          git push origin HEAD:main
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/deploy-pages@v4
-        id: deployment
+      # Re-enable when Settings → Pages → Source is GitHub Actions:
+      # - uses: actions/upload-pages-artifact@v3
+      #   with:
+      #     path: dist

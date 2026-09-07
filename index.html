@@ -813,15 +813,15 @@
     </div>
 
     <script>
-        // If GitHub Pages serves the dev entry (js/app.js) from repo root, redirect to the built /docs bundle.
+        // GitHub Pages publishes the whole repo (legacy / root). This file is the
+        // Vite *source* app and will not run there — send visitors to docs/, the
+        // built snapshot CI refreshes on every main push.
         (function () {
             const devEntry = document.querySelector('script[type="module"][src="js/app.js"]');
             if (!devEntry || !location.hostname.endsWith('github.io')) return;
             if (location.pathname.includes('/docs')) return;
             const base = location.pathname.replace(/\/index\.html$/, '').replace(/\/?$/, '/');
-            fetch(base + 'docs/index.html', { method: 'HEAD' })
-                .then((res) => { if (res.ok) location.replace(base + 'docs/'); })
-                .catch(() => {});
+            location.replace(base + 'docs/');
         })();
         lucide.createIcons();
     </script>

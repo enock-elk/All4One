@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "node scripts/generate-icons.mjs && vite build && node scripts/sync-docs.mjs",
+    "build:app": "node scripts/generate-icons.mjs && vite build",
     "preview": "vite preview",
     "firebase:emulators": "npx -y firebase-tools@latest emulators:start --only functions",
     "firebase:deploy:functions": "npx -y firebase-tools@latest deploy --only functions"
