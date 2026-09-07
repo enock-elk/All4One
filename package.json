@@ -1,7 +1,7 @@
 {
   "name": "all4one-command-center",
   "private": true,
-  "version": "1.2.3",
+  "version": "1.2.4",
   "type": "module",
   "description": "All4One Command Center — PDF manager, Trello watcher, and case tools",
   "scripts": {
