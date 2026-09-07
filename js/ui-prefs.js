@@ -33,23 +33,25 @@ export function setDefaultTab(tabId) {
 export function reorderSidebarNav(pinnedTabId = getDefaultTab()) {
     const nav = document.getElementById('sidebar-nav');
     if (!nav) return;
-    const buttons = [...nav.querySelectorAll('.tab-btn')];
+    const items = [...nav.querySelectorAll('.sidebar-nav-item')];
     const order = [pinnedTabId, ...NAV_TAB_ORDER.filter((id) => id !== pinnedTabId)];
     order.forEach((id) => {
-        const btn = buttons.find((b) => b.getAttribute('data-tab') === id);
-        if (btn) nav.appendChild(btn);
+        const item = items.find((entry) => entry.querySelector('.tab-btn')?.getAttribute('data-tab') === id);
+        if (item) nav.appendChild(item);
     });
 }
 
 export function syncHeaderPin(tabId = activeTabId) {
     const btn = document.getElementById('header-pin-btn');
     const icon = document.getElementById('header-pin-icon');
-    if (!btn || !icon) return;
     const isPinned = getDefaultTab() === tabId;
-    btn.classList.toggle('is-pinned', isPinned);
-    btn.title = isPinned ? 'Pinned as default workspace' : 'Pin as default workspace';
-    icon.setAttribute('data-lucide', isPinned ? 'pin' : 'pin-off');
-    if (window.lucide) window.lucide.createIcons();
+    if (btn && icon) {
+        btn.classList.toggle('is-pinned', isPinned);
+        btn.title = isPinned ? 'Pinned as default workspace' : 'Pin as default workspace';
+        icon.setAttribute('data-lucide', isPinned ? 'pin' : 'pin-off');
+        if (window.lucide) window.lucide.createIcons();
+    }
+    syncSidebarPinMarkers();
 }
 
 export function syncSidebarPinMarkers() {
@@ -57,6 +59,14 @@ export function syncSidebarPinMarkers() {
     document.querySelectorAll('#sidebar-nav .tab-btn').forEach((btn) => {
         const tabId = btn.getAttribute('data-tab');
         btn.classList.toggle('is-pinned-tab', tabId === pinned);
+    });
+    document.querySelectorAll('.sidebar-item-pin').forEach((btn) => {
+        const tabId = btn.getAttribute('data-pin-tab');
+        const isPinned = tabId === pinned;
+        const label = TAB_META[tabId]?.label || 'workspace';
+        btn.classList.toggle('is-pinned', isPinned);
+        btn.setAttribute('aria-pressed', isPinned ? 'true' : 'false');
+        btn.title = isPinned ? `${label} is the default workspace` : `Pin ${label} as default`;
     });
 }
 
@@ -141,13 +151,26 @@ export function initHeaderPin() {
         setDefaultTab(activeTabId);
         showAppToast(`${TAB_META[activeTabId].label} pinned — opens first on login.`);
     });
+    document.querySelectorAll('.sidebar-item-pin').forEach((pin) => {
+        pin.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const tabId = pin.getAttribute('data-pin-tab');
+            if (!TAB_META[tabId] || getDefaultTab() === tabId) return;
+            setDefaultTab(tabId);
+            showAppToast(`${TAB_META[tabId].label} pinned — opens first on login.`);
+        });
+    });
     syncHeaderPin(activeTabId);
 }
 
 export function initSidebarCollapse() {
     const brand = document.getElementById('sidebar-brand-toggle');
+    const collapse = document.getElementById('sidebar-collapse-btn');
     brand?.addEventListener('click', () => {
         setSidebarCollapsed(!isSidebarCollapsed());
+    });
+    collapse?.addEventListener('click', () => {
+        setSidebarCollapsed(true);
     });
 
     setSidebarCollapsed(isSidebarCollapsed());

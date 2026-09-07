@@ -1,8 +1,17 @@
-export const APP_VERSION = '1.3.3';
+export const APP_VERSION = '1.3.4';
 export const APP_RELEASE_DATE = '7 September 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.4',
+    date: '7 Sep 2026',
+    items: [
+      'Expanded sidebar now has a clear corner collapse control that disappears in compact mode.',
+      'Each workspace tab has a quiet bottom-right pin control for choosing the default workspace; pins hide when compact.',
+      'The ALL4ONE corner control uses a restrained flat treatment while the selected tab keeps its gradient emphasis.',
+    ],
+  },
   {
     version: '1.3.3',
     date: '7 Sep 2026',
