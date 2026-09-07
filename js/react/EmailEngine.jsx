@@ -24,13 +24,15 @@ const INPUT_CLASS = "w-full p-3 rounded-xl border border-slate-200 dark:border-s
 
 // Brand colours from official Actuary Consulting signature
 const SIG = {
-  tan: '#B6946A',
+  tan: '#B3936E',
+  nameShadow: '#E9BF81',
   logoTan: '#B6946A',
   logoGrey: '#8D8D8D',
-  label: '#8D8D8D',
-  text: '#8D8D8D',
+  label: '#7F7F7F',
+  text: '#7F7F7F',
   link: '#1155cc',
-  disclaimer: '#C8B9AA',
+  disclaimer: '#D0CECE',
+  disclaimerShadow: '#EEDDD1',
 };
 
 // Logo native 930×268 — width tracks address line via table layout below
@@ -40,7 +42,7 @@ const getSignatureHtml = () => `
 <br>
 <br>
 <div style="font-family: Verdana, Geneva, sans-serif; line-height: 1.35; color: ${SIG.tan};">
-  <p style="margin: 0; font-size: 10pt; font-weight: bold; color: ${SIG.tan};">Namir Waisberg</p>
+  <p style="margin: 0; font-size: 10pt; font-weight: bold; color: ${SIG.tan}; text-shadow: 0.25px 0.25px 0 ${SIG.nameShadow};">Namir Waisberg</p>
   <p style="margin: 0; font-size: 10pt; font-weight: normal; color: ${SIG.tan};">Managing Director</p>
   <p style="margin: 0; font-size: 9pt; font-weight: normal; color: ${SIG.tan};">BEconSc (Cum Laude) BSc Hons (Cum Laude) (Wits) Actuary CFA</p>
 </div>
@@ -66,7 +68,7 @@ const getSignatureHtml = () => `
     </td>
   </tr>
 </table>
-<p style="margin: 0; font-family: Verdana, Geneva, sans-serif; font-size: 7.5pt; color: ${SIG.disclaimer}; text-align: justify; line-height: 1.35;">
+<p style="margin: 0; font-family: Verdana, Geneva, sans-serif; font-size: 7.5pt; color: ${SIG.disclaimer}; text-shadow: 0.25px 0.25px 0 ${SIG.disclaimerShadow}; text-align: justify; line-height: 1.35;">
   The information contained in this email is confidential and may be subject to legal privilege. The content of this email, which may include one or more attachments, is strictly confidential, and is intended solely for the use of the named recipient/s. If you are not the intended recipient, you cannot use, copy, distribute, disclose or retain the email or any part of its contents or take any action in reliance on it. If you have received this email in error, please email the sender by replying to this message and to permanently delete it and all attachments from your computer. All reasonable precautions have been taken to ensure that no viruses are present in this email and the company cannot accept responsibility for any loss or damage arising from the use of this email or attachments.
 </p>
 `;

@@ -1,8 +1,16 @@
-export const APP_VERSION = '1.2.2';
+export const APP_VERSION = '1.2.3';
 export const APP_RELEASE_DATE = '7 September 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.2.3',
+    date: '7 Sep 2026',
+    items: [
+      'Signature colours now use sampled official values: Namir Waisberg #B3936E and contact labels #7F7F7F.',
+      'Disclaimer uses #D0CECE with a subtle #EEDDD1 peach shadow; the name uses a subtle #E9BF81 shadow.',
+    ],
+  },
   {
     version: '1.2.2',
     date: '7 Sep 2026',
