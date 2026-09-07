@@ -45,6 +45,14 @@ function onHostMessage(event) {
 // ping can arrive before DOMContentLoaded if the iframe starts during parse.
 window.addEventListener('message', onHostMessage);
 
+export function loadCaseMakerFrameIfNeeded() {
+    const iframe = document.getElementById('casemaker-frame');
+    if (!iframe) return;
+    const base = iframe.getAttribute('data-src');
+    if (!base || iframe.getAttribute('src')) return;
+    iframe.src = `${base}?theme=${encodeURIComponent(getAll4OneTheme())}`;
+}
+
 export function initCaseMakerThemeSync() {
     const iframe = document.getElementById('casemaker-frame');
     if (iframe) {

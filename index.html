@@ -716,14 +716,6 @@
                         allow="clipboard-write"
                         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads"
                     ></iframe>
-                    <script>
-                        (function () {
-                            var frame = document.getElementById('casemaker-frame');
-                            if (!frame) return;
-                            var theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-                            frame.src = frame.getAttribute('data-src') + '?theme=' + encodeURIComponent(theme);
-                        })();
-                    </script>
                 </div>
 
                 <!-- AFFIDAVIT AUTOMATION TAB -->

@@ -4,7 +4,7 @@
 
 import { registerReactTabs } from './react/mount.jsx';
 import { getDefaultTab, initWorkspacePrefs, onWorkspaceTabActivated, expandSidebar } from './ui-prefs.js';
-import { initCaseMakerThemeSync, postCaseMakerTheme } from './casemaker-theme.js';
+import { initCaseMakerThemeSync, loadCaseMakerFrameIfNeeded, postCaseMakerTheme } from './casemaker-theme.js';
 import './pdf-manager.js';
 import './trello.js';
 
@@ -188,6 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.dispatchEvent(new CustomEvent('tab-activated', { detail: targetTabId }));
         onWorkspaceTabActivated(targetTabId);
         if (targetTabId === 'casemaker') {
+            loadCaseMakerFrameIfNeeded();
             postCaseMakerTheme();
         }
     }
