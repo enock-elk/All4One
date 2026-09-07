@@ -1,8 +1,16 @@
-export const APP_VERSION = '1.3.1';
+export const APP_VERSION = '1.3.2';
 export const APP_RELEASE_DATE = '7 September 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.2',
+    date: '7 Sep 2026',
+    items: [
+      'Sidebar and top header now read as one continuous L-shaped gradient shell with a joined inner accent edge.',
+      'Navigation items use raised glass-button surfaces, borders, and shadows for clearer interaction affordance.',
+    ],
+  },
   {
     version: '1.3.1',
     date: '7 Sep 2026',
