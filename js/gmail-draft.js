@@ -66,6 +66,18 @@ export function describeGmailConnectError(err) {
       `Wait about a minute, then try Connect Gmail again.`
     );
   }
+  if (
+    code === 'auth/operation-not-allowed' ||
+    /operation-not-allowed/i.test(message) ||
+    /sign-in provider is disabled/i.test(message)
+  ) {
+    return (
+      'Google sign-in is turned off for this Firebase project. ' +
+      'Anonymous login can still succeed (the silent GUARDIAN line in the console). ' +
+      'In Firebase Console → Authentication → Sign-in method, open Google, turn Enable on, ' +
+      'choose a project support email, and Save. Then hard-refresh and try Connect Gmail again.'
+    );
+  }
   return message || 'Gmail connection failed.';
 }
 

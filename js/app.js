@@ -22,9 +22,10 @@ document.addEventListener('DOMContentLoaded', () => {
         appId: "1:1092267743610:web:f0c6370afcab7cbd559ec3"
     };
     
-    // Gmail "Connect" uses signInWithPopup. Add every host that serves this
-    // app (enock-elk.github.io — hostname only, no /All4One/docs path) under
-    // Firebase Console → Authentication → Settings → Authorized domains.
+    // Gmail "Connect" uses Google signInWithPopup. In Firebase Console:
+    // Authentication → Sign-in method → enable Google, and
+    // Authentication → Settings → Authorized domains → add every host
+    // (enock-elk.github.io — hostname only, no /All4One/docs path).
     if (!firebase.apps.length) {
         firebase.initializeApp(firebaseConfig);
     }

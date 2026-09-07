@@ -38,6 +38,7 @@ const SIG = {
 // Signature HTML with embedded transparent logo image
 const getSignatureHtml = () => `
 <br>
+<br>
 <div style="font-family: Verdana, Geneva, sans-serif; line-height: 1.35; color: ${SIG.tan};">
   <p style="margin: 0; font-size: 12pt; font-weight: bold; color: ${SIG.tan};">Namir Waisberg</p>
   <p style="margin: 0; font-size: 10pt; font-weight: normal; color: ${SIG.tan};">Managing Director</p>
@@ -615,7 +616,7 @@ export default function EmailEngine() {
     } catch (err) {
       console.error(err);
       const msg = describeGmailConnectError(err);
-      if (/oauth|gmail|token|configured|authorized domain/i.test(msg)) {
+      if (/oauth|gmail|token|configured|authorized domain|sign-in method/i.test(msg)) {
         setStatus({
           msg: `${msg} Click "Connect Gmail" first, or redeploy gas/Code.gs on Apps Script.`,
           type: 'error',
@@ -801,7 +802,7 @@ export default function EmailEngine() {
               <button
                 type="button"
                 onClick={connectGmail}
-                title="Uses Firebase Google sign-in. The site hostname must be listed under Firebase Authorized domains."
+                title="Uses Firebase Google sign-in. Enable the Google provider under Authentication → Sign-in method, and list this hostname under Authorized domains."
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all active:scale-95"
               >
                 <Mail className="w-4 h-4" /> Connect Gmail
@@ -840,24 +841,24 @@ export default function EmailEngine() {
         )}
 
         <div className="flex-1 overflow-y-auto p-8 custom-scroll flex justify-center">
-          <div className="w-full max-w-3xl bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col self-start">
-            <div className="bg-slate-50 dark:bg-slate-800/80 px-6 py-4 border-b border-slate-100 dark:border-slate-700/50">
+          <div className="w-full max-w-3xl bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden flex flex-col self-start" style={{ colorScheme: 'light' }}>
+            <div className="bg-slate-50 px-6 py-4 border-b border-slate-100">
               <div className="flex items-center gap-4 mb-3">
-                <span className="text-slate-400 dark:text-slate-500 font-medium text-sm w-16">To</span>
-                <div className="flex-1 border-b border-slate-200 dark:border-slate-700 pb-1">
-                  <span className="text-sm text-slate-700 dark:text-slate-300 italic">Recipient selected in Gmail...</span>
+                <span className="text-slate-400 font-medium text-sm w-16">To</span>
+                <div className="flex-1 border-b border-slate-200 pb-1">
+                  <span className="text-sm text-slate-700 italic">Recipient selected in Gmail...</span>
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <span className="text-slate-400 dark:text-slate-500 font-medium text-sm w-16">Subject</span>
-                <div className="flex-1 font-semibold text-slate-800 dark:text-slate-100 text-lg border-b border-slate-200 dark:border-slate-700 pb-1">
+                <span className="text-slate-400 font-medium text-sm w-16">Subject</span>
+                <div className="flex-1 font-semibold text-slate-800 text-lg border-b border-slate-200 pb-1">
                   {compiledContent.subject}
                 </div>
               </div>
             </div>
 
-            <div 
-              className="p-8 text-sm text-slate-800 dark:text-slate-200 leading-relaxed min-h-[400px] outline-none"
+            <div
+              className="p-8 text-sm text-black leading-relaxed min-h-[400px] outline-none"
               dangerouslySetInnerHTML={{ __html: compiledContent.htmlBody }}
             />
           </div>
