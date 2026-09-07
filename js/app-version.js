@@ -1,8 +1,17 @@
-export const APP_VERSION = '1.3.2';
+export const APP_VERSION = '1.3.3';
 export const APP_RELEASE_DATE = '7 September 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.3',
+    date: '7 Sep 2026',
+    items: [
+      'ALL4ONE branding is integrated into the square corner of the L-shaped shell so it no longer resembles a navigation tab.',
+      'The header now uses a larger active-tab title and matching tab icon, with the redundant Workspace label removed.',
+      'The remaining sidebar/header seam and vertical divider were removed for a continuous shell surface.',
+    ],
+  },
   {
     version: '1.3.2',
     date: '7 Sep 2026',

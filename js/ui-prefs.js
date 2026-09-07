@@ -6,11 +6,11 @@ export const PREF_DEFAULT_TAB = 'all4one_default_tab';
 export const PREF_SIDEBAR_COLLAPSED = 'all4one_sidebar_collapsed';
 
 export const TAB_META = {
-    'pdf-manager': { label: 'Document Manager', short: 'PDF tools & file bay' },
-    dashboard: { label: 'Trello Watcher', short: 'Board activity monitor' },
-    casemaker: { label: 'Case Maker', short: 'RyanGPT case builder' },
-    affidavits: { label: 'Affidavit Automation', short: 'Expert affidavit drafts' },
-    emails: { label: 'Draft Email Generator', short: 'Client email templates' },
+    'pdf-manager': { label: 'Document Manager', short: 'PDF tools & file bay', icon: 'files' },
+    dashboard: { label: 'Trello Watcher', short: 'Board activity monitor', icon: 'radar' },
+    casemaker: { label: 'Case Maker', short: 'RyanGPT case builder', icon: 'sparkles' },
+    affidavits: { label: 'Affidavit Automation', short: 'Expert affidavit drafts', icon: 'scroll-text' },
+    emails: { label: 'Draft Email Generator', short: 'Client email templates', icon: 'mail-plus' },
 };
 
 export const NAV_TAB_ORDER = Object.keys(TAB_META);
@@ -58,6 +58,18 @@ export function syncSidebarPinMarkers() {
         const tabId = btn.getAttribute('data-tab');
         btn.classList.toggle('is-pinned-tab', tabId === pinned);
     });
+}
+
+export function syncHeaderContext(tabId = activeTabId) {
+    const meta = TAB_META[tabId];
+    const title = document.getElementById('header-title');
+    const icon = document.getElementById('header-context-icon');
+    if (!meta) return;
+    if (title) title.textContent = meta.label;
+    if (icon) {
+        icon.setAttribute('data-lucide', meta.icon);
+        if (window.lucide) window.lucide.createIcons();
+    }
 }
 
 export function setAppStatus(label = 'SYSTEM ONLINE', tone = 'ok') {
@@ -145,6 +157,7 @@ export function initSidebarCollapse() {
 
 export function onWorkspaceTabActivated(tabId) {
     activeTabId = tabId;
+    syncHeaderContext(tabId);
     syncHeaderPin(tabId);
     setAppStatus('SYSTEM ONLINE', 'ok');
 }
@@ -152,6 +165,7 @@ export function onWorkspaceTabActivated(tabId) {
 export function initWorkspacePrefs() {
     initHeaderPin();
     initSidebarCollapse();
+    syncHeaderContext(activeTabId);
     initVersionPanel();
 }
 
