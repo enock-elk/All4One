@@ -802,7 +802,7 @@ export default function EmailEngine() {
               <button
                 type="button"
                 onClick={connectGmail}
-                title="Uses Firebase Google sign-in. Enable the Google provider under Authentication → Sign-in method, and list this hostname under Authorized domains."
+                title="Requests Gmail draft access for your Actuary work Google account. The site hostname must be listed on the OAuth web client’s Authorized JavaScript origins."
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all active:scale-95"
               >
                 <Mail className="w-4 h-4" /> Connect Gmail
