@@ -708,13 +708,22 @@
 
                 <!-- CASE MAKER TAB -->
                 <div id="tab-casemaker" class="tab-content hidden h-full w-full flex flex-col">
-                    <iframe 
-                        src="https://script.google.com/macros/s/AKfycbxDKB-wWAd-BDOdfqe-sr6RRgrakIM5qhqfQy-2mvF9hQ7-xJAk8NhZcdPSPeHFFfGZ/exec"
+                    <iframe
+                        id="casemaker-frame"
+                        data-src="https://script.google.com/macros/s/AKfycbxDKB-wWAd-BDOdfqe-sr6RRgrakIM5qhqfQy-2mvF9hQ7-xJAk8NhZcdPSPeHFFfGZ/exec"
                         class="w-full flex-1 min-h-0 border-0"
                         title="RyanGPT Case Maker"
                         allow="clipboard-write"
                         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads"
                     ></iframe>
+                    <script>
+                        (function () {
+                            var frame = document.getElementById('casemaker-frame');
+                            if (!frame) return;
+                            var theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+                            frame.src = frame.getAttribute('data-src') + '?theme=' + encodeURIComponent(theme);
+                        })();
+                    </script>
                 </div>
 
                 <!-- AFFIDAVIT AUTOMATION TAB -->
