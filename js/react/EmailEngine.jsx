@@ -133,8 +133,13 @@ function draftSubject(draftName, claimantLabel) {
 function htmlList(items, emptyPlaceholder) {
   const cleaned = (Array.isArray(items) ? items : []).map((item) => String(item || '').trim()).filter(Boolean);
   const source = cleaned.length ? cleaned : [emptyPlaceholder];
-  const lis = source.map((item) => `<li>${escapeHtml(item)}</li>`).join('');
-  return `<ul style="margin: 8px 0 0 0; padding-left: 24px;">${lis}</ul>`;
+  const rows = source.map((item) => (
+    `<tr>` +
+      `<td valign="top" style="width:18px; padding:0 8px 6px 0; font-family: Verdana, Geneva, sans-serif; font-size:13px; color:#000; line-height:1.5;">&#8226;</td>` +
+      `<td valign="top" style="padding:0 0 6px 0; font-family: Verdana, Geneva, sans-serif; font-size:13px; color:#000; line-height:1.5;">${escapeHtml(item)}</td>` +
+    `</tr>`
+  )).join('');
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 12px 4px; border-collapse:collapse;">${rows}</table>`;
 }
 
 function inTheLine(value, source, valuePlaceholder, sourcePlaceholder) {
@@ -858,7 +863,7 @@ export default function EmailEngine() {
             </div>
 
             <div
-              className="p-8 text-sm text-black leading-relaxed min-h-[400px] outline-none"
+              className="email-preview-body p-8 text-sm text-black leading-relaxed min-h-[400px] outline-none"
               dangerouslySetInnerHTML={{ __html: compiledContent.htmlBody }}
             />
           </div>
