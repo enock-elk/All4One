@@ -573,6 +573,14 @@ export default function EmailEngine() {
     setStatus({ msg: 'Pushing draft to Gmail...', type: 'info' });
 
     try {
+      // Once the user has connected Gmail, use that account directly. The
+      // Apps Script deployment may be an older revision and is unrelated to
+      // the user's OAuth-backed Gmail drafts.
+      if (gmailLinked) {
+        await pushDraftViaGmailApi();
+        return;
+      }
+
       const payload = {
         action: 'CREATE_DRAFT',
         subject: compiledContent.subject,

@@ -1,8 +1,16 @@
-export const APP_VERSION = '1.2.0';
+export const APP_VERSION = '1.2.1';
 export const APP_RELEASE_DATE = '7 September 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.2.1',
+    date: '7 Sep 2026',
+    items: [
+      'Gmail MIME keeps the required blank line between headers and body, fixing drafts that arrived with an empty body.',
+      'Connected Gmail users push directly through the Gmail API without the obsolete backend fallback notice.',
+    ],
+  },
   {
     version: '1.2.0',
     date: '7 Sep 2026',

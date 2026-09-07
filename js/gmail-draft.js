@@ -258,19 +258,21 @@ function foldBase64(b64) {
   return String(b64 || '').replace(/.{1,76}/g, '$&\r\n').trim();
 }
 
-function buildMimeMessage({ to, cc, subject, htmlBody }) {
+export function buildMimeMessage({ to, cc, subject, htmlBody }) {
   const encodedBody = foldBase64(utf8ToBase64(htmlBody || ''));
-  const lines = [
+  const headers = [
     `To: ${to}`,
     cc ? `Cc: ${cc}` : null,
     `Subject: ${rfc2047Encode(subject || '(DRAFT) Email')}`,
     'MIME-Version: 1.0',
     'Content-Type: text/html; charset="UTF-8"',
     'Content-Transfer-Encoding: base64',
-    '',
-    encodedBody,
-  ].filter(Boolean);
-  return lines.join('\r\n');
+  ].filter((line) => line !== null);
+
+  // RFC 5322 requires an empty line between headers and body. Do not use
+  // filter(Boolean) here: it removes that separator and Gmail parses the
+  // encoded HTML as another malformed header, resulting in an empty draft.
+  return `${headers.join('\r\n')}\r\n\r\n${encodedBody}`;
 }
 
 function toBase64Url(str) {
