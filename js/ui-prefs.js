@@ -1,5 +1,7 @@
 // Shared workspace UI: pin/default tab, sidebar collapse, status badge, toasts
 
+import { initVersionPanel } from './app-version.js';
+
 export const PREF_DEFAULT_TAB = 'all4one_default_tab';
 export const PREF_SIDEBAR_COLLAPSED = 'all4one_sidebar_collapsed';
 
@@ -66,30 +68,31 @@ export function setAppStatus(label = 'SYSTEM ONLINE', tone = 'ok') {
 
     if (!headerStatusDot || !headerStatusBadge) return;
 
-    headerStatusDot.classList.remove('bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'animate-pulse');
+    headerStatusDot.classList.remove('bg-emerald-400', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'animate-pulse');
     headerStatusBadge.classList.remove(
+        'bg-emerald-500/15', 'border-emerald-300/30',
         'bg-emerald-500/10', 'border-emerald-500/20',
         'bg-amber-500/10', 'border-amber-500/20',
         'bg-rose-500/10', 'border-rose-500/20',
     );
     headerStatusText.classList.remove(
-        'text-emerald-600', 'dark:text-emerald-400',
-        'text-amber-600', 'dark:text-amber-400',
-        'text-rose-600', 'dark:text-rose-400',
+        'text-emerald-200', 'text-emerald-600', 'dark:text-emerald-400',
+        'text-amber-200', 'text-amber-600', 'dark:text-amber-400',
+        'text-rose-200', 'text-rose-600', 'dark:text-rose-400',
     );
 
     if (tone === 'error') {
         headerStatusDot.classList.add('bg-rose-500');
         headerStatusBadge.classList.add('bg-rose-500/10', 'border-rose-500/20');
-        headerStatusText.classList.add('text-rose-600', 'dark:text-rose-400');
+        headerStatusText.classList.add('text-rose-200');
     } else if (tone === 'busy') {
         headerStatusDot.classList.add('bg-amber-500', 'animate-pulse');
         headerStatusBadge.classList.add('bg-amber-500/10', 'border-amber-500/20');
-        headerStatusText.classList.add('text-amber-600', 'dark:text-amber-400');
+        headerStatusText.classList.add('text-amber-200');
     } else {
-        headerStatusDot.classList.add('bg-emerald-500', 'animate-pulse');
-        headerStatusBadge.classList.add('bg-emerald-500/10', 'border-emerald-500/20');
-        headerStatusText.classList.add('text-emerald-600', 'dark:text-emerald-400');
+        headerStatusDot.classList.add('bg-emerald-400', 'animate-pulse');
+        headerStatusBadge.classList.add('bg-emerald-500/15', 'border-emerald-300/30');
+        headerStatusText.classList.add('text-emerald-200');
     }
 }
 
@@ -149,6 +152,7 @@ export function onWorkspaceTabActivated(tabId) {
 export function initWorkspacePrefs() {
     initHeaderPin();
     initSidebarCollapse();
+    initVersionPanel();
 }
 
 let toastTimer = null;

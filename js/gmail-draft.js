@@ -243,24 +243,38 @@ export async function requestGmailAccessToken() {
   }
 }
 
+function utf8ToBase64(str) {
+  const bytes = new TextEncoder().encode(str);
+  let binary = '';
+  bytes.forEach((b) => { binary += String.fromCharCode(b); });
+  return btoa(binary);
+}
+
+function rfc2047Encode(text) {
+  return `=?UTF-8?B?${utf8ToBase64(String(text || ''))}?=`;
+}
+
+function foldBase64(b64) {
+  return String(b64 || '').replace(/.{1,76}/g, '$&\r\n').trim();
+}
+
 function buildMimeMessage({ to, cc, subject, htmlBody }) {
+  const encodedBody = foldBase64(utf8ToBase64(htmlBody || ''));
   const lines = [
     `To: ${to}`,
     cc ? `Cc: ${cc}` : null,
-    `Subject: ${subject}`,
+    `Subject: ${rfc2047Encode(subject || '(DRAFT) Email')}`,
     'MIME-Version: 1.0',
-    'Content-Type: text/html; charset=UTF-8',
+    'Content-Type: text/html; charset="UTF-8"',
+    'Content-Transfer-Encoding: base64',
     '',
-    htmlBody,
+    encodedBody,
   ].filter(Boolean);
   return lines.join('\r\n');
 }
 
 function toBase64Url(str) {
-  const bytes = new TextEncoder().encode(str);
-  let binary = '';
-  bytes.forEach((b) => { binary += String.fromCharCode(b); });
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return utf8ToBase64(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 export async function createGmailDraft({ subject, htmlBody, to, cc }) {

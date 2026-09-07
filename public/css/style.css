@@ -174,11 +174,93 @@
 /* --- Header -------------------------------------------------------------- */
 
 #app-header {
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.82), rgba(248, 250, 252, 0.65));
+  background: linear-gradient(90deg, #3a4d66 0%, #4a6078 100%);
+  border-bottom: 1px solid #2d3f55;
 }
 
 .dark #app-header {
-  background: linear-gradient(90deg, rgba(2, 6, 23, 0.92), rgba(15, 23, 42, 0.78));
+  background: linear-gradient(90deg, #3a4d66 0%, #4a6078 100%);
+  border-bottom-color: #2d3f55;
+}
+
+#app-version-panel {
+  position: fixed;
+  right: 1.5rem;
+  top: 4.35rem;
+  width: min(26rem, calc(100vw - 2rem));
+  z-index: 80;
+}
+
+.app-version-card {
+  background: #f8fafc;
+  color: #0f172a;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 1rem;
+  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.28);
+  padding: 1rem 1.1rem 0.85rem;
+  max-height: min(70vh, 28rem);
+  overflow: auto;
+}
+
+.app-version-kicker {
+  margin: 0;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #b45309;
+}
+
+.app-version-current {
+  margin: 0.2rem 0 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.app-version-date {
+  margin: 0.15rem 0 0.85rem;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.app-version-entry {
+  padding: 0.7rem 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.app-version-entry-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.78rem;
+  margin-bottom: 0.35rem;
+}
+
+.app-version-entry-head span {
+  color: #64748b;
+}
+
+.app-version-entry ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  list-style: disc;
+}
+
+.app-version-entry li {
+  display: list-item;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  margin: 0 0 0.3rem;
+}
+
+.email-preview-body ul {
+  list-style-type: disc !important;
+  padding-left: 1.4rem !important;
+  margin: 0.5rem 0 !important;
+}
+
+.email-preview-body li {
+  display: list-item !important;
 }
 
 .sidebar-nav-btn.is-pinned-tab::after {
@@ -202,16 +284,16 @@
   width: 2rem;
   height: 2rem;
   border-radius: 0.65rem;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  color: #64748b;
-  background: rgba(248, 250, 252, 0.8);
+  border: 1px solid rgba(226, 232, 240, 0.28);
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.08);
   transition: all 0.2s ease;
 }
 
 .dark .header-pin-btn {
-  background: rgba(15, 23, 42, 0.65);
-  border-color: rgba(71, 85, 105, 0.65);
-  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(226, 232, 240, 0.28);
+  color: #cbd5e1;
 }
 
 .header-pin-btn:hover {
