@@ -5,7 +5,9 @@
 
 const SHEET_ID = '1twLeKxFlNOjD5HmCqIqdTPg5qd_34twgOetm6AD5AYc';
 const FIRMS_TAB = 'Firms'; // column A=id, B=firm, C=attorney, D=rules JSON
-const FEEDBACK_TAB = 'Feedback';
+const USAGE_SHEET_ID = '14PwX3IqOdiU-_iF_dNxYRkH-adHYIkdRXiCWgfhBK00';
+const EMAIL_USAGE_TAB = 'All4One-Email';
+const AFFIDAVIT_USAGE_TAB = 'All4One-Affidavits';
 
 const DRAFT_TO = 'namir@actuaryconsulting.co.za';
 const DRAFT_CC = 'actuarialteam@actuaryconsulting.co.za';
@@ -28,11 +30,15 @@ function doPost(e) {
       return json_(logFeedback_(data));
     }
 
+    if (action === 'LOG_EMAIL_USAGE') {
+      return json_(logEmailUsage_(data));
+    }
+
     if (action === 'SYNC_RULES' || data.firm) {
       return json_(syncFirmRules_(data));
     }
 
-    return json_({ status: 'error', message: 'Unknown action. Use CREATE_DRAFT, LOG_FEEDBACK, or SYNC_RULES.' });
+    return json_({ status: 'error', message: 'Unknown action. Use CREATE_DRAFT, LOG_EMAIL_USAGE, LOG_FEEDBACK, or SYNC_RULES.' });
   } catch (err) {
     return json_({ status: 'error', message: String(err.message || err) });
   }
@@ -98,19 +104,68 @@ function syncFirmRules_(data) {
 }
 
 function logFeedback_(data) {
-  const ss = SpreadsheetApp.openById(SHEET_ID);
-  let sheet = ss.getSheetByName(FEEDBACK_TAB);
+  const ss = SpreadsheetApp.openById(USAGE_SHEET_ID);
+  let sheet = ss.getSheetByName(AFFIDAVIT_USAGE_TAB);
   if (!sheet) {
-    sheet = ss.insertSheet(FEEDBACK_TAB);
-    sheet.appendRow(['Timestamp', 'User', 'Case', 'Feedback']);
+    sheet = ss.insertSheet(AFFIDAVIT_USAGE_TAB);
+    sheet.appendRow(['Affidavit Author', 'Date', 'Time', 'Case Name', 'Before Feedback']);
   }
+  const stamp = usageStamp_(ss);
   sheet.appendRow([
-    new Date(),
     data.userName || 'Unknown',
+    stamp.date,
+    stamp.time,
     data.caseName || '',
     data.feedback || '',
   ]);
-  return { status: 'success', message: 'Feedback logged' };
+  return { status: 'success', message: 'Affidavit usage logged' };
+}
+
+function logEmailUsage_(data) {
+  const ss = SpreadsheetApp.openById(USAGE_SHEET_ID);
+  let sheet = ss.getSheetByName(EMAIL_USAGE_TAB);
+  if (!sheet) {
+    sheet = ss.insertSheet(EMAIL_USAGE_TAB);
+  }
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow([
+      'Email Author',
+      'Date',
+      'Time',
+      'Template',
+      'Claimant',
+      'Subject',
+      'Action',
+      'Status',
+      'Delivery Channel',
+      'App Version',
+    ]);
+    sheet.setFrozenRows(1);
+  }
+
+  const stamp = usageStamp_(ss);
+  sheet.appendRow([
+    data.userName || 'Unknown',
+    stamp.date,
+    stamp.time,
+    data.templateName || data.templateId || '',
+    data.claimant || '',
+    data.subject || '',
+    data.usageAction || '',
+    data.status || '',
+    data.deliveryChannel || '',
+    data.appVersion || '',
+  ]);
+  return { status: 'success', message: 'Email usage logged' };
+}
+
+function usageStamp_(ss) {
+  const now = new Date();
+  const timezone = ss.getSpreadsheetTimeZone() || Session.getScriptTimeZone();
+  return {
+    date: Utilities.formatDate(now, timezone, 'yyyy-MM-dd'),
+    time: Utilities.formatDate(now, timezone, 'HH:mm:ss'),
+  };
 }
 
 function parseRules_(val) {

@@ -295,7 +295,7 @@ export default function AffidavitAutomation() {
     URL.revokeObjectURL(url);
   };
 
-  // GUARDIAN: Intercepts export and logs feedback to Google Apps Script
+  // GUARDIAN: Intercepts export and logs it to the shared All4One audit sheet.
   const handleFeedbackSubmit = async (skipped = false) => {
     // 1. Download immediately to avoid blocking the user's workflow
     exportToWord();
@@ -977,13 +977,13 @@ export default function AffidavitAutomation() {
                 <RefreshCw className="w-4 h-4" /> Reset preview
               </button>
             )}
-            <a 
-              href="https://docs.google.com/spreadsheets/d/1twLeKxFlNOjD5HmCqIqdTPg5qd_34twgOetm6AD5AYc/edit?gid=432356199#gid=432356199" 
-              target="_blank" 
+            <a
+              href="https://docs.google.com/spreadsheets/d/14PwX3IqOdiU-_iF_dNxYRkH-adHYIkdRXiCWgfhBK00/edit?gid=1037491136#gid=1037491136"
+              target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all"
             >
-              📝 Post-Case Feedback
+              📝 Affidavit Log
             </a>
             <button 
               onClick={() => setIsFullscreen(!isFullscreen)} 
