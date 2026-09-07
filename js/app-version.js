@@ -1,8 +1,17 @@
-export const APP_VERSION = '1.2.3';
+export const APP_VERSION = '1.2.4';
 export const APP_RELEASE_DATE = '7 September 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.2.4',
+    date: '7 Sep 2026',
+    items: [
+      'Email paragraph spacing now uses the official-like intermediate line height instead of the tighter previous value.',
+      'Discrepancy lists flow directly into “or alternatively” without an extra blank paragraph.',
+      'Disclaimer line spacing is increased to match the less-dense official signature.',
+    ],
+  },
   {
     version: '1.2.3',
     date: '7 Sep 2026',

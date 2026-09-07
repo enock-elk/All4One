@@ -68,7 +68,7 @@ const getSignatureHtml = () => `
     </td>
   </tr>
 </table>
-<p style="margin: 0; font-family: Verdana, Geneva, sans-serif; font-size: 7.5pt; color: ${SIG.disclaimer}; text-shadow: 0.25px 0.25px 0 ${SIG.disclaimerShadow}; text-align: justify; line-height: 1.35;">
+<p style="margin: 0; font-family: Verdana, Geneva, sans-serif; font-size: 7.5pt; color: ${SIG.disclaimer}; text-shadow: 0.25px 0.25px 0 ${SIG.disclaimerShadow}; text-align: justify; line-height: 1.65;">
   The information contained in this email is confidential and may be subject to legal privilege. The content of this email, which may include one or more attachments, is strictly confidential, and is intended solely for the use of the named recipient/s. If you are not the intended recipient, you cannot use, copy, distribute, disclose or retain the email or any part of its contents or take any action in reliance on it. If you have received this email in error, please email the sender by replying to this message and to permanently delete it and all attachments from your computer. All reasonable precautions have been taken to ensure that no viruses are present in this email and the company cannot accept responsibility for any loss or damage arising from the use of this email or attachments.
 </p>
 `;
@@ -137,11 +137,11 @@ function htmlList(items, emptyPlaceholder) {
   const source = cleaned.length ? cleaned : [emptyPlaceholder];
   const rows = source.map((item) => (
     `<tr>` +
-      `<td valign="top" style="width:18px; padding:0 8px 6px 0; font-family: Verdana, Geneva, sans-serif; font-size:13px; color:#000; line-height:1.5;">&#8226;</td>` +
-      `<td valign="top" style="padding:0 0 6px 0; font-family: Verdana, Geneva, sans-serif; font-size:13px; color:#000; line-height:1.5;">${escapeHtml(item)}</td>` +
+      `<td valign="top" style="width:18px; padding:0 8px 2px 0; font-family: Verdana, Geneva, sans-serif; font-size:13px; color:#000; line-height:1.35;">&#8226;</td>` +
+      `<td valign="top" style="padding:0 0 2px 0; font-family: Verdana, Geneva, sans-serif; font-size:13px; color:#000; line-height:1.35;">${escapeHtml(item)}</td>` +
     `</tr>`
   )).join('');
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 12px 4px; border-collapse:collapse;">${rows}</table>`;
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 0 4px; border-collapse:collapse;">${rows}</table>`;
 }
 
 function inTheLine(value, source, valuePlaceholder, sourcePlaceholder) {
@@ -160,10 +160,14 @@ function orIdDocumentLine(gender) {
   return `or alternatively, kindly provide a copy of ${possessivePronoun(gender)} ID document.`;
 }
 
+function htmlListWithIdFollowup(items, emptyPlaceholder, gender) {
+  return `${htmlList(items, emptyPlaceholder)}${orIdDocumentLine(gender)}`;
+}
+
 function wrapCompiledEmail(subject, bodyHtml) {
   return {
     subject,
-    htmlBody: `<div style="font-family: Verdana, Geneva, sans-serif; font-size: 13px; color: #000; line-height: 1.2;">${bodyHtml}${getSignatureHtml()}</div>`,
+    htmlBody: `<div style="font-family: Verdana, Geneva, sans-serif; font-size: 13px; color: #000; line-height: 1.35;">${bodyHtml}${getSignatureHtml()}</div>`,
   };
 }
 
@@ -282,11 +286,10 @@ const TEMPLATES = [
           inTheLine(vars.dateA, vars.dateASource, '[Date A]', '[Source A]'),
           inTheLine(vars.dateB, vars.dateBSource, '[Date B]', '[Source B]'),
         ], '[Date discrepancy]')}`,
-        `Also kindly assist us by confirming the correct spelling of the claimant\u2019s name.${htmlList([
+        `Also kindly assist us by confirming the correct spelling of the claimant\u2019s name.${htmlListWithIdFollowup([
           inTheLine(vars.nameA, vars.nameASource, '[Spelling A]', '[Source A]'),
           inTheLine(vars.nameB, vars.nameBSource, '[Spelling B]', '[Source B]'),
-        ], '[Name discrepancy]')}`,
-        orIdDocumentLine(vars.gender),
+        ], '[Name discrepancy]', vars.gender)}`,
         PROCEED_HYPHEN,
         SIGN_OFF,
       ].join('<br/><br/>');
@@ -352,11 +355,10 @@ const TEMPLATES = [
       const bodyHtml = [
         `Dear ${attorney}`,
         thankYouLoe(shortName),
-        `Kindly assist us by confirming the correct spelling of the claimant\u2019s surname.${htmlList([
+        `Kindly assist us by confirming the correct spelling of the claimant\u2019s surname.${htmlListWithIdFollowup([
           inTheLine(vars.surnameA, vars.surnameASource, '[Surname A]', '[Source A]'),
           inTheLine(vars.surnameB, vars.surnameBSource, '[Surname B]', '[Source B]'),
-        ], '[Surname discrepancy]')}`,
-        orIdDocumentLine(vars.gender),
+        ], '[Surname discrepancy]', vars.gender)}`,
         PROCEED_HYPHEN,
         SIGN_OFF,
       ].join('<br/><br/>');
@@ -381,11 +383,10 @@ const TEMPLATES = [
       const bodyHtml = [
         `Dear ${attorney}`,
         thankYouLoe(shortName),
-        `Kindly assist us by confirming the correct spelling of the claimant\u2019s name.${htmlList([
+        `Kindly assist us by confirming the correct spelling of the claimant\u2019s name.${htmlListWithIdFollowup([
           inTheLine(vars.nameA, vars.nameASource, '[Spelling A]', '[Source A]'),
           inTheLine(vars.nameB, vars.nameBSource, '[Spelling B]', '[Source B]'),
-        ], '[Name discrepancy]')}`,
-        orIdDocumentLine(vars.gender),
+        ], '[Name discrepancy]', vars.gender)}`,
         PROCEED_HYPHEN,
         SIGN_OFF,
       ].join('<br/><br/>');
