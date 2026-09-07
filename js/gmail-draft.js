@@ -49,32 +49,59 @@ export function isGmailConnected() {
   return Boolean(getCachedToken());
 }
 
+export function describeGmailConnectError(err) {
+  const code = err?.code || '';
+  const message = String(err?.message || '');
+  const host = typeof location !== 'undefined' ? location.hostname : '';
+  const domain = host || 'enock-elk.github.io';
+  if (
+    code === 'auth/unauthorized-domain' ||
+    /unauthorized-domain/i.test(message) ||
+    /not authorized for OAuth/i.test(message)
+  ) {
+    return (
+      `Firebase will not open Google sign-in from ${domain}. ` +
+      `In Firebase Console → Authentication → Settings → Authorized domains, ` +
+      `click Add domain and enter "${domain}" (hostname only — no https:// and no /All4One/docs). ` +
+      `Wait about a minute, then try Connect Gmail again.`
+    );
+  }
+  return message || 'Gmail connection failed.';
+}
+
 async function requestGmailAccessTokenViaFirebase() {
   const fb = typeof window !== 'undefined' ? window.firebase : null;
   if (!fb?.auth) {
     throw new Error('Firebase is not loaded. Refresh the page and try again.');
   }
 
-  const provider = new fb.auth.GoogleAuthProvider();
-  provider.addScope(GMAIL_SCOPE);
-  provider.setCustomParameters({ prompt: 'consent' });
+  try {
+    const provider = new fb.auth.GoogleAuthProvider();
+    provider.addScope(GMAIL_SCOPE);
+    provider.setCustomParameters({ prompt: 'consent' });
 
-  const wasAnonymous = fb.auth().currentUser?.isAnonymous;
-  const result = await fb.auth().signInWithPopup(provider);
-  const credential = fb.auth.GoogleAuthProvider.credentialFromResult(result);
-  const accessToken = credential?.accessToken;
+    const wasAnonymous = fb.auth().currentUser?.isAnonymous;
+    const result = await fb.auth().signInWithPopup(provider);
+    const credential = fb.auth.GoogleAuthProvider.credentialFromResult(result);
+    const accessToken = credential?.accessToken;
 
-  if (!accessToken) {
-    throw new Error('Google sign-in did not return a Gmail access token.');
+    if (!accessToken) {
+      throw new Error('Google sign-in did not return a Gmail access token.');
+    }
+
+    if (wasAnonymous) {
+      await fb.auth().signOut();
+      await fb.auth().signInAnonymously();
+    }
+
+    cacheToken(accessToken);
+    return accessToken;
+  } catch (err) {
+    const wrapped = new Error(describeGmailConnectError(err));
+    wrapped.code = err?.code;
+    wrapped.cause = err;
+    throw wrapped;
   }
-
-  if (wasAnonymous) {
-    await fb.auth().signOut();
-    await fb.auth().signInAnonymously();
-  }
-
-  cacheToken(accessToken);
-  return accessToken;
 }
 
 export async function requestGmailAccessToken() {
