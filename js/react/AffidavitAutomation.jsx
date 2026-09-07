@@ -306,6 +306,7 @@ export default function AffidavitAutomation() {
     try {
       const payload = {
         action: 'LOG_FEEDBACK',
+        source: 'ALL4ONE',
         userName: localStorage.getItem('username') || 'Unknown User',
         // GUARDIAN: Smart Case Name Formatting (Omits case number if empty)
         caseName: `${form.plaintiff || '[PLAINTIFF]'} v ${form.defendent || '[DEFENDANT]'}${form.case ? ` (Case: ${form.case})` : ''}`,
