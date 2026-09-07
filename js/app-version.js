@@ -1,8 +1,16 @@
-export const APP_VERSION = '1.2.1';
+export const APP_VERSION = '1.2.2';
 export const APP_RELEASE_DATE = '7 September 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.2.2',
+    date: '7 Sep 2026',
+    items: [
+      'Email signature more closely matches the official Gmail version: normal-sized name, fixed 302 px logo, and lighter contact labels.',
+      'Disclaimer uses a warm brown-grey and email body spacing is tightened to one empty row after the greeting.',
+    ],
+  },
   {
     version: '1.2.1',
     date: '7 Sep 2026',
