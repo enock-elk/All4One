@@ -1,8 +1,16 @@
-export const APP_VERSION = '1.3.0';
+export const APP_VERSION = '1.3.1';
 export const APP_RELEASE_DATE = '7 September 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.1',
+    date: '7 Sep 2026',
+    items: [
+      'Sidebar and workspace header now use a more intentional layered navy, amber, and blue gradient system.',
+      'Navigation states, icon tiles, brand treatment, status badge, and header controls have clearer visual depth without changing behavior.',
+    ],
+  },
   {
     version: '1.3.0',
     date: '7 Sep 2026',
