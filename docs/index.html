@@ -214,8 +214,8 @@
             transition: opacity 0.2s ease;
         }
     </style>
-  <script type="module" crossorigin src="./assets/index-DH9UEYTM.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-BV-o2Isz.css">
+  <script type="module" crossorigin src="./assets/index-DuXHvjXQ.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CRU12Sfx.css">
 </head>
 <body class="bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
 
@@ -340,11 +340,11 @@
         <div class="flex-1 relative flex flex-col h-full bg-slate-50 dark:bg-slate-900/50 transition-colors duration-300">
             
             <!-- Dynamic Header -->
-            <header id="app-header" class="h-16 shrink-0 flex items-center justify-between px-8 border-b border-slate-200 dark:border-slate-800 backdrop-blur-md z-10">
+            <header id="app-header" class="h-16 shrink-0 flex items-center justify-between px-8 z-10">
                 <div>
-                    <p class="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-amber-600/80 dark:text-amber-400/80 mb-0.5">Workspace</p>
+                    <p class="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-amber-300/90 mb-0.5">Workspace</p>
                     <div class="flex items-center gap-2">
-                        <h1 id="header-title" class="text-base font-bold text-slate-800 dark:text-slate-100">
+                        <h1 id="header-title" class="text-base font-bold text-slate-100">
                             Document Manager
                         </h1>
                         <button type="button" id="header-pin-btn" class="header-pin-btn" title="Pin as default workspace" aria-label="Pin as default workspace">
@@ -353,12 +353,12 @@
                     </div>
                 </div>
                 
-                <div class="flex items-center gap-3">
-                    <!-- Status Badge -->
-                    <div id="header-status-badge" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 transition-all duration-300">
-                        <div id="header-status-dot" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                        <span id="header-status-text" class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">System Online</span>
-                    </div>
+                <div class="relative flex items-center gap-3">
+                    <button type="button" id="header-status-badge" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-300/30 transition-all duration-300 hover:bg-emerald-500/25" title="View app version and recent work" aria-haspopup="dialog">
+                        <div id="header-status-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+                        <span id="header-status-text" class="text-[10px] font-bold text-emerald-200 uppercase tracking-wider">System Online</span>
+                    </button>
+                    <div id="app-version-panel" class="hidden" role="dialog" aria-label="App version history"></div>
                 </div>
             </header>
 
@@ -708,8 +708,9 @@
 
                 <!-- CASE MAKER TAB -->
                 <div id="tab-casemaker" class="tab-content hidden h-full w-full flex flex-col">
-                    <iframe 
-                        src="https://script.google.com/macros/s/AKfycbxDKB-wWAd-BDOdfqe-sr6RRgrakIM5qhqfQy-2mvF9hQ7-xJAk8NhZcdPSPeHFFfGZ/exec"
+                    <iframe
+                        id="casemaker-frame"
+                        data-src="https://script.google.com/macros/s/AKfycbxDKB-wWAd-BDOdfqe-sr6RRgrakIM5qhqfQy-2mvF9hQ7-xJAk8NhZcdPSPeHFFfGZ/exec"
                         class="w-full flex-1 min-h-0 border-0"
                         title="RyanGPT Case Maker"
                         allow="clipboard-write"
