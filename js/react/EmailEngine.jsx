@@ -6,7 +6,9 @@ import {
   RefreshCw, 
   CheckCircle2, 
   AlertCircle,
-  FileText
+  FileText,
+  Plus,
+  Minus
 } from 'lucide-react';
 import { AC_LOGO_DATA_URI } from './ac-logo-b64.js';
 import {
@@ -16,6 +18,8 @@ import {
   clearGmailToken,
 } from '../gmail-draft.js';
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbw-M9kVkSSXKuJ49tohaconx99-l5VcbU1xSNeUTccX2gs0prok3LltyTyO7mdNKtm8/exec";
+
+const INPUT_CLASS = "w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm outline-none focus:border-amber-500 dark:text-white transition-all";
 
 // Brand colours from official Actuary Consulting signature
 const SIG = {
@@ -65,6 +69,139 @@ const getSignatureHtml = () => `
 </p>
 `;
 
+const KUBHEKA_APN_HTML = 'In accordance with the precedent set by the court in <em>Kubheka v RAF</em> (5 November 2025) and the Advisory Practice Note issued by the Actuarial Society of South Africa (APN 702), we are required to obtain all available supporting documentation related to earnings referenced in the Industrial Psychologist report. Compliance with these requirements is important to ensure adherence to professional standards.';
+const PROCEED_HYPHEN = 'We will be able to proceed with the actuarial calculations once the above-mentioned information has been provided.';
+const PROCEED_SPACE = 'We will be able to proceed with the actuarial calculations once the above mentioned information has been provided.';
+const SIGN_OFF = 'Kind regards<br/>Namir';
+const GENDER_OPTIONS = [
+  { value: 'Male', label: 'Male' },
+  { value: 'Female', label: 'Female' },
+];
+
+function escapeHtml(text) {
+  return String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function filled(value, placeholder) {
+  const trimmed = String(value ?? '').trim();
+  return trimmed || placeholder;
+}
+
+function htmlField(vars, key, placeholder) {
+  return escapeHtml(filled(vars[key], placeholder));
+}
+
+function formatClaimantShortName(fullName, gender) {
+  const parts = String(fullName || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '';
+  const title = gender === 'Female' ? 'Ms' : gender === 'Male' ? 'Mr' : '';
+  let core;
+  if (parts.length === 1) {
+    core = parts[0];
+  } else {
+    const surname = parts[parts.length - 1];
+    const initials = parts.slice(0, -1).map((part) => part.charAt(0).toUpperCase()).join('');
+    core = `${initials} ${surname}`;
+  }
+  return title ? `${title} ${core}` : core;
+}
+
+function possessivePronoun(gender) {
+  if (gender === 'Female') return 'her';
+  if (gender === 'Male') return 'his';
+  return '[his/her]';
+}
+
+function claimantShortLabel(vars) {
+  return formatClaimantShortName(vars.claimantFullName, vars.gender) || '[Claimant]';
+}
+
+function claimantFullLabel(vars) {
+  return filled(vars.claimantFullName, '[Claimant]');
+}
+
+function draftSubject(draftName, claimantLabel) {
+  return `${draftName} \u2014 ${claimantLabel}`;
+}
+
+function htmlList(items, emptyPlaceholder) {
+  const cleaned = (Array.isArray(items) ? items : []).map((item) => String(item || '').trim()).filter(Boolean);
+  const source = cleaned.length ? cleaned : [emptyPlaceholder];
+  const lis = source.map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+  return `<ul style="margin: 8px 0 0 0; padding-left: 24px;">${lis}</ul>`;
+}
+
+function inTheLine(value, source, valuePlaceholder, sourcePlaceholder) {
+  return `${filled(value, valuePlaceholder)} in the ${filled(source, sourcePlaceholder)}.`;
+}
+
+function ipDateLine(date, page, datePlaceholder, pagePlaceholder) {
+  return `${filled(date, datePlaceholder)} in the IP report (Page ${filled(page, pagePlaceholder)}).`;
+}
+
+function thankYouLoe(claimantHtml) {
+  return `Thank you for requesting a Loss of Earnings calculation for ${claimantHtml}.`;
+}
+
+function orIdDocumentLine(gender) {
+  return `or alternatively, kindly provide a copy of ${possessivePronoun(gender)} ID document.`;
+}
+
+function wrapCompiledEmail(subject, bodyHtml) {
+  return {
+    subject,
+    htmlBody: `<div style="font-family: Verdana, Geneva, sans-serif; font-size: 13px; color: #000; line-height: 1.5;">${bodyHtml}${getSignatureHtml()}</div>`,
+  };
+}
+
+function extractPlaceholderKeys(text) {
+  const keys = [];
+  const regex = /<<([^>]+)>>/g;
+  let match;
+  while ((match = regex.exec(text || '')) !== null) {
+    if (!keys.includes(match[1])) keys.push(match[1]);
+  }
+  return keys;
+}
+
+function initialVariables(template) {
+  if (template.fields) {
+    const vars = {};
+    template.fields.forEach((field) => {
+      vars[field.key] = field.type === 'lines' ? [''] : '';
+    });
+    return vars;
+  }
+  const keys = [...extractPlaceholderKeys(template.subject), ...extractPlaceholderKeys(template.body)];
+  const vars = {};
+  keys.forEach((key) => {
+    vars[key] = '';
+  });
+  return vars;
+}
+
+function compilePlaceholderTemplate(template, variables) {
+  let compSubject = template.subject;
+  let compBody = template.body;
+
+  Object.keys(variables).forEach((key) => {
+    const val = variables[key] || `[${key}]`;
+    const replaceRegex = new RegExp(`<<${key}>>`, 'g');
+    compSubject = compSubject.replace(replaceRegex, val);
+    compBody = compBody.replace(replaceRegex, val);
+  });
+
+  return wrapCompiledEmail(compSubject, compBody.replace(/\n/g, '<br/>'));
+}
+
+const ATTORNEY_FIELD = { key: 'attorneyFirstName', label: 'Attorney first name', type: 'text', placeholder: 'e.g. Ntembeko' };
+const CLAIMANT_FIELD = { key: 'claimantFullName', label: 'Claimant full name', type: 'text', placeholder: 'e.g. Arnold Moses Monashane' };
+const GENDER_FIELD = { key: 'gender', label: 'Gender', type: 'select', options: GENDER_OPTIONS };
+
 const TEMPLATES = [
   {
     id: 'loe-report',
@@ -83,39 +220,267 @@ const TEMPLATES = [
     name: 'Amended Report Dispatch',
     subject: 'AMENDED Actuarial Report: <<Claimant Name>>',
     body: `Dear <<Attorney First Name>>,\n\nAs requested, please find attached the AMENDED Actuarial Report for <<Claimant Name>>.\n\nThe amendments reflect the following changes:\n<<Amendment Details>>\n\nWe trust you find the above in order.\n\nKind regards,\nNamir`
-  }
+  },
+  {
+    id: 'draft-earnings',
+    name: '(DRAFT) Request for claimant earnings',
+    fields: [
+      ATTORNEY_FIELD,
+      CLAIMANT_FIELD,
+      GENDER_FIELD,
+      { key: 'attorneyFirm', label: 'Attorney firm', type: 'text', placeholder: 'e.g. Yonela Bodlani Attorneys' },
+      { key: 'documentLines', label: 'Documents requested', type: 'lines', placeholder: 'Payslips dated: 2024 - 25th June; \u2026' },
+    ],
+    compile(vars) {
+      const attorney = htmlField(vars, 'attorneyFirstName', '[Attorney]');
+      const shortName = escapeHtml(claimantShortLabel(vars));
+      const firm = htmlField(vars, 'attorneyFirm', '[Attorney firm]');
+      const bodyHtml = [
+        `Dear ${attorney}`,
+        'I trust you are well.',
+        `Kindly note that we are undertaking Loss of Earnings Calculations for <strong>${shortName}</strong> on behalf of ${firm}.`,
+        KUBHEKA_APN_HTML,
+        `Kindly assist us by providing the following documents referenced in your report:${htmlList(vars.documentLines, '[Documents requested]')}`,
+        'We will provide the report within 24 hours once the abovementioned information is provided and no further information is required.',
+        SIGN_OFF,
+      ].join('<br/><br/>');
+      return { subject: draftSubject(this.name, claimantShortLabel(vars)), bodyHtml };
+    },
+  },
+  {
+    id: 'draft-disc-accident-first-name',
+    name: '(DRAFT) Discrepancy in Accident Date & First Name',
+    fields: [
+      ATTORNEY_FIELD,
+      CLAIMANT_FIELD,
+      GENDER_FIELD,
+      { key: 'dateA', label: 'Date A', type: 'text', placeholder: 'e.g. 14 July 2020' },
+      { key: 'dateASource', label: 'Date A source', type: 'text', placeholder: 'e.g. RAF report' },
+      { key: 'dateB', label: 'Date B', type: 'text', placeholder: 'e.g. 13 July 2020' },
+      { key: 'dateBSource', label: 'Date B source', type: 'text', placeholder: 'e.g. IP report' },
+      { key: 'nameA', label: 'Spelling A', type: 'text', placeholder: 'e.g. Rofhiwa' },
+      { key: 'nameASource', label: 'Spelling A source', type: 'text', placeholder: 'e.g. Instruction letter' },
+      { key: 'nameB', label: 'Spelling B', type: 'text', placeholder: 'e.g. Rofhiwe' },
+      { key: 'nameBSource', label: 'Spelling B source', type: 'text', placeholder: 'e.g. IP report' },
+    ],
+    compile(vars) {
+      const attorney = htmlField(vars, 'attorneyFirstName', '[Attorney]');
+      const shortName = escapeHtml(claimantShortLabel(vars));
+      const bodyHtml = [
+        `Dear ${attorney}`,
+        thankYouLoe(shortName),
+        `Kindly assist us by confirming the correct date of accident.${htmlList([
+          inTheLine(vars.dateA, vars.dateASource, '[Date A]', '[Source A]'),
+          inTheLine(vars.dateB, vars.dateBSource, '[Date B]', '[Source B]'),
+        ], '[Date discrepancy]')}`,
+        `Also kindly assist us by confirming the correct spelling of the claimant\u2019s name.${htmlList([
+          inTheLine(vars.nameA, vars.nameASource, '[Spelling A]', '[Source A]'),
+          inTheLine(vars.nameB, vars.nameBSource, '[Spelling B]', '[Source B]'),
+        ], '[Name discrepancy]')}`,
+        orIdDocumentLine(vars.gender),
+        PROCEED_HYPHEN,
+        SIGN_OFF,
+      ].join('<br/><br/>');
+      return { subject: draftSubject(this.name, claimantShortLabel(vars)), bodyHtml };
+    },
+  },
+  {
+    id: 'draft-missing-gender',
+    name: '(DRAFT) Missing Gender Info',
+    fields: [
+      ATTORNEY_FIELD,
+      CLAIMANT_FIELD,
+    ],
+    compile(vars) {
+      const attorney = htmlField(vars, 'attorneyFirstName', '[Attorney]');
+      const fullName = escapeHtml(claimantFullLabel(vars));
+      const bodyHtml = [
+        `Dear ${attorney}`,
+        'I trust that you are well.',
+        `Kindly confirm whether ${fullName} is a male or female.`,
+        PROCEED_SPACE,
+        SIGN_OFF,
+      ].join('<br/><br/>');
+      return { subject: draftSubject(this.name, claimantFullLabel(vars)), bodyHtml };
+    },
+  },
+  {
+    id: 'draft-missing-accident-date',
+    name: '(DRAFT) Missing Accident Date',
+    fields: [
+      ATTORNEY_FIELD,
+      CLAIMANT_FIELD,
+      GENDER_FIELD,
+    ],
+    compile(vars) {
+      const attorney = htmlField(vars, 'attorneyFirstName', '[Attorney]');
+      const shortName = escapeHtml(claimantShortLabel(vars));
+      const bodyHtml = [
+        `Dear ${attorney}`,
+        thankYouLoe(shortName),
+        'The date of accident was not provided. Kindly assist by providing the date of accident.',
+        PROCEED_SPACE,
+        SIGN_OFF,
+      ].join('<br/><br/>');
+      return { subject: draftSubject(this.name, claimantShortLabel(vars)), bodyHtml };
+    },
+  },
+  {
+    id: 'draft-disc-surname',
+    name: '(DRAFT) Discrepancy in Surname',
+    fields: [
+      ATTORNEY_FIELD,
+      CLAIMANT_FIELD,
+      GENDER_FIELD,
+      { key: 'surnameA', label: 'Surname A', type: 'text', placeholder: 'e.g. Sethlabane' },
+      { key: 'surnameASource', label: 'Surname A source', type: 'text', placeholder: 'e.g. OT report' },
+      { key: 'surnameB', label: 'Surname B', type: 'text', placeholder: 'e.g. Setlhabane' },
+      { key: 'surnameBSource', label: 'Surname B source', type: 'text', placeholder: 'e.g. IP report' },
+    ],
+    compile(vars) {
+      const attorney = htmlField(vars, 'attorneyFirstName', '[Attorney]');
+      const shortName = escapeHtml(claimantShortLabel(vars));
+      const bodyHtml = [
+        `Dear ${attorney}`,
+        thankYouLoe(shortName),
+        `Kindly assist us by confirming the correct spelling of the claimant\u2019s surname.${htmlList([
+          inTheLine(vars.surnameA, vars.surnameASource, '[Surname A]', '[Source A]'),
+          inTheLine(vars.surnameB, vars.surnameBSource, '[Surname B]', '[Source B]'),
+        ], '[Surname discrepancy]')}`,
+        orIdDocumentLine(vars.gender),
+        PROCEED_HYPHEN,
+        SIGN_OFF,
+      ].join('<br/><br/>');
+      return { subject: draftSubject(this.name, claimantShortLabel(vars)), bodyHtml };
+    },
+  },
+  {
+    id: 'draft-disc-first-name',
+    name: '(DRAFT) Discrepancy in First Name',
+    fields: [
+      ATTORNEY_FIELD,
+      CLAIMANT_FIELD,
+      GENDER_FIELD,
+      { key: 'nameA', label: 'Spelling A', type: 'text', placeholder: 'e.g. Sipiwe' },
+      { key: 'nameASource', label: 'Spelling A source', type: 'text', placeholder: 'e.g. Email' },
+      { key: 'nameB', label: 'Spelling B', type: 'text', placeholder: 'e.g. Simphiwe' },
+      { key: 'nameBSource', label: 'Spelling B source', type: 'text', placeholder: 'e.g. IP report' },
+    ],
+    compile(vars) {
+      const attorney = htmlField(vars, 'attorneyFirstName', '[Attorney]');
+      const shortName = escapeHtml(claimantShortLabel(vars));
+      const bodyHtml = [
+        `Dear ${attorney}`,
+        thankYouLoe(shortName),
+        `Kindly assist us by confirming the correct spelling of the claimant\u2019s name.${htmlList([
+          inTheLine(vars.nameA, vars.nameASource, '[Spelling A]', '[Source A]'),
+          inTheLine(vars.nameB, vars.nameBSource, '[Spelling B]', '[Source B]'),
+        ], '[Name discrepancy]')}`,
+        orIdDocumentLine(vars.gender),
+        PROCEED_HYPHEN,
+        SIGN_OFF,
+      ].join('<br/><br/>');
+      return { subject: draftSubject(this.name, claimantShortLabel(vars)), bodyHtml };
+    },
+  },
+  {
+    id: 'draft-link-not-opening',
+    name: '(DRAFT) Link Not Opening',
+    fields: [
+      { key: 'contactFirstName', label: 'Contact first name', type: 'text', placeholder: 'e.g. Pelisa' },
+    ],
+    compile(vars) {
+      const contact = htmlField(vars, 'contactFirstName', '[Name]');
+      const bodyHtml = [
+        `Good day ${contact}`,
+        'Thank you for your email.',
+        'Please kindly note we are unable to view the link. Please kindly share access openly.',
+        'Apologies for any inconvience.',
+        SIGN_OFF,
+      ].join('<br/><br/>');
+      return { subject: this.name, bodyHtml };
+    },
+  },
+  {
+    id: 'draft-disc-accident-dates-ip',
+    name: '(DRAFT) Discrepancy in Accident Dates within IP',
+    fields: [
+      ATTORNEY_FIELD,
+      CLAIMANT_FIELD,
+      GENDER_FIELD,
+      { key: 'dateA', label: 'Date A', type: 'text', placeholder: 'e.g. 15 January 2015' },
+      { key: 'dateAPage', label: 'Date A page', type: 'text', placeholder: 'e.g. 6' },
+      { key: 'dateB', label: 'Date B', type: 'text', placeholder: 'e.g. 15 January 2020' },
+      { key: 'dateBPage', label: 'Date B page', type: 'text', placeholder: 'e.g. 8' },
+    ],
+    compile(vars) {
+      const attorney = htmlField(vars, 'attorneyFirstName', '[Attorney]');
+      const shortName = escapeHtml(claimantShortLabel(vars));
+      const bodyHtml = [
+        `Dear ${attorney}`,
+        thankYouLoe(shortName),
+        `Kindly assist us by confirming the correct date of accident.${htmlList([
+          ipDateLine(vars.dateA, vars.dateAPage, '[Date A]', '[Page A]'),
+          ipDateLine(vars.dateB, vars.dateBPage, '[Date B]', '[Page B]'),
+        ], '[Date discrepancy]')}`,
+        PROCEED_HYPHEN,
+        SIGN_OFF,
+      ].join('<br/><br/>');
+      return { subject: draftSubject(this.name, claimantShortLabel(vars)), bodyHtml };
+    },
+  },
+  {
+    id: 'draft-no-ip-report',
+    name: '(DRAFT) No IP Report',
+    fields: [
+      ATTORNEY_FIELD,
+      CLAIMANT_FIELD,
+      GENDER_FIELD,
+    ],
+    compile(vars) {
+      const attorney = htmlField(vars, 'attorneyFirstName', '[Attorney]');
+      const shortName = escapeHtml(claimantShortLabel(vars));
+      const bodyHtml = [
+        `Dear ${attorney}`,
+        thankYouLoe(shortName),
+        'Kindly note that we require an Industrial Psychologist report in order to perform Loss of Earnings calculations.',
+        'Kindly assist by providing an Industrial Psychologist report.',
+        PROCEED_SPACE,
+        SIGN_OFF,
+      ].join('<br/><br/>');
+      return { subject: draftSubject(this.name, claimantShortLabel(vars)), bodyHtml };
+    },
+  },
 ];
 
 export default function EmailEngine() {
   const [selectedTemplateId, setSelectedTemplateId] = useState(TEMPLATES[0].id);
-  const [variables, setVariables] = useState({});
-  const [parsedKeys, setParsedKeys] = useState({ subject: [], body: [] });
+  const [variables, setVariables] = useState(() => initialVariables(TEMPLATES[0]));
+  const [parsedKeys, setParsedKeys] = useState(() => ({
+    subject: extractPlaceholderKeys(TEMPLATES[0].subject),
+    body: extractPlaceholderKeys(TEMPLATES[0].body),
+  }));
   const [status, setStatus] = useState({ msg: '', type: '' });
   const [isPushing, setIsPushing] = useState(false);
   const [gmailLinked, setGmailLinked] = useState(() => isGmailConnected());
 
+  const selectedTemplate = TEMPLATES.find((t) => t.id === selectedTemplateId) || TEMPLATES[0];
+
   useEffect(() => {
     const template = TEMPLATES.find(t => t.id === selectedTemplateId) || TEMPLATES[0];
-    const regex = /<<([^>]+)>>/g;
-    
-    const subjectKeys = [];
-    let match;
-    while ((match = regex.exec(template.subject)) !== null) {
-      if (!subjectKeys.includes(match[1])) subjectKeys.push(match[1]);
+
+    if (template.fields) {
+      setParsedKeys({ subject: [], body: [] });
+      setVariables(initialVariables(template));
+      setStatus({ msg: '', type: '' });
+      return;
     }
 
-    const bodyKeys = [];
-    while ((match = regex.exec(template.body)) !== null) {
-      if (!bodyKeys.includes(match[1])) bodyKeys.push(match[1]);
-    }
-
-    setParsedKeys({ subject: subjectKeys, body: bodyKeys });
-
-    const newVars = {};
-    [...subjectKeys, ...bodyKeys].forEach(key => {
-      newVars[key] = '';
+    setParsedKeys({
+      subject: extractPlaceholderKeys(template.subject),
+      body: extractPlaceholderKeys(template.body),
     });
-    setVariables(newVars);
+    setVariables(initialVariables(template));
     setStatus({ msg: '', type: '' });
   }, [selectedTemplateId]);
 
@@ -123,22 +488,33 @@ export default function EmailEngine() {
     setVariables(prev => ({ ...prev, [key]: val }));
   };
 
+  const handleLineChange = (key, index, value) => {
+    setVariables((prev) => {
+      const next = [...(prev[key] || [''])];
+      next[index] = value;
+      return { ...prev, [key]: next };
+    });
+  };
+
+  const addLine = (key) => {
+    setVariables((prev) => ({ ...prev, [key]: [...(prev[key] || ['']), ''] }));
+  };
+
+  const removeLine = (key, index) => {
+    setVariables((prev) => {
+      const curr = [...(prev[key] || [''])];
+      if (curr.length <= 1) return { ...prev, [key]: [''] };
+      return { ...prev, [key]: curr.filter((_, i) => i !== index) };
+    });
+  };
+
   const compiledContent = useMemo(() => {
     const template = TEMPLATES.find(t => t.id === selectedTemplateId) || TEMPLATES[0];
-    
-    let compSubject = template.subject;
-    let compBody = template.body;
-
-    Object.keys(variables).forEach(key => {
-      const val = variables[key] || `[${key}]`; 
-      const replaceRegex = new RegExp(`<<${key}>>`, 'g');
-      compSubject = compSubject.replace(replaceRegex, val);
-      compBody = compBody.replace(replaceRegex, val);
-    });
-
-    const htmlBody = `<div style="font-family: Verdana, Geneva, sans-serif; font-size: 13px; color: #000; line-height: 1.5;">${compBody.replace(/\n/g, '<br/>')}${getSignatureHtml()}</div>`;
-
-    return { subject: compSubject, htmlBody };
+    if (typeof template.compile === 'function') {
+      const { subject, bodyHtml } = template.compile(variables);
+      return wrapCompiledEmail(subject, bodyHtml);
+    }
+    return compilePlaceholderTemplate(template, variables);
   }, [selectedTemplateId, variables]);
 
   const copyToClipboard = () => {
@@ -255,6 +631,69 @@ export default function EmailEngine() {
   };
 
   const allUniqueKeys = [...new Set([...parsedKeys.subject, ...parsedKeys.body])];
+  const structuredFields = selectedTemplate.fields || null;
+  const fieldCount = structuredFields ? structuredFields.length : allUniqueKeys.length;
+
+  const renderStructuredField = (field) => {
+    if (field.type === 'select') {
+      return (
+        <select
+          value={variables[field.key] || ''}
+          onChange={(e) => handleVarChange(field.key, e.target.value)}
+          className={`${INPUT_CLASS} appearance-none cursor-pointer`}
+        >
+          <option value="">Select {field.label.toLowerCase()}</option>
+          {(field.options || []).map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      );
+    }
+
+    if (field.type === 'lines') {
+      const lines = Array.isArray(variables[field.key]) ? variables[field.key] : [''];
+      return (
+        <div className="space-y-2">
+          {lines.map((line, idx) => (
+            <div key={`${field.key}-${idx}`} className="flex items-center gap-2">
+              <input
+                type="text"
+                value={line}
+                onChange={(e) => handleLineChange(field.key, idx, e.target.value)}
+                placeholder={field.placeholder || `Enter ${field.label}...`}
+                className={INPUT_CLASS}
+              />
+              <button
+                type="button"
+                onClick={() => removeLine(field.key, idx)}
+                className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all shrink-0"
+                title="Remove line"
+              >
+                <Minus size={16} />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => addLine(field.key)}
+            className="flex items-center justify-center gap-2 w-full text-xs font-bold px-4 py-2.5 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 transition-all"
+          >
+            <Plus className="w-4 h-4" /> Add document line
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <input
+        type="text"
+        value={variables[field.key] || ''}
+        onChange={(e) => handleVarChange(field.key, e.target.value)}
+        placeholder={field.placeholder || `Enter ${field.label}...`}
+        className={INPUT_CLASS}
+      />
+    );
+  };
 
   return (
     <div className="h-full flex overflow-hidden bg-slate-50 dark:bg-slate-900/50">
@@ -295,11 +734,20 @@ export default function EmailEngine() {
                 2. Template Variables
               </label>
               <span className="bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-bold px-2 py-1 rounded-full border border-amber-500/20">
-                {allUniqueKeys.length} DETECTED
+                {fieldCount} DETECTED
               </span>
             </div>
 
-            {allUniqueKeys.length === 0 ? (
+            {structuredFields ? (
+              <div className="space-y-4">
+                {structuredFields.map((field) => (
+                  <div key={field.key}>
+                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">{field.label}</label>
+                    {renderStructuredField(field)}
+                  </div>
+                ))}
+              </div>
+            ) : allUniqueKeys.length === 0 ? (
               <p className="text-sm text-slate-400 text-center py-4">No dynamic variables detected.</p>
             ) : (
               <div className="space-y-4">
@@ -308,19 +756,19 @@ export default function EmailEngine() {
                     <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">{key}</label>
                     {key.toLowerCase().includes('list') || key.toLowerCase().includes('details') ? (
                       <textarea 
-                        value={variables[key]}
+                        value={variables[key] || ''}
                         onChange={(e) => handleVarChange(key, e.target.value)}
                         placeholder={`Enter ${key}...`}
                         rows="4"
-                        className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm outline-none focus:border-amber-500 dark:text-white transition-all resize-none"
+                        className={`${INPUT_CLASS} resize-none`}
                       />
                     ) : (
                       <input 
                         type="text" 
-                        value={variables[key]}
+                        value={variables[key] || ''}
                         onChange={(e) => handleVarChange(key, e.target.value)}
                         placeholder={`Enter ${key}...`}
-                        className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm outline-none focus:border-amber-500 dark:text-white transition-all"
+                        className={INPUT_CLASS}
                       />
                     )}
                   </div>
