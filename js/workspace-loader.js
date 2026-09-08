@@ -2,6 +2,7 @@ import { TAB_META } from './ui-prefs.js';
 
 const readyTabs = new Set();
 const timers = new Map();
+const shownAt = new Map();
 
 function loaderId(tabId) {
     return `${tabId}-loader`;
@@ -40,7 +41,13 @@ export function isTabReady(tabId) {
 
 export function markTabReady(tabId) {
     readyTabs.add(tabId);
-    hideWorkspaceLoader(tabId);
+    const elapsed = performance.now() - (shownAt.get(tabId) || performance.now());
+    const wait = Math.max(0, 520 - elapsed);
+    updateWorkspaceLoader(tabId, 100, 'Ready');
+    window.setTimeout(() => {
+        hideWorkspaceLoader(tabId);
+        shownAt.delete(tabId);
+    }, wait);
 }
 
 export function showWorkspaceLoader(tabId, percent = 8, status = 'Opening…') {
@@ -48,6 +55,7 @@ export function showWorkspaceLoader(tabId, percent = 8, status = 'Opening…') {
     const el = ensureLoader(tabId);
     if (!el) return;
     el.classList.remove('hidden');
+    if (!shownAt.has(tabId)) shownAt.set(tabId, performance.now());
     updateWorkspaceLoader(tabId, percent, status);
 }
 

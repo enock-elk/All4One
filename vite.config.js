@@ -3,9 +3,36 @@ import react from '@vitejs/plugin-react';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+const DEEP_LINK_RE = /^\/(DocumentManager|TrelloWatcher|CaseMaker|AffidavitAutomation|EmailGenerator)(\/index\.html)?\/?$/;
+
+function rewriteDeepLinks() {
+    return {
+        name: 'all4one-deep-links',
+        configureServer(server) {
+            server.middlewares.use((req, _res, next) => {
+                const [path, query] = (req.url || '').split('?');
+                if (DEEP_LINK_RE.test(path)) {
+                    req.url = query ? `/?${query}` : '/';
+                }
+                next();
+            });
+        },
+        configurePreviewServer(server) {
+            server.middlewares.use((req, _res, next) => {
+                const [path, query] = (req.url || '').split('?');
+                if (DEEP_LINK_RE.test(path)) {
+                    req.url = query ? `/?${query}` : '/';
+                }
+                next();
+            });
+        },
+    };
+}
+
 export default defineConfig({
   base: './',
   plugins: [
+    rewriteDeepLinks(),
     react(),
     {
       name: 'stable-pwa-urls',

@@ -19,6 +19,7 @@ const SLUG_ALIASES = {
     pdf: 'pdf-manager',
     files: 'pdf-manager',
 
+    trellowatcher: 'dashboard',
     trelowatcher: 'dashboard',
     'trello-watcher': 'dashboard',
     trello: 'dashboard',
@@ -101,30 +102,31 @@ function readStoredDeepLink() {
     }
 }
 
+function tabFromUrlParts(pathname, search, hash) {
+    const queryTab = tabIdFromSlug(new URLSearchParams(String(search || '').replace(/^\?/, '')).get('tab'));
+    if (queryTab) return queryTab;
+    const hashTab = tabIdFromSlug(tokenFromHash(hash));
+    if (hashTab) return hashTab;
+    return tabIdFromSlug(tokenFromPath(pathname));
+}
+
 export function resolveIncomingTab() {
-    const stored = readStoredDeepLink();
-    if (stored) {
-        try {
-            const url = new URL(stored, location.origin);
-            const fromQuery = tabIdFromSlug(url.searchParams.get('tab'));
-            if (fromQuery) return fromQuery;
-            const fromHash = tabIdFromSlug(tokenFromHash(url.hash));
-            if (fromHash) return fromHash;
-            const fromPath = tabIdFromSlug(tokenFromPath(url.pathname));
-            if (fromPath) return fromPath;
-        } catch {
-            const fromPath = tabIdFromSlug(tokenFromPath(stored));
-            if (fromPath) return fromPath;
-        }
+    // The address bar always wins. Session storage is only a 404-bounce fallback
+    // when the current path has no tab slug (for example /All4One/docs/).
+    const live = tabFromUrlParts(location.pathname, location.search, location.hash);
+    if (live) {
+        try { sessionStorage.removeItem(DEEP_LINK_STORAGE); } catch { /* ignore */ }
+        return live;
     }
 
-    const queryTab = tabIdFromSlug(new URLSearchParams(location.search).get('tab'));
-    if (queryTab) return queryTab;
-
-    const hashTab = tabIdFromSlug(tokenFromHash(location.hash));
-    if (hashTab) return hashTab;
-
-    return tabIdFromSlug(tokenFromPath(location.pathname));
+    const stored = readStoredDeepLink();
+    if (!stored) return '';
+    try {
+        const url = new URL(stored, location.origin);
+        return tabFromUrlParts(url.pathname, url.search, url.hash);
+    } catch {
+        return tabFromUrlParts(stored, '', '');
+    }
 }
 
 export function applyFirstVisitPin(tabId) {

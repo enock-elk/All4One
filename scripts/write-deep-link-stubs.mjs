@@ -22,7 +22,11 @@ for (const slug of slugs) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script>
         (function () {
-            try { sessionStorage.setItem('all4one_deep_link', location.pathname + location.search + location.hash); } catch (e) {}
+            try { sessionStorage.setItem('all4one_deep_link', '/${slug}' + location.search + location.hash); } catch (e) {}
+            if (!location.hostname.endsWith('github.io')) {
+                location.replace('/?tab=${slug}' + (location.hash || ''));
+                return;
+            }
             var parts = location.pathname.split('/').filter(Boolean);
             var repo = parts[0] || 'All4One';
             location.replace('/' + repo + '/docs/${slug}' + location.search + location.hash);
