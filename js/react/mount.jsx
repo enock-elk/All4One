@@ -72,7 +72,7 @@ async function mountAffidavit() {
         if (affidavitRoot) markTabReady('affidavits');
         return;
     }
-    await mountLazyPanel('affidavits', el, () => import('./AffidavitAutomation.jsx'), 'Affidavit Automation');
+    await mountLazyPanel('affidavits', el, () => import('./AffidavitAutomation.jsx'), 'Affidavit Generator');
 }
 
 function prefetchReactTabs() {

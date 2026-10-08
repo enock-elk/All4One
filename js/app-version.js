@@ -1,8 +1,18 @@
-export const APP_VERSION = '1.3.10';
+export const APP_VERSION = '1.3.11';
 export const APP_RELEASE_DATE = '8 October 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.11',
+    date: '8 Oct 2026',
+    items: [
+      'The affidavit workspace is labeled Affidavit Generator. The AffidavitAutomation link is unchanged.',
+      'Master LOE document names are dropdowns, with Other for a name that is not on the list.',
+      'Phones keep the workspaces in a bottom bar. Light mode, sign out, and Install app live in the header menu.',
+      'Email and Trello use a phone layout, and All4One can be installed as an app.',
+    ],
+  },
   {
     version: '1.3.10',
     date: '8 Oct 2026',

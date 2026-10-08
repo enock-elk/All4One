@@ -225,6 +225,17 @@ const REPORT_SOURCES = [
   'Medico-legal report',
 ];
 
+function reportSourceField(key, label, defaultValue, extra = {}) {
+  return {
+    key,
+    label,
+    type: 'source',
+    default: defaultValue,
+    options: REPORT_SOURCES,
+    ...extra,
+  };
+}
+
 const INFORMAL_EARNINGS_PROOF = [
   'Previous clients.',
   'Previous suppliers.',
@@ -382,17 +393,12 @@ const TEMPLATES = [
         nested: true,
         loeOnly: true,
       },
-      {
-        key: 'accidentOtSource',
-        label: 'Source A',
-        type: 'text',
-        default: 'OT report',
-        placeholder: 'OT report',
+      reportSourceField('accidentOtSource', 'Source A', 'OT report', {
         row: 'accident-a',
         showWhen: { key: 'secAccident', equals: true },
         nested: true,
         loeOnly: true,
-      },
+      }),
       {
         key: 'accidentIp',
         label: 'Accident date B',
@@ -403,17 +409,12 @@ const TEMPLATES = [
         nested: true,
         loeOnly: true,
       },
-      {
-        key: 'accidentIpSource',
-        label: 'Source B',
-        type: 'text',
-        default: 'IP report',
-        placeholder: 'IP report',
+      reportSourceField('accidentIpSource', 'Source B', 'IP report', {
         row: 'accident-b',
         showWhen: { key: 'secAccident', equals: true },
         nested: true,
         loeOnly: true,
-      },
+      }),
       {
         key: 'secDob',
         label: 'Confirm date of birth',
@@ -431,17 +432,12 @@ const TEMPLATES = [
         nested: true,
         loeOnly: true,
       },
-      {
-        key: 'dobOtSource',
-        label: 'Source A',
-        type: 'text',
-        default: 'OT report',
-        placeholder: 'OT report',
+      reportSourceField('dobOtSource', 'Source A', 'OT report', {
         row: 'dob-a',
         showWhen: { key: 'secDob', equals: true },
         nested: true,
         loeOnly: true,
-      },
+      }),
       {
         key: 'dobIp',
         label: 'Date of birth B',
@@ -452,17 +448,12 @@ const TEMPLATES = [
         nested: true,
         loeOnly: true,
       },
-      {
-        key: 'dobIpSource',
-        label: 'Source B',
-        type: 'text',
-        default: 'IP report',
-        placeholder: 'IP report',
+      reportSourceField('dobIpSource', 'Source B', 'IP report', {
         row: 'dob-b',
         showWhen: { key: 'secDob', equals: true },
         nested: true,
         loeOnly: true,
-      },
+      }),
       {
         key: 'secName',
         label: 'Confirm name or surname spelling',
@@ -480,17 +471,12 @@ const TEMPLATES = [
         nested: true,
         loeOnly: true,
       },
-      {
-        key: 'nameOtSource',
-        label: 'Source A',
-        type: 'text',
-        default: 'OT report',
-        placeholder: 'OT report',
+      reportSourceField('nameOtSource', 'Source A', 'OT report', {
         row: 'name-a',
         showWhen: { key: 'secName', equals: true },
         nested: true,
         loeOnly: true,
-      },
+      }),
       {
         key: 'nameIp',
         label: 'Spelling B',
@@ -501,17 +487,12 @@ const TEMPLATES = [
         nested: true,
         loeOnly: true,
       },
-      {
-        key: 'nameIpSource',
-        label: 'Source B',
-        type: 'text',
-        default: 'IP report',
-        placeholder: 'IP report',
+      reportSourceField('nameIpSource', 'Source B', 'IP report', {
         row: 'name-b',
         showWhen: { key: 'secName', equals: true },
         nested: true,
         loeOnly: true,
-      },
+      }),
       {
         key: 'idPronoun',
         label: 'ID document pronoun',
@@ -992,6 +973,7 @@ export default function EmailEngine() {
   const [status, setStatus] = useState({ msg: '', type: '' });
   const [isPushing, setIsPushing] = useState(false);
   const [gmailLinked, setGmailLinked] = useState(() => isGmailConnected());
+  const [sourceMode, setSourceMode] = useState({});
 
   const selectedTemplate = TEMPLATES.find((t) => t.id === selectedTemplateId) || TEMPLATES[0];
 
@@ -1001,6 +983,7 @@ export default function EmailEngine() {
     if (template.fields) {
       setParsedKeys({ subject: [], body: [] });
       setVariables(initialVariables(template));
+      setSourceMode({});
       setStatus({ msg: '', type: '' });
       return;
     }
@@ -1010,6 +993,7 @@ export default function EmailEngine() {
       body: extractPlaceholderKeys(template.body),
     });
     setVariables(initialVariables(template));
+    setSourceMode({});
     setStatus({ msg: '', type: '' });
   }, [selectedTemplateId]);
 
@@ -1259,32 +1243,39 @@ export default function EmailEngine() {
     if (field.type === 'source') {
       const value = variables[field.key] || '';
       const options = field.options || [];
+      const known = options.includes(value);
+      const selectValue = sourceMode[field.key] === 'other' || (value && !known) ? '__other__' : value;
       return (
         <div className="space-y-2">
-          <div className="flex flex-wrap gap-1.5">
-            {options.map((opt) => {
-              const on = value === opt;
-              return (
-                <button
-                  key={`${field.key}-${opt}`}
-                  type="button"
-                  onClick={() => handleVarChange(field.key, opt)}
-                  className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-all ${on
-                    ? 'bg-amber-500 border-amber-500 text-slate-900'
-                    : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-amber-400'}`}
-                >
-                  {opt}
-                </button>
-              );
-            })}
-          </div>
-          <input
-            type="text"
-            value={value}
-            onChange={(e) => handleVarChange(field.key, e.target.value)}
-            placeholder="Or type another document"
-            className={INPUT_CLASS}
-          />
+          <select
+            value={selectValue}
+            onChange={(e) => {
+              const next = e.target.value;
+              if (next === '__other__') {
+                setSourceMode((prev) => ({ ...prev, [field.key]: 'other' }));
+                if (known) handleVarChange(field.key, '');
+              } else {
+                setSourceMode((prev) => ({ ...prev, [field.key]: 'list' }));
+                handleVarChange(field.key, next);
+              }
+            }}
+            className={`${INPUT_CLASS} appearance-none cursor-pointer`}
+          >
+            {!value ? <option value="">Select a document</option> : null}
+            {options.map((opt) => (
+              <option key={`${field.key}-${opt}`} value={opt}>{opt}</option>
+            ))}
+            <option value="__other__">Other…</option>
+          </select>
+          {selectValue === '__other__' ? (
+            <input
+              type="text"
+              value={known ? '' : value}
+              onChange={(e) => handleVarChange(field.key, e.target.value)}
+              placeholder="Type the document name"
+              className={INPUT_CLASS}
+            />
+          ) : null}
         </div>
       );
     }

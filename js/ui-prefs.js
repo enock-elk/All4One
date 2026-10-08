@@ -9,7 +9,7 @@ export const TAB_META = {
     'pdf-manager': { label: 'Document Manager', short: 'PDF tools & file bay', icon: 'files' },
     dashboard: { label: 'Trello Watcher', short: 'Board activity monitor', icon: 'radar' },
     casemaker: { label: 'Case Maker', short: 'RyanGPT case builder', icon: 'sparkles' },
-    affidavits: { label: 'Affidavit Automation', short: 'Expert affidavit drafts', icon: 'scroll-text' },
+    affidavits: { label: 'Affidavit Generator', short: 'Expert affidavit drafts', icon: 'scroll-text' },
     emails: { label: 'Draft Email Generator', short: 'Client email templates', icon: 'mail-plus' },
 };
 

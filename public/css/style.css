@@ -986,6 +986,13 @@
   font-variant-numeric: tabular-nums;
 }
 
+.mobile-menu-btn,
+.mobile-menu-backdrop,
+.mobile-menu-title,
+.pwa-install-btn {
+  display: none;
+}
+
 @media (max-width: 860px) {
   #app-view > .flex-1 {
     min-width: 0;
@@ -1015,7 +1022,8 @@
     flex-direction: row;
     align-items: stretch;
     padding: 0.3rem 0.35rem calc(0.3rem + env(safe-area-inset-bottom));
-    overflow-x: auto;
+    overflow: visible;
+    contain: none;
     border-top: 1px solid rgba(148, 163, 184, 0.2);
   }
 
@@ -1026,6 +1034,41 @@
     display: none !important;
   }
 
+  .mobile-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    flex: none;
+    border-radius: 0.75rem;
+    color: #e2e8f0;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .mobile-menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    border: 0;
+    background: rgba(2, 6, 23, 0.55);
+  }
+
+  body.mobile-menu-open .mobile-menu-backdrop {
+    display: block;
+  }
+
+  .mobile-menu-title {
+    display: block;
+    margin: 0 0 0.35rem;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #94a3b8;
+  }
+
   #sidebar-nav {
     flex: 1;
     flex-direction: row;
@@ -1034,13 +1077,65 @@
     min-width: 0;
   }
 
-  #app-sidebar > .mt-auto {
-    width: auto;
-    margin-top: 0;
-    padding-top: 0;
+  #app-sidebar > #sidebar-footer {
+    position: fixed;
+    z-index: 60;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(18.5rem, 86vw);
+    margin: 0;
+    padding: 1.25rem 1rem calc(1.25rem + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    transform: translateX(-105%);
+    transition: transform 0.2s ease;
+    background: #0f172a;
     border-top: 0;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 16px 0 40px rgba(0, 0, 0, 0.35);
+  }
+
+  body.mobile-menu-open #app-sidebar > #sidebar-footer {
+    transform: translateX(0);
+  }
+
+  #app-sidebar > #sidebar-footer .sidebar-nav-btn:not(.pwa-install-btn),
+  #app-sidebar.is-collapsed > #sidebar-footer .sidebar-nav-btn:not(.pwa-install-btn),
+  #app-sidebar > #sidebar-footer .pwa-install-btn:not([hidden]) {
+    display: flex;
     flex-direction: row;
-    gap: 0.25rem;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    min-height: 3.1rem;
+    padding: 0.7rem 0.85rem;
+    text-align: left;
+  }
+
+  #app-sidebar > #sidebar-footer .sidebar-nav-label,
+  #app-sidebar.is-collapsed > #sidebar-footer .sidebar-nav-label {
+    font-size: 0.95rem;
+    opacity: 1;
+    max-width: none;
+    pointer-events: auto;
+  }
+
+  #app-sidebar.is-collapsed > #sidebar-footer .sidebar-nav-sub {
+    opacity: 1;
+    max-width: none;
+    pointer-events: auto;
+  }
+
+  #sidebar-footer .sidebar-nav-label::after {
+    content: none;
+  }
+
+  #sidebar-footer .sidebar-nav-sub {
+    display: block !important;
+    font-size: 0.72rem;
   }
 
   .sidebar-nav-item {
@@ -1049,27 +1144,27 @@
     min-width: 0;
   }
 
-  #app-sidebar .sidebar-nav-btn,
-  #app-sidebar.is-collapsed .sidebar-nav-btn {
+  #sidebar-nav .sidebar-nav-btn,
+  #app-sidebar.is-collapsed #sidebar-nav .sidebar-nav-btn {
     flex-direction: column;
     justify-content: center;
     align-items: center;
     gap: 0.15rem;
     width: 100%;
-    min-height: 3rem;
+    min-height: 3.15rem;
     padding: 0.35rem 0.15rem;
     text-align: center;
     border-radius: 0.75rem;
   }
 
-  #app-sidebar .sidebar-nav-icon,
-  #app-sidebar.is-collapsed .sidebar-nav-btn .sidebar-nav-icon {
+  #sidebar-nav .sidebar-nav-icon,
+  #app-sidebar.is-collapsed #sidebar-nav .sidebar-nav-icon {
     width: 1.55rem;
     height: 1.55rem;
   }
 
-  #app-sidebar .sidebar-nav-label,
-  #app-sidebar.is-collapsed .sidebar-nav-label {
+  #sidebar-nav .sidebar-nav-label,
+  #app-sidebar.is-collapsed #sidebar-nav .sidebar-nav-label {
     opacity: 1;
     max-width: none;
     font-size: 0;
@@ -1078,7 +1173,7 @@
     white-space: nowrap;
   }
 
-  #app-sidebar .sidebar-nav-label::after {
+  #sidebar-nav .sidebar-nav-label::after {
     content: attr(data-short);
     font-size: 10px;
     font-weight: 700;
@@ -1086,50 +1181,80 @@
   }
 
   #pdf-tool-strip {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    flex-wrap: wrap;
+    overflow: visible;
   }
 
   #pdf-tool-strip .pdf-tool-btn {
-    flex: 0 0 auto;
+    flex: 1 1 calc(50% - 0.5rem);
+    justify-content: center;
     min-height: 2.75rem;
   }
 
+  #tab-emails,
+  #tab-affidavits,
+  #tab-pdf-manager {
+    overflow: auto;
+  }
+
+  #email-root,
   #email-root > div,
+  #affidavit-root,
   #affidavit-root > div {
+    height: auto !important;
+    min-height: 100%;
+    overflow: visible !important;
     flex-direction: column !important;
-    overflow: auto !important;
   }
 
   #email-root > div > div,
-  #affidavit-root > div > div {
+  #affidavit-root > div > div,
+  #email-root > div > div > div,
+  #affidavit-root > div > div > div {
     width: 100% !important;
-    max-width: 100%;
-    border-right-width: 0 !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
     flex: none !important;
+    border-right-width: 0 !important;
   }
 
-  #email-root > div > div:first-child {
-    max-height: 52vh;
-  }
-
-  #email-root > div > div:nth-child(2),
-  #affidavit-root > div > div:last-child {
-    min-height: 70vh;
+  #email-root .p-6,
+  #email-root .p-8,
+  #affidavit-root .p-6,
+  #affidavit-root .p-8 {
+    padding: 1rem !important;
   }
 
   .workspace-toolbar {
     height: auto !important;
     min-height: 3.25rem;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    align-items: stretch !important;
+    gap: 0.65rem;
     padding: 0.75rem !important;
   }
 
   .workspace-actions {
-    flex-wrap: wrap;
-    justify-content: flex-end;
+    width: 100%;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .workspace-actions > :last-child {
+    grid-column: 1 / -1;
+  }
+
+  #app-header .header-context {
+    min-width: 0;
+    flex: 1;
+    margin-right: 0.5rem;
+  }
+
+  #header-title {
+    font-size: 0.98rem;
   }
 
   #app-view input,

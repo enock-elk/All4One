@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'pdf-manager': 'Document Manager',
         'dashboard': 'Trello Watcher',
         'casemaker': 'Case Maker',
-        'affidavits': 'Affidavit Automation',
+        'affidavits': 'Affidavit Generator',
         'emails': 'Draft Email Generator'
     };
 
@@ -225,6 +225,43 @@ document.addEventListener('DOMContentLoaded', () => {
     initCaseMakerThemeSync();
     initWorkspacePrefs();
     checkLoginState();
+
+    const menuBtn = document.getElementById('mobile-menu-btn');
+    const menuBackdrop = document.getElementById('mobile-menu-backdrop');
+    const setMobileMenu = (open) => {
+        document.body.classList.toggle('mobile-menu-open', open);
+        menuBtn?.setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
+    menuBtn?.addEventListener('click', () => {
+        setMobileMenu(!document.body.classList.contains('mobile-menu-open'));
+    });
+    menuBackdrop?.addEventListener('click', () => setMobileMenu(false));
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') setMobileMenu(false);
+    });
+    document.querySelectorAll('#sidebar-nav .tab-btn').forEach((btn) => {
+        btn.addEventListener('click', () => setMobileMenu(false));
+    });
+
+    const installBtn = document.getElementById('pwa-install-btn');
+    let deferredInstall = null;
+    window.addEventListener('beforeinstallprompt', (event) => {
+        event.preventDefault();
+        deferredInstall = event;
+        installBtn?.removeAttribute('hidden');
+    });
+    installBtn?.addEventListener('click', async () => {
+        if (!deferredInstall) return;
+        deferredInstall.prompt();
+        await deferredInstall.userChoice.catch(() => {});
+        deferredInstall = null;
+        installBtn.hidden = true;
+        setMobileMenu(false);
+    });
+    window.addEventListener('appinstalled', () => {
+        deferredInstall = null;
+        if (installBtn) installBtn.hidden = true;
+    });
 
     if ('serviceWorker' in navigator) {
         const registerSw = (path) => navigator.serviceWorker.register(path);
