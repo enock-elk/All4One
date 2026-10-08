@@ -1,8 +1,19 @@
-export const APP_VERSION = '1.3.8';
+export const APP_VERSION = '1.3.9';
 export const APP_RELEASE_DATE = '8 October 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.9',
+    date: '8 Oct 2026',
+    items: [
+      'Loss of Earnings and Wrongful Arrest are separate openings, so a draft uses only one of them.',
+      'The subject can be typed over the automatic subject, and the claimant title is a dropdown.',
+      'The note that the calculation increases the claim sits inside the Wrongful Arrest opening.',
+      'Trello’s console is a small top-right panel that opens on its own, and the case counter stays two rows high.',
+      'Document Manager marks the tool tab you are on.',
+    ],
+  },
   {
     version: '1.3.8',
     date: '8 Oct 2026',

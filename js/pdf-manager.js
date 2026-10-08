@@ -1012,8 +1012,9 @@ document.addEventListener('DOMContentLoaded', () => {
         activeTool = tool;
         document.querySelectorAll('.pdf-tool-btn').forEach((btn) => {
             const on = btn.getAttribute('data-tool') === tool;
-            btn.classList.toggle('text-white', on);
-            btn.classList.toggle('bg-slate-800', on);
+            btn.classList.toggle('is-active', on);
+            btn.setAttribute('aria-current', on ? 'page' : 'false');
+            btn.classList.remove('text-white', 'bg-slate-800');
             btn.classList.toggle('text-slate-600', !on);
             btn.classList.toggle('dark:text-slate-300', !on);
             btn.classList.toggle('hover:bg-slate-100', !on);

@@ -51,6 +51,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const logContainer = document.getElementById('trello-log-container');
     const logHome = document.getElementById('trello-log-home');
     const logFs = document.getElementById('trello-log-fs');
+    const logDock = document.getElementById('trello-log-dock');
+    const logDockToggle = document.getElementById('trello-log-dock-toggle');
     const consoleCard = document.getElementById('trello-console-card');
     const btnFullscreen = document.getElementById('btn-trello-fullscreen');
     const btnExitFs = document.getElementById('btn-trello-exit-fs');
@@ -630,7 +632,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setupCard?.classList.remove('hidden');
         consoleCard?.classList.remove('hidden');
         monitorSection?.classList.add('hidden');
-        parkLog(logHome);
+        hideWatchConsole();
         renderBucketGrid([]);
         hideBoardPip();
         addLog('Disconnected from Trello.', 'error');
@@ -671,12 +673,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function setLogDockOpen(open) {
+        logDock?.classList.toggle('is-open', open);
+        logDockToggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+
+    function showWatchConsole() {
+        logDock?.classList.remove('hidden');
+        parkLog(logFs);
+    }
+
+    function hideWatchConsole() {
+        setLogDockOpen(false);
+        logDock?.classList.add('hidden');
+        parkLog(logHome);
+    }
+
     function enterTrelloFullscreen() {
         if (!worker && !mainWatcher) return;
         document.body.classList.add('trello-fullscreen');
         btnFullscreen?.classList.add('hidden');
         btnExitFs?.classList.remove('hidden');
-        parkLog(logFs);
+        showWatchConsole();
         const pane = document.getElementById('tab-dashboard') || lockscreen;
         const req = pane?.requestFullscreen || pane?.webkitRequestFullscreen;
         if (req) {
@@ -688,8 +706,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.classList.remove('trello-fullscreen');
         if (worker || mainWatcher) btnFullscreen?.classList.remove('hidden');
         btnExitFs?.classList.add('hidden');
-        if (worker || mainWatcher) parkLog(logFs);
-        else parkLog(logHome);
+        if (worker || mainWatcher) showWatchConsole();
+        else hideWatchConsole();
         if (document.fullscreenElement) {
             const exit = document.exitFullscreen || document.webkitExitFullscreen;
             if (exit) Promise.resolve(exit.call(document)).catch(() => {});
@@ -827,6 +845,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('trello-log-copy')?.addEventListener('click', copyConsoleLog);
     document.getElementById('trello-log-copy-active')?.addEventListener('click', copyConsoleLog);
+    logDockToggle?.addEventListener('click', () => {
+        setLogDockOpen(!logDock?.classList.contains('is-open'));
+    });
 
     document.getElementById('trello-wallpaper-btn')?.addEventListener('click', () => bgInput?.click());
     document.getElementById('trello-reset-bg')?.addEventListener('click', () => {
@@ -888,7 +909,8 @@ document.addEventListener('DOMContentLoaded', () => {
         setupCard?.classList.add('hidden');
         consoleCard?.classList.add('hidden');
         monitorSection?.classList.remove('hidden');
-        parkLog(logFs);
+        showWatchConsole();
+        setLogDockOpen(false);
         renderBucketGrid(targets.map((t) => ({ ...t, count: '-', cards: [] })));
         if (btnStart) btnStart.disabled = true;
         if (btnStop) btnStop.disabled = false;
@@ -907,7 +929,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setupCard?.classList.remove('hidden');
         consoleCard?.classList.remove('hidden');
         monitorSection?.classList.add('hidden');
-        parkLog(logHome);
+        hideWatchConsole();
         hideBoardPip();
         if (btnStart) btnStart.disabled = selectedTargets().length === 0;
         if (btnStop) btnStop.disabled = true;

@@ -229,6 +229,7 @@ const FORMAL_EARNINGS_PROOF = [
 ];
 
 function fieldIsVisible(field, variables) {
+  if (field.loeOnly && variables?.audience === 'incident') return false;
   if (!field.showWhen) return true;
   return variables?.[field.showWhen.key] === field.showWhen.equals;
 }
@@ -301,19 +302,38 @@ const TEMPLATES = [
     name: '(DRAFT) Master LOE',
     intro: 'Tick only the blocks this email needs. Notes under each block stay in the form and are left out of the draft. A block that starts with “Also” uses that word only when another request is already above it; otherwise it starts with “Kindly” or “In accordance”.',
     fields: [
+      {
+        key: 'subject',
+        label: 'Subject',
+        type: 'text',
+        guidance: 'Leave this blank to keep the automatic subject.',
+      },
       { key: 'recipientName', label: 'Recipient name', type: 'text', placeholder: 'e.g. Ntembeko' },
       {
         key: 'audience',
-        label: 'Who you are writing to',
+        label: 'Opening',
         type: 'select',
         default: 'attorneys',
-        guidance: 'Instructing attorneys is the usual opening. Switch to IP or others only when this email is not going to the instructing attorney.',
+        guidance: 'Loss of Earnings and Wrongful Arrest are separate openings. Only one is used in the draft.',
         options: [
-          { value: 'attorneys', label: 'Instructing attorneys' },
-          { value: 'ip', label: 'IP or others' },
+          { value: 'attorneys', label: 'Loss of Earnings — instructing attorneys' },
+          { value: 'ip', label: 'Loss of Earnings — IP or others' },
+          { value: 'incident', label: 'Wrongful Arrest — date of incident not provided' },
         ],
       },
-      { key: 'claimantTitle', label: 'Claimant title', type: 'text', placeholder: 'Mr or Ms', row: 'claimant' },
+      {
+        key: 'claimantTitle',
+        label: 'Claimant title',
+        type: 'select',
+        default: 'Mr/Ms',
+        row: 'claimant',
+        options: [
+          { value: 'Mr/Ms', label: 'Mr/Ms' },
+          { value: 'Mr', label: 'Mr' },
+          { value: 'Ms', label: 'Ms' },
+          { value: 'Mrs', label: 'Mrs' },
+        ],
+      },
       { key: 'claimantName', label: 'Claimant name', type: 'text', placeholder: 'e.g. L Nkosi', row: 'claimant' },
       {
         key: 'attorneyFirm',
@@ -328,12 +348,14 @@ const TEMPLATES = [
         label: 'No IP report',
         type: 'toggle',
         guidance: 'Use if no Industrial Psychologist report was provided.',
+        loeOnly: true,
       },
       {
         key: 'secAccident',
         label: 'Confirm the date of accident',
         type: 'toggle',
         guidance: 'Use to confirm the date of accident.',
+        loeOnly: true,
       },
       {
         key: 'accidentOt',
@@ -343,6 +365,7 @@ const TEMPLATES = [
         row: 'accident-a',
         showWhen: { key: 'secAccident', equals: true },
         nested: true,
+        loeOnly: true,
       },
       {
         key: 'accidentOtSource',
@@ -353,6 +376,7 @@ const TEMPLATES = [
         row: 'accident-a',
         showWhen: { key: 'secAccident', equals: true },
         nested: true,
+        loeOnly: true,
       },
       {
         key: 'accidentIp',
@@ -362,6 +386,7 @@ const TEMPLATES = [
         row: 'accident-b',
         showWhen: { key: 'secAccident', equals: true },
         nested: true,
+        loeOnly: true,
       },
       {
         key: 'accidentIpSource',
@@ -372,12 +397,14 @@ const TEMPLATES = [
         row: 'accident-b',
         showWhen: { key: 'secAccident', equals: true },
         nested: true,
+        loeOnly: true,
       },
       {
         key: 'secDob',
         label: 'Confirm date of birth',
         type: 'toggle',
         guidance: 'Use to confirm a discrepancy in the claimant’s date of birth.',
+        loeOnly: true,
       },
       {
         key: 'dobOt',
@@ -387,6 +414,7 @@ const TEMPLATES = [
         row: 'dob-a',
         showWhen: { key: 'secDob', equals: true },
         nested: true,
+        loeOnly: true,
       },
       {
         key: 'dobOtSource',
@@ -397,6 +425,7 @@ const TEMPLATES = [
         row: 'dob-a',
         showWhen: { key: 'secDob', equals: true },
         nested: true,
+        loeOnly: true,
       },
       {
         key: 'dobIp',
@@ -406,6 +435,7 @@ const TEMPLATES = [
         row: 'dob-b',
         showWhen: { key: 'secDob', equals: true },
         nested: true,
+        loeOnly: true,
       },
       {
         key: 'dobIpSource',
@@ -416,12 +446,14 @@ const TEMPLATES = [
         row: 'dob-b',
         showWhen: { key: 'secDob', equals: true },
         nested: true,
+        loeOnly: true,
       },
       {
         key: 'secName',
         label: 'Confirm name or surname spelling',
         type: 'toggle',
         guidance: 'Use to confirm the spelling of the claimant’s name or surname. Starts with “Also kindly” only when another request is above it.',
+        loeOnly: true,
       },
       {
         key: 'nameOt',
@@ -431,6 +463,7 @@ const TEMPLATES = [
         row: 'name-a',
         showWhen: { key: 'secName', equals: true },
         nested: true,
+        loeOnly: true,
       },
       {
         key: 'nameOtSource',
@@ -441,6 +474,7 @@ const TEMPLATES = [
         row: 'name-a',
         showWhen: { key: 'secName', equals: true },
         nested: true,
+        loeOnly: true,
       },
       {
         key: 'nameIp',
@@ -450,6 +484,7 @@ const TEMPLATES = [
         row: 'name-b',
         showWhen: { key: 'secName', equals: true },
         nested: true,
+        loeOnly: true,
       },
       {
         key: 'nameIpSource',
@@ -460,6 +495,7 @@ const TEMPLATES = [
         row: 'name-b',
         showWhen: { key: 'secName', equals: true },
         nested: true,
+        loeOnly: true,
       },
       {
         key: 'idPronoun',
@@ -467,6 +503,7 @@ const TEMPLATES = [
         type: 'select',
         showWhen: { key: 'secName', equals: true },
         nested: true,
+        loeOnly: true,
         guidance: 'Used in “or alternatively, kindly provide a copy of his/her ID document”. Leave on “Match the title” to follow Mr or Ms.',
         options: [
           { value: '', label: 'Match the title' },
@@ -479,12 +516,14 @@ const TEMPLATES = [
         label: 'Clearer payslips',
         type: 'toggle',
         guidance: 'Use when the payslips provided are illegible.',
+        loeOnly: true,
       },
       {
         key: 'secInformal',
         label: 'Informal earnings proof',
         type: 'toggle',
         guidance: 'Use to ask for proof of earnings for informal or self-employed work. The Kubheka paragraph drops “Also” when no request sits above this block.',
+        loeOnly: true,
       },
       {
         key: 'informalDocs',
@@ -494,6 +533,7 @@ const TEMPLATES = [
         presets: EARNINGS_DOCUMENT_PRESETS,
         showWhen: { key: 'secInformal', equals: true },
         nested: true,
+        loeOnly: true,
       },
       {
         key: 'informalBusiness',
@@ -502,12 +542,14 @@ const TEMPLATES = [
         placeholder: 'e.g. spaza shop, January 2022 to March 2024',
         showWhen: { key: 'secInformal', equals: true },
         nested: true,
+        loeOnly: true,
       },
       {
         key: 'secFormal',
         label: 'Formal earnings proof',
         type: 'toggle',
         guidance: 'Use to obtain proof of earnings for formal employment.',
+        loeOnly: true,
       },
       {
         key: 'formalDocs',
@@ -517,6 +559,7 @@ const TEMPLATES = [
         presets: EARNINGS_DOCUMENT_PRESETS,
         showWhen: { key: 'secFormal', equals: true },
         nested: true,
+        loeOnly: true,
       },
       {
         key: 'formalEarnings',
@@ -525,27 +568,15 @@ const TEMPLATES = [
         placeholder: 'e.g. R15 000 per month at ABC Stores, January 2022 to March 2024',
         showWhen: { key: 'secFormal', equals: true },
         nested: true,
-      },
-      {
-        key: 'secIncident',
-        label: 'Date of incident not provided',
-        type: 'toggle',
-        guidance: 'Use if the date of incident was not provided. This block adds its own thank-you line, so use it when that introduction is the one you want.',
+        loeOnly: true,
       },
       {
         key: 'calculationType',
         label: 'Calculation type',
         type: 'text',
         placeholder: 'Wrongful Arrest',
-        showWhen: { key: 'secIncident', equals: true },
-        nested: true,
-      },
-      {
-        key: 'secDependent',
-        label: 'Calculation depends on this information',
-        type: 'toggle',
-        default: true,
-        guidance: 'Adds the note that the calculation depends on the information requested because it increases the claim.',
+        showWhen: { key: 'audience', equals: 'incident' },
+        guidance: 'Used in the Wrongful Arrest thank-you. Leave blank for Wrongful Arrest.',
       },
       {
         key: 'secTurnaround',
@@ -558,9 +589,15 @@ const TEMPLATES = [
     compile(vars) {
       const recipient = escapeHtml(filled(vars.recipientName, 'XXXXX'));
       const claimant = masterClaimantHtml(vars);
+      const wrongfulArrest = vars.audience === 'incident';
       const parts = [`Dear ${recipient}`];
 
-      if (vars.audience === 'ip') {
+      if (wrongfulArrest) {
+        const calculation = escapeHtml(filled(vars.calculationType, 'Wrongful Arrest'));
+        parts.push(`Thank you for requesting a ${calculation} calculation for ${claimant}.`);
+        parts.push('The date of incident was not provided. Kindly assist by providing the date of incident.');
+        parts.push('Kindly note that the calculation is dependent on the information we have requested since it will directly increase the claim.');
+      } else if (vars.audience === 'ip') {
         const firm = escapeHtml(filled(vars.attorneyFirm, 'XXXXX Attorneys'));
         parts.push(`Kindly note that we are undertaking Loss of Earnings Calculations for ${claimant} on behalf of <strong>${firm}</strong>.`);
       } else {
@@ -573,28 +610,28 @@ const TEMPLATES = [
         hasPriorRequest = true;
       };
 
-      if (vars.secNoIp) {
+      if (!wrongfulArrest && vars.secNoIp) {
         pushRequest([
           'Kindly note that we require an Industrial Psychologist report in order to perform Loss of Earnings calculations.',
           'Kindly assist by providing an Industrial Psychologist report.',
         ].join('<br/><br/>'));
       }
 
-      if (vars.secAccident) {
+      if (!wrongfulArrest && vars.secAccident) {
         pushRequest(`Kindly assist us by confirming the correct date of accident.${htmlRichList([
           boldReportLine(vars.accidentOt, vars.accidentOtSource, '[date]', 'OT report'),
           boldReportLine(vars.accidentIp, vars.accidentIpSource, '[date]', 'IP report'),
         ])}`);
       }
 
-      if (vars.secDob) {
+      if (!wrongfulArrest && vars.secDob) {
         pushRequest(`Kindly assist us by confirming the claimant\u2019s date of birth.${htmlRichList([
           boldReportLine(vars.dobOt, vars.dobOtSource, '[date of birth]', 'OT report'),
           boldReportLine(vars.dobIp, vars.dobIpSource, '[date of birth]', 'IP report'),
         ])}`);
       }
 
-      if (vars.secName) {
+      if (!wrongfulArrest && vars.secName) {
         const lead = hasPriorRequest ? 'Also kindly' : 'Kindly';
         pushRequest(`${lead} assist us by confirming the correct spelling of the claimant\u2019s name.${htmlRichList([
           boldReportLine(vars.nameOt, vars.nameOtSource, '[spelling]', 'OT report'),
@@ -602,11 +639,11 @@ const TEMPLATES = [
         ])}${orIdDocumentPronoun(masterPronoun(vars))}`);
       }
 
-      if (vars.secPayslips) {
+      if (!wrongfulArrest && vars.secPayslips) {
         pushRequest(`The payslips provided for ${claimant} are illegible. Will you please provide clearer copies of all payslips in your possession?`);
       }
 
-      if (vars.secInformal) {
+      if (!wrongfulArrest && vars.secInformal) {
         pushRequest([
           kubhekaParagraph(hasPriorRequest),
           `Kindly assist us by providing the following documents referenced in the IP report:${htmlList(vars.informalDocs, '[Document referenced in the IP report]')}`,
@@ -615,7 +652,7 @@ const TEMPLATES = [
         ].join('<br/><br/>'));
       }
 
-      if (vars.secFormal) {
+      if (!wrongfulArrest && vars.secFormal) {
         pushRequest([
           `Kindly assist us by providing the following documents referenced in the IP report:${htmlList(vars.formalDocs, '[Document referenced in the IP report]')}`,
           `We note that the claimant was earning the following:${htmlList([withPeriod(filled(vars.formalEarnings, '[earnings description]'))], '[earnings description]')}`,
@@ -624,24 +661,14 @@ const TEMPLATES = [
         ].join('<br/><br/>'));
       }
 
-      if (vars.secIncident) {
-        const calculation = escapeHtml(filled(vars.calculationType, 'Wrongful Arrest'));
-        pushRequest([
-          `Thank you for requesting a ${calculation} calculation for ${claimant}.`,
-          'The date of incident was not provided. Kindly assist by providing the date of incident.',
-        ].join('<br/><br/>'));
-      }
-
-      if (vars.secDependent !== false) {
-        parts.push('Kindly note that the calculation is dependent on the information we have requested since it will directly increase the claim.');
-      }
       if (vars.secTurnaround !== false) {
         parts.push('We will provide the report within 24 hours once the abovementioned information is provided and no further information is required.');
       }
       parts.push(SIGN_OFF);
 
+      const generatedSubject = draftSubject(this.name, masterClaimantLabel(vars));
       return {
-        subject: draftSubject(this.name, masterClaimantLabel(vars)),
+        subject: String(vars.subject || '').trim() || generatedSubject,
         bodyHtml: parts.join('<br/><br/>'),
       };
     },
@@ -1238,7 +1265,9 @@ export default function EmailEngine() {
         type="text"
         value={variables[field.key] || ''}
         onChange={(e) => handleVarChange(field.key, e.target.value)}
-        placeholder={field.placeholder || `Enter ${field.label}...`}
+        placeholder={field.key === 'subject'
+          ? draftSubject(selectedTemplate.name, masterClaimantLabel(variables))
+          : (field.placeholder || `Enter ${field.label}...`)}
         className={INPUT_CLASS}
       />
     );

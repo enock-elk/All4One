@@ -55,19 +55,59 @@
             bottom: 0.75rem;
             transform: translateX(-50%);
             z-index: 20;
-            width: min(92%, 36rem);
-            max-height: 34vh;
-            overflow: hidden;
+            width: max-content;
+            max-width: min(96%, calc(100% - 1.5rem));
+            overflow: visible;
         }
         #trello-monitor:not(.hidden) {
             display: flex;
             flex-direction: column;
         }
         #trello-bucket-grid {
-            flex: 1 1 auto;
-            min-height: 0;
-            max-height: 18vh;
-            overflow-y: auto;
+            display: grid;
+            grid-template-rows: repeat(2, auto);
+            grid-auto-flow: column;
+            grid-auto-columns: minmax(7.25rem, 8.75rem);
+            gap: 0.5rem;
+            width: max-content;
+            max-width: 100%;
+            justify-content: start;
+            align-content: start;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+        #trello-log-dock {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+            z-index: 30;
+            width: max-content;
+            max-width: min(24rem, 46%);
+        }
+        #trello-log-dock-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        #trello-log-dock-body {
+            margin-top: 0.4rem;
+        }
+        #trello-log-dock:not(.is-open) #trello-log-dock-body {
+            display: none;
+        }
+        #trello-log-dock.is-open {
+            width: min(24rem, 46%);
+        }
+        #trello-log-dock #trello-log-container {
+            width: 100%;
+            height: auto;
+            min-height: 9rem;
+            max-height: 38vh;
+        }
+        html:not(.dark) #trello-log-dock-toggle {
+            color: #1e293b !important;
         }
         .trello-log-copy {
             font-size: 11px;
@@ -107,8 +147,8 @@
             color: #fff !important;
         }
         .trello-bucket-card {
-            width: 31%;
-            min-width: 90px;
+            width: auto;
+            min-width: 0;
             background: rgba(255,255,255,0.07);
             border: 1px solid rgba(255,255,255,0.08);
             border-radius: 12px;
@@ -133,7 +173,8 @@
         }
         @media (max-width: 640px) {
             .trello-clock-time { font-size: 3.2rem; }
-            .trello-bucket-card { width: 47%; }
+            #trello-bucket-grid { grid-auto-columns: minmax(6.5rem, 7.5rem); }
+            #trello-log-dock { max-width: min(18rem, 70%); }
         }
         body.trello-fullscreen #app-sidebar,
         body.trello-fullscreen #app-header {
@@ -154,17 +195,18 @@
             bottom: 1rem;
             left: 50%;
             transform: translateX(-50%);
-            width: min(960px, 94%);
-            max-width: 960px;
+            width: max-content;
+            max-width: min(1400px, 96vw);
             margin: 0;
-            max-height: 34vh;
+            max-height: none;
         }
         body.trello-fullscreen #trello-bucket-grid {
-            max-height: 18vh;
+            grid-auto-columns: minmax(8.5rem, 10.5rem);
+            max-height: none;
         }
         body.trello-fullscreen .trello-bucket-card {
-            width: 22%;
-            min-width: 120px;
+            width: auto;
+            min-width: 0;
             padding: 16px 10px;
         }
         body.trello-fullscreen .trello-bucket-count { font-size: 2rem; }
@@ -265,6 +307,16 @@
         }
         html:not(.dark) #trello-monitor .text-rose-300 {
             color: #e11d48 !important;
+        }
+        .pdf-tool-btn.is-active {
+            background: #f59e0b !important;
+            color: #1c1917 !important;
+            font-weight: 700;
+            box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.45);
+        }
+        .pdf-tool-btn.is-active:hover {
+            background: #fbbf24 !important;
+            color: #1c1917 !important;
         }
         #app-toast {
             transition: opacity 0.2s ease;
@@ -467,22 +519,22 @@
                     <div class="max-w-[90rem] mx-auto space-y-4 pb-16">
 
                         <nav id="pdf-tool-strip" class="flex flex-wrap items-center gap-2 bg-white dark:bg-slate-800 p-3 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
-                            <button type="button" data-tool="unlock" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
+                            <button type="button" data-tool="unlock" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" aria-current="false">
                                 <i data-lucide="unlock" class="w-4 h-4"></i> Unlock PDF
                             </button>
-                            <button type="button" data-tool="merge" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap text-white bg-slate-800">
+                            <button type="button" data-tool="merge" class="pdf-tool-btn is-active flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap" aria-current="page">
                                 <i data-lucide="layers" class="w-4 h-4"></i> Merge PDF
                             </button>
-                            <button type="button" data-tool="split" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
+                            <button type="button" data-tool="split" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" aria-current="false">
                                 <i data-lucide="scissors" class="w-4 h-4"></i> Split PDF
                             </button>
-                            <button type="button" data-tool="compress" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
+                            <button type="button" data-tool="compress" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" aria-current="false">
                                 <i data-lucide="minimize-2" class="w-4 h-4"></i> Compress PDF
                             </button>
-                            <button type="button" data-tool="convert" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
+                            <button type="button" data-tool="convert" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" aria-current="false">
                                 <i data-lucide="refresh-cw" class="w-4 h-4"></i> Convert
                             </button>
-                            <button type="button" data-tool="extract" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
+                            <button type="button" data-tool="extract" class="pdf-tool-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" aria-current="false">
                                 <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Extract to Excel
                             </button>
                             <div class="flex flex-col ml-auto w-full sm:w-56 shrink-0">
@@ -799,14 +851,20 @@
                             <p class="text-center text-sm text-white/80 mt-2 uppercase tracking-wide">
                                 <span id="trello-total-cards" class="text-sky-400 font-extrabold text-base">0</span> cases in total in:
                             </p>
-                            <div id="trello-bucket-grid" class="flex flex-wrap justify-center gap-2 mt-3 overflow-y-auto"></div>
-                            <details id="trello-log-accordion" class="mt-3 rounded-xl border border-white/10 bg-black/20">
-                                <summary class="cursor-pointer select-none px-3 py-2 text-sm font-medium text-white/80 flex items-center justify-between gap-2">
-                                    <span>Console log</span>
-                                    <button type="button" id="trello-log-copy-active" class="trello-log-copy">Copy log</button>
-                                </summary>
-                                <div id="trello-log-fs" class="p-2"></div>
-                            </details>
+                            <div id="trello-bucket-grid" class="mt-3"></div>
+                        </div>
+
+                        <div id="trello-log-dock" class="hidden trello-glass rounded-2xl shadow-2xl">
+                            <div class="flex items-center justify-between gap-2 px-3 py-2">
+                                <button type="button" id="trello-log-dock-toggle" class="text-white/90" aria-expanded="false">
+                                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-sky-400"></i>
+                                    <span>Console</span>
+                                </button>
+                                <button type="button" id="trello-log-copy-active" class="trello-log-copy">Copy log</button>
+                            </div>
+                            <div id="trello-log-dock-body" class="px-2 pb-2">
+                                <div id="trello-log-fs"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
