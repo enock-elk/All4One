@@ -47,6 +47,40 @@
             background: rgba(2, 6, 23, 0.45);
             pointer-events: none;
         }
+        #trello-monitor {
+            position: absolute;
+            left: 50%;
+            bottom: 0.75rem;
+            transform: translateX(-50%);
+            z-index: 20;
+            width: min(92%, 36rem);
+            max-height: 34vh;
+            overflow: hidden;
+        }
+        #trello-monitor:not(.hidden) {
+            display: flex;
+            flex-direction: column;
+        }
+        #trello-bucket-grid {
+            flex: 1 1 auto;
+            min-height: 0;
+            max-height: 18vh;
+            overflow-y: auto;
+        }
+        .trello-log-copy {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            padding: 4px 8px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            color: inherit;
+        }
+        .trello-log-copy:hover {
+            background: rgba(255, 255, 255, 0.22);
+        }
         .trello-clock-time {
             font-size: 4.5rem;
             font-weight: 200;
@@ -114,13 +148,17 @@
             z-index: 40;
         }
         body.trello-fullscreen #trello-monitor {
-            position: relative;
-            bottom: auto;
-            left: auto;
-            transform: none;
+            position: absolute;
+            bottom: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
             width: min(960px, 94%);
             max-width: 960px;
-            margin: 10vh auto 0;
+            margin: 0;
+            max-height: 34vh;
+        }
+        body.trello-fullscreen #trello-bucket-grid {
+            max-height: 18vh;
         }
         body.trello-fullscreen .trello-bucket-card {
             width: 22%;
@@ -136,14 +174,24 @@
             background-color: #e8edf4;
         }
         html:not(.dark) #trello-lockscreen::before {
-            background: rgba(255, 255, 255, 0.55);
+            background: none;
         }
         html:not(.dark) .trello-clock-time {
             color: #0f172a;
             text-shadow: none;
         }
-        html:not(.dark) .trello-clock-date {
+        html:not(.dark) .trello-clock-date,
+        html:not(.dark) #trello-hero p {
             color: #64748b;
+            text-shadow: none;
+        }
+        html:not(.dark) #trello-lockscreen.has-wallpaper .trello-clock-time,
+        html:not(.dark) #trello-lockscreen.has-wallpaper .trello-clock-date,
+        html:not(.dark) #trello-lockscreen.has-wallpaper #trello-hero,
+        html:not(.dark) #trello-lockscreen.has-wallpaper #trello-hero h2,
+        html:not(.dark) #trello-lockscreen.has-wallpaper #trello-hero p {
+            color: #fff;
+            text-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
         }
         html:not(.dark) .trello-glass {
             background: rgba(255, 255, 255, 0.94);
@@ -151,18 +199,18 @@
             color: #334155;
             box-shadow: 0 12px 40px rgba(15, 23, 42, 0.08);
         }
-        html:not(.dark) #trello-lockscreen .text-white\/70,
+        html:not(.dark) #trello-lockscreen .trello-glass .text-white\/70,
         html:not(.dark) #trello-monitor .text-white\/70 {
             color: #64748b !important;
         }
-        html:not(.dark) #trello-lockscreen .text-white\/50 {
+        html:not(.dark) #trello-lockscreen .trello-glass .text-white\/50 {
             color: #94a3b8 !important;
         }
-        html:not(.dark) #trello-lockscreen .text-white\/60,
+        html:not(.dark) #trello-lockscreen .trello-glass .text-white\/60,
         html:not(.dark) #trello-monitor .text-white\/60 {
             color: #64748b !important;
         }
-        html:not(.dark) #trello-lockscreen .text-white\/80,
+        html:not(.dark) #trello-lockscreen .trello-glass .text-white\/80,
         html:not(.dark) #trello-monitor .text-white\/80 {
             color: #475569 !important;
         }
@@ -196,6 +244,12 @@
             color: #047857 !important;
             border-color: #cbd5e1 !important;
         }
+        html:not(.dark) .trello-glass .trello-log-copy,
+        html:not(.dark) #trello-monitor .trello-log-copy {
+            background: #f8fafc;
+            border-color: #cbd5e1;
+            color: #334155;
+        }
         html:not(.dark) #trello-monitor .text-sky-400,
         html:not(.dark) #trello-lockscreen .text-sky-400 {
             color: #0284c7 !important;
@@ -214,7 +268,7 @@
             transition: opacity 0.2s ease;
         }
     </style>
-  <script type="module" crossorigin src="./assets/index-DPABILz3.js"></script>
+  <script type="module" crossorigin src="./assets/index-B499X9jW.js"></script>
   <link rel="stylesheet" crossorigin href="./assets/index-D4xSL7tQ.css">
 </head>
 <body class="bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
@@ -614,8 +668,9 @@
 
                 <!-- TRELLO WATCHER TAB -->
                 <div id="tab-dashboard" class="tab-content hidden h-full w-full overflow-hidden relative">
-                    <div id="trello-lockscreen" class="trello-lockscreen absolute inset-0 flex flex-col items-center overflow-y-auto dark:text-white text-slate-800">
-                        <div class="relative z-10 w-full max-w-xl px-4 pt-10 pb-40 flex flex-col items-center">
+                    <div id="trello-lockscreen" class="trello-lockscreen absolute inset-0 overflow-hidden dark:text-white text-slate-800">
+                        <div id="trello-lockscreen-scroll" class="absolute inset-0 overflow-y-auto">
+                        <div class="relative z-10 w-full max-w-xl mx-auto px-4 pt-10 pb-10 flex flex-col items-center">
                             <div id="trello-hero" class="text-center mb-6">
                                 <div id="trello-clock-time" class="trello-clock-time">--:--</div>
                                 <div id="trello-clock-date" class="trello-clock-date">loading...</div>
@@ -714,14 +769,18 @@
                             </div>
 
                             <div id="trello-console-card" class="trello-glass w-full rounded-2xl p-4 mt-4 shadow-2xl">
-                                <h3 class="font-bold text-sm mb-2 flex items-center gap-2"><i data-lucide="terminal" class="w-4 h-4 text-sky-400"></i> Console</h3>
+                                <div class="flex items-center justify-between gap-2 mb-2">
+                                    <h3 class="font-bold text-sm flex items-center gap-2"><i data-lucide="terminal" class="w-4 h-4 text-sky-400"></i> Console</h3>
+                                    <button type="button" id="trello-log-copy" class="trello-log-copy">Copy log</button>
+                                </div>
                                 <div id="trello-log-home">
                                     <div id="trello-log-container" class="bg-slate-950/80 text-emerald-400 p-3 rounded-xl font-mono text-[11px] overflow-y-auto h-36 whitespace-pre-wrap border border-white/10"></div>
                                 </div>
                             </div>
                         </div>
+                        </div>
 
-                        <div id="trello-monitor" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-20 w-[95%] max-w-xl trello-glass rounded-2xl p-4 shadow-2xl">
+                        <div id="trello-monitor" class="hidden trello-glass rounded-2xl p-4 shadow-2xl">
                             <div class="flex items-center justify-between gap-3">
                                 <div class="flex items-center gap-2 text-emerald-400 text-xs font-extrabold tracking-wider uppercase">
                                     <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Active
@@ -740,9 +799,12 @@
                             <p class="text-center text-sm text-white/80 mt-2 uppercase tracking-wide">
                                 <span id="trello-total-cards" class="text-sky-400 font-extrabold text-base">0</span> cases in total in:
                             </p>
-                            <div id="trello-bucket-grid" class="flex flex-wrap justify-center gap-2 mt-3 max-h-[50vh] overflow-y-auto"></div>
-                            <details id="trello-log-accordion" class="mt-4 rounded-xl border border-white/10 bg-black/20">
-                                <summary class="cursor-pointer select-none px-3 py-2 text-sm font-medium text-white/80">Console log</summary>
+                            <div id="trello-bucket-grid" class="flex flex-wrap justify-center gap-2 mt-3 overflow-y-auto"></div>
+                            <details id="trello-log-accordion" class="mt-3 rounded-xl border border-white/10 bg-black/20">
+                                <summary class="cursor-pointer select-none px-3 py-2 text-sm font-medium text-white/80 flex items-center justify-between gap-2">
+                                    <span>Console log</span>
+                                    <button type="button" id="trello-log-copy-active" class="trello-log-copy">Copy log</button>
+                                </summary>
                                 <div id="trello-log-fs" class="p-2"></div>
                             </details>
                         </div>
