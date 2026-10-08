@@ -161,6 +161,78 @@ function orIdDocumentLine(gender) {
   return `or alternatively, kindly provide a copy of ${possessivePronoun(gender)} ID document.`;
 }
 
+function orIdDocumentPronoun(pronoun) {
+  return `or alternatively, kindly provide a copy of ${pronoun} ID document.`;
+}
+
+function withPeriod(text) {
+  const value = String(text || '').trim();
+  if (!value) return value;
+  return /[.!?]$/.test(value) ? value : `${value}.`;
+}
+
+function htmlRichList(items) {
+  const source = (Array.isArray(items) ? items : []).filter(Boolean);
+  const rows = source.map((item) => (
+    `<tr>` +
+      `<td valign="top" style="width:18px; padding:0 8px 2px 0; font-family: Verdana, Geneva, sans-serif; font-size:13px; color:#000; line-height:1.35;">&#8226;</td>` +
+      `<td valign="top" style="padding:0 0 2px 0; font-family: Verdana, Geneva, sans-serif; font-size:13px; color:#000; line-height:1.35;">${item}</td>` +
+    `</tr>`
+  )).join('');
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 0 4px; border-collapse:collapse;">${rows}</table>`;
+}
+
+function boldReportLine(value, source, valuePlaceholder, sourcePlaceholder) {
+  return `<strong>${escapeHtml(filled(value, valuePlaceholder))}</strong> in the ${escapeHtml(filled(source, sourcePlaceholder))}.`;
+}
+
+function masterClaimantHtml(vars) {
+  const title = filled(vars.claimantTitle, 'Mr/Ms');
+  const name = filled(vars.claimantName, '[Claimant]');
+  return `<strong>${escapeHtml(title)} ${escapeHtml(name)}</strong>`;
+}
+
+function masterClaimantLabel(vars) {
+  return `${filled(vars.claimantTitle, 'Mr/Ms')} ${filled(vars.claimantName, '[Claimant]')}`;
+}
+
+function masterPronoun(vars) {
+  const chosen = String(vars.idPronoun || '').trim();
+  if (chosen) return chosen;
+  const title = String(vars.claimantTitle || '').trim().toLowerCase();
+  if (title === 'ms' || title === 'mrs' || title === 'miss') return 'her';
+  if (title === 'mr') return 'his';
+  return 'his/her';
+}
+
+function kubhekaParagraph(hasPriorRequest) {
+  if (!hasPriorRequest) return KUBHEKA_APN_HTML;
+  return `Also, ${KUBHEKA_APN_HTML.charAt(0).toLowerCase()}${KUBHEKA_APN_HTML.slice(1)}`;
+}
+
+const INFORMAL_EARNINGS_PROOF = [
+  'Previous clients.',
+  'Previous suppliers.',
+  'Previous employees.',
+  'Previous co-workers.',
+  'Competitors.',
+  'Other independent persons with direct knowledge of the claimant\u2019s business activities.',
+];
+
+const FORMAL_EARNINGS_PROOF = [
+  'Payslips',
+  'Tax returns',
+  'Annual Financial statements',
+  'Bank statements',
+  'An employer certificate',
+  'An affidavit from the employer confirming the claimant\'s earnings.',
+];
+
+function fieldIsVisible(field, variables) {
+  if (!field.showWhen) return true;
+  return variables?.[field.showWhen.key] === field.showWhen.equals;
+}
+
 function htmlListWithIdFollowup(items, emptyPlaceholder, gender) {
   return `${htmlList(items, emptyPlaceholder)}${orIdDocumentLine(gender)}`;
 }
@@ -186,7 +258,9 @@ function initialVariables(template) {
   if (template.fields) {
     const vars = {};
     template.fields.forEach((field) => {
-      vars[field.key] = field.type === 'lines' ? [''] : '';
+      if (field.type === 'lines') vars[field.key] = [''];
+      else if (field.type === 'toggle') vars[field.key] = Boolean(field.default);
+      else vars[field.key] = field.default ?? '';
     });
     return vars;
   }
@@ -222,6 +296,356 @@ const EARNINGS_DOCUMENT_PRESETS = [
 ];
 
 const TEMPLATES = [
+  {
+    id: 'draft-master-loe',
+    name: '(DRAFT) Master LOE',
+    intro: 'Tick only the blocks this email needs. Notes under each block stay in the form and are left out of the draft. A block that starts with “Also” uses that word only when another request is already above it; otherwise it starts with “Kindly” or “In accordance”.',
+    fields: [
+      { key: 'recipientName', label: 'Recipient name', type: 'text', placeholder: 'e.g. Ntembeko' },
+      {
+        key: 'audience',
+        label: 'Who you are writing to',
+        type: 'select',
+        default: 'attorneys',
+        guidance: 'Instructing attorneys is the usual opening. Switch to IP or others only when this email is not going to the instructing attorney.',
+        options: [
+          { value: 'attorneys', label: 'Instructing attorneys' },
+          { value: 'ip', label: 'IP or others' },
+        ],
+      },
+      { key: 'claimantTitle', label: 'Claimant title', type: 'text', placeholder: 'Mr or Ms', row: 'claimant' },
+      { key: 'claimantName', label: 'Claimant name', type: 'text', placeholder: 'e.g. L Nkosi', row: 'claimant' },
+      {
+        key: 'attorneyFirm',
+        label: 'On behalf of',
+        type: 'text',
+        placeholder: 'e.g. Yonela Bodlani Attorneys',
+        showWhen: { key: 'audience', equals: 'ip' },
+        guidance: 'Written into the IP or others greeting only.',
+      },
+      {
+        key: 'secNoIp',
+        label: 'No IP report',
+        type: 'toggle',
+        guidance: 'Use if no Industrial Psychologist report was provided.',
+      },
+      {
+        key: 'secAccident',
+        label: 'Confirm the date of accident',
+        type: 'toggle',
+        guidance: 'Use to confirm the date of accident.',
+      },
+      {
+        key: 'accidentOt',
+        label: 'Accident date A',
+        type: 'text',
+        placeholder: 'e.g. 14 July 2020',
+        row: 'accident-a',
+        showWhen: { key: 'secAccident', equals: true },
+        nested: true,
+      },
+      {
+        key: 'accidentOtSource',
+        label: 'Source A',
+        type: 'text',
+        default: 'OT report',
+        placeholder: 'OT report',
+        row: 'accident-a',
+        showWhen: { key: 'secAccident', equals: true },
+        nested: true,
+      },
+      {
+        key: 'accidentIp',
+        label: 'Accident date B',
+        type: 'text',
+        placeholder: 'e.g. 13 July 2020',
+        row: 'accident-b',
+        showWhen: { key: 'secAccident', equals: true },
+        nested: true,
+      },
+      {
+        key: 'accidentIpSource',
+        label: 'Source B',
+        type: 'text',
+        default: 'IP report',
+        placeholder: 'IP report',
+        row: 'accident-b',
+        showWhen: { key: 'secAccident', equals: true },
+        nested: true,
+      },
+      {
+        key: 'secDob',
+        label: 'Confirm date of birth',
+        type: 'toggle',
+        guidance: 'Use to confirm a discrepancy in the claimant’s date of birth.',
+      },
+      {
+        key: 'dobOt',
+        label: 'Date of birth A',
+        type: 'text',
+        placeholder: 'e.g. 4 March 1988',
+        row: 'dob-a',
+        showWhen: { key: 'secDob', equals: true },
+        nested: true,
+      },
+      {
+        key: 'dobOtSource',
+        label: 'Source A',
+        type: 'text',
+        default: 'OT report',
+        placeholder: 'OT report',
+        row: 'dob-a',
+        showWhen: { key: 'secDob', equals: true },
+        nested: true,
+      },
+      {
+        key: 'dobIp',
+        label: 'Date of birth B',
+        type: 'text',
+        placeholder: 'e.g. 4 March 1989',
+        row: 'dob-b',
+        showWhen: { key: 'secDob', equals: true },
+        nested: true,
+      },
+      {
+        key: 'dobIpSource',
+        label: 'Source B',
+        type: 'text',
+        default: 'IP report',
+        placeholder: 'IP report',
+        row: 'dob-b',
+        showWhen: { key: 'secDob', equals: true },
+        nested: true,
+      },
+      {
+        key: 'secName',
+        label: 'Confirm name or surname spelling',
+        type: 'toggle',
+        guidance: 'Use to confirm the spelling of the claimant’s name or surname. Starts with “Also kindly” only when another request is above it.',
+      },
+      {
+        key: 'nameOt',
+        label: 'Spelling A',
+        type: 'text',
+        placeholder: 'e.g. Nkosi',
+        row: 'name-a',
+        showWhen: { key: 'secName', equals: true },
+        nested: true,
+      },
+      {
+        key: 'nameOtSource',
+        label: 'Source A',
+        type: 'text',
+        default: 'OT report',
+        placeholder: 'OT report',
+        row: 'name-a',
+        showWhen: { key: 'secName', equals: true },
+        nested: true,
+      },
+      {
+        key: 'nameIp',
+        label: 'Spelling B',
+        type: 'text',
+        placeholder: 'e.g. Nkosi',
+        row: 'name-b',
+        showWhen: { key: 'secName', equals: true },
+        nested: true,
+      },
+      {
+        key: 'nameIpSource',
+        label: 'Source B',
+        type: 'text',
+        default: 'IP report',
+        placeholder: 'IP report',
+        row: 'name-b',
+        showWhen: { key: 'secName', equals: true },
+        nested: true,
+      },
+      {
+        key: 'idPronoun',
+        label: 'ID document pronoun',
+        type: 'select',
+        showWhen: { key: 'secName', equals: true },
+        nested: true,
+        guidance: 'Used in “or alternatively, kindly provide a copy of his/her ID document”. Leave on “Match the title” to follow Mr or Ms.',
+        options: [
+          { value: '', label: 'Match the title' },
+          { value: 'his', label: 'his' },
+          { value: 'her', label: 'her' },
+        ],
+      },
+      {
+        key: 'secPayslips',
+        label: 'Clearer payslips',
+        type: 'toggle',
+        guidance: 'Use when the payslips provided are illegible.',
+      },
+      {
+        key: 'secInformal',
+        label: 'Informal earnings proof',
+        type: 'toggle',
+        guidance: 'Use to ask for proof of earnings for informal or self-employed work. The Kubheka paragraph drops “Also” when no request sits above this block.',
+      },
+      {
+        key: 'informalDocs',
+        label: 'Documents referenced in the IP report',
+        type: 'lines',
+        placeholder: 'Type a document from the IP report…',
+        presets: EARNINGS_DOCUMENT_PRESETS,
+        showWhen: { key: 'secInformal', equals: true },
+        nested: true,
+      },
+      {
+        key: 'informalBusiness',
+        label: 'Informal business and period',
+        type: 'text',
+        placeholder: 'e.g. spaza shop, January 2022 to March 2024',
+        showWhen: { key: 'secInformal', equals: true },
+        nested: true,
+      },
+      {
+        key: 'secFormal',
+        label: 'Formal earnings proof',
+        type: 'toggle',
+        guidance: 'Use to obtain proof of earnings for formal employment.',
+      },
+      {
+        key: 'formalDocs',
+        label: 'Documents referenced in the IP report',
+        type: 'lines',
+        placeholder: 'Type a document from the IP report…',
+        presets: EARNINGS_DOCUMENT_PRESETS,
+        showWhen: { key: 'secFormal', equals: true },
+        nested: true,
+      },
+      {
+        key: 'formalEarnings',
+        label: 'Formal earnings and period',
+        type: 'text',
+        placeholder: 'e.g. R15 000 per month at ABC Stores, January 2022 to March 2024',
+        showWhen: { key: 'secFormal', equals: true },
+        nested: true,
+      },
+      {
+        key: 'secIncident',
+        label: 'Date of incident not provided',
+        type: 'toggle',
+        guidance: 'Use if the date of incident was not provided. This block adds its own thank-you line, so use it when that introduction is the one you want.',
+      },
+      {
+        key: 'calculationType',
+        label: 'Calculation type',
+        type: 'text',
+        placeholder: 'Wrongful Arrest',
+        showWhen: { key: 'secIncident', equals: true },
+        nested: true,
+      },
+      {
+        key: 'secDependent',
+        label: 'Calculation depends on this information',
+        type: 'toggle',
+        default: true,
+        guidance: 'Adds the note that the calculation depends on the information requested because it increases the claim.',
+      },
+      {
+        key: 'secTurnaround',
+        label: '24-hour turnaround',
+        type: 'toggle',
+        default: true,
+        guidance: 'Adds the note that the report will follow within 24 hours once the information is in and nothing further is required.',
+      },
+    ],
+    compile(vars) {
+      const recipient = escapeHtml(filled(vars.recipientName, 'XXXXX'));
+      const claimant = masterClaimantHtml(vars);
+      const parts = [`Dear ${recipient}`];
+
+      if (vars.audience === 'ip') {
+        const firm = escapeHtml(filled(vars.attorneyFirm, 'XXXXX Attorneys'));
+        parts.push(`Kindly note that we are undertaking Loss of Earnings Calculations for ${claimant} on behalf of <strong>${firm}</strong>.`);
+      } else {
+        parts.push(`Thank you for requesting a Loss of Earnings calculation for ${claimant}.`);
+      }
+
+      let hasPriorRequest = false;
+      const pushRequest = (html) => {
+        parts.push(html);
+        hasPriorRequest = true;
+      };
+
+      if (vars.secNoIp) {
+        pushRequest([
+          'Kindly note that we require an Industrial Psychologist report in order to perform Loss of Earnings calculations.',
+          'Kindly assist by providing an Industrial Psychologist report.',
+        ].join('<br/><br/>'));
+      }
+
+      if (vars.secAccident) {
+        pushRequest(`Kindly assist us by confirming the correct date of accident.${htmlRichList([
+          boldReportLine(vars.accidentOt, vars.accidentOtSource, '[date]', 'OT report'),
+          boldReportLine(vars.accidentIp, vars.accidentIpSource, '[date]', 'IP report'),
+        ])}`);
+      }
+
+      if (vars.secDob) {
+        pushRequest(`Kindly assist us by confirming the claimant\u2019s date of birth.${htmlRichList([
+          boldReportLine(vars.dobOt, vars.dobOtSource, '[date of birth]', 'OT report'),
+          boldReportLine(vars.dobIp, vars.dobIpSource, '[date of birth]', 'IP report'),
+        ])}`);
+      }
+
+      if (vars.secName) {
+        const lead = hasPriorRequest ? 'Also kindly' : 'Kindly';
+        pushRequest(`${lead} assist us by confirming the correct spelling of the claimant\u2019s name.${htmlRichList([
+          boldReportLine(vars.nameOt, vars.nameOtSource, '[spelling]', 'OT report'),
+          boldReportLine(vars.nameIp, vars.nameIpSource, '[spelling]', 'IP report'),
+        ])}${orIdDocumentPronoun(masterPronoun(vars))}`);
+      }
+
+      if (vars.secPayslips) {
+        pushRequest(`The payslips provided for ${claimant} are illegible. Will you please provide clearer copies of all payslips in your possession?`);
+      }
+
+      if (vars.secInformal) {
+        pushRequest([
+          kubhekaParagraph(hasPriorRequest),
+          `Kindly assist us by providing the following documents referenced in the IP report:${htmlList(vars.informalDocs, '[Document referenced in the IP report]')}`,
+          `Also, please provide the proof of earnings for the <strong>${escapeHtml(filled(vars.informalBusiness, '[informal business and period]'))}</strong>:`,
+          `Acceptable proof of self-employed earnings if no formal records can be provided may include affidavits or confirmation from:${htmlList(INFORMAL_EARNINGS_PROOF, '')}`,
+        ].join('<br/><br/>'));
+      }
+
+      if (vars.secFormal) {
+        pushRequest([
+          `Kindly assist us by providing the following documents referenced in the IP report:${htmlList(vars.formalDocs, '[Document referenced in the IP report]')}`,
+          `We note that the claimant was earning the following:${htmlList([withPeriod(filled(vars.formalEarnings, '[earnings description]'))], '[earnings description]')}`,
+          KUBHEKA_APN_HTML,
+          `Acceptable proof of earnings may include:${htmlList(FORMAL_EARNINGS_PROOF, '')}`,
+        ].join('<br/><br/>'));
+      }
+
+      if (vars.secIncident) {
+        const calculation = escapeHtml(filled(vars.calculationType, 'Wrongful Arrest'));
+        pushRequest([
+          `Thank you for requesting a ${calculation} calculation for ${claimant}.`,
+          'The date of incident was not provided. Kindly assist by providing the date of incident.',
+        ].join('<br/><br/>'));
+      }
+
+      if (vars.secDependent !== false) {
+        parts.push('Kindly note that the calculation is dependent on the information we have requested since it will directly increase the claim.');
+      }
+      if (vars.secTurnaround !== false) {
+        parts.push('We will provide the report within 24 hours once the abovementioned information is provided and no further information is required.');
+      }
+      parts.push(SIGN_OFF);
+
+      return {
+        subject: draftSubject(this.name, masterClaimantLabel(vars)),
+        bodyHtml: parts.join('<br/><br/>'),
+      };
+    },
+  },
   {
     id: 'loe-report',
     name: 'Standard LOE Dispatch',
@@ -553,7 +977,7 @@ export default function EmailEngine() {
       userName: getWorkspaceName() || 'Unknown User',
       templateId: selectedTemplate.id,
       templateName: selectedTemplate.name,
-      claimant: variables.claimantFullName || variables['Claimant Name'] || '',
+      claimant: variables.claimantFullName || variables.claimantName || variables['Claimant Name'] || '',
       subject: compiledContent.subject,
       usageAction: action,
       status: 'Success',
@@ -695,8 +1119,11 @@ export default function EmailEngine() {
 
   const allUniqueKeys = [...new Set([...parsedKeys.subject, ...parsedKeys.body])];
   const structuredFields = selectedTemplate.fields || null;
-  const structuredRows = structuredFields
-    ? structuredFields.reduce((rows, field) => {
+  const visibleFields = structuredFields
+    ? structuredFields.filter((field) => fieldIsVisible(field, variables))
+    : null;
+  const structuredRows = visibleFields
+    ? visibleFields.reduce((rows, field) => {
         const previous = rows[rows.length - 1];
         if (field.row && previous?.[0]?.row === field.row) {
           previous.push(field);
@@ -706,19 +1133,41 @@ export default function EmailEngine() {
         return rows;
       }, [])
     : null;
-  const fieldCount = structuredFields ? structuredFields.length : allUniqueKeys.length;
+  const fieldCount = visibleFields ? visibleFields.length : allUniqueKeys.length;
 
   const renderStructuredField = (field) => {
+    if (field.type === 'toggle') {
+      const on = Boolean(variables[field.key]);
+      return (
+        <label className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 cursor-pointer transition-colors ${on ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/30' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40'}`}>
+          <input
+            type="checkbox"
+            checked={on}
+            onChange={(e) => handleVarChange(field.key, e.target.checked)}
+            className="mt-0.5 rounded border-slate-300 text-amber-500 focus:ring-amber-500"
+          />
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-slate-800 dark:text-slate-100">{field.label}</span>
+            {field.guidance ? (
+              <span className="block text-[11px] leading-snug text-slate-500 dark:text-slate-400 mt-0.5">{field.guidance}</span>
+            ) : null}
+          </span>
+        </label>
+      );
+    }
+
     if (field.type === 'select') {
+      const options = field.options || [];
+      const hasEmptyOption = options.some((opt) => opt.value === '');
       return (
         <select
           value={variables[field.key] || ''}
           onChange={(e) => handleVarChange(field.key, e.target.value)}
           className={`${INPUT_CLASS} appearance-none cursor-pointer`}
         >
-          <option value="">Select {field.label.toLowerCase()}</option>
-          {(field.options || []).map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          {!hasEmptyOption && field.default == null ? <option value="">Select {field.label.toLowerCase()}</option> : null}
+          {options.map((opt) => (
+            <option key={`${field.key}-${opt.value || 'empty'}`} value={opt.value}>{opt.label}</option>
           ))}
         </select>
       );
@@ -826,6 +1275,9 @@ export default function EmailEngine() {
                 ))}
               </select>
             </div>
+            {selectedTemplate.intro ? (
+              <p className="mt-3 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">{selectedTemplate.intro}</p>
+            ) : null}
           </div>
 
           <div className="p-5 rounded-2xl border border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-slate-900/50">
@@ -846,8 +1298,16 @@ export default function EmailEngine() {
                     className={row.length > 1 ? 'grid grid-cols-2 gap-2' : ''}
                   >
                     {row.map((field) => (
-                      <div key={field.key} className="min-w-0">
-                        <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">{field.label}</label>
+                      <div
+                        key={field.key}
+                        className={`min-w-0 ${row.length === 1 && field.nested ? 'pl-3 border-l-2 border-amber-200 dark:border-amber-800' : ''}`}
+                      >
+                        {field.type === 'toggle' ? null : (
+                          <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">{field.label}</label>
+                        )}
+                        {field.type !== 'toggle' && field.guidance ? (
+                          <p className="text-[11px] leading-snug text-slate-500 dark:text-slate-400 mb-1">{field.guidance}</p>
+                        ) : null}
                         {renderStructuredField(field)}
                       </div>
                     ))}

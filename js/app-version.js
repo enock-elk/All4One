@@ -1,8 +1,17 @@
-export const APP_VERSION = '1.3.7';
-export const APP_RELEASE_DATE = '7 September 2026';
+export const APP_VERSION = '1.3.8';
+export const APP_RELEASE_DATE = '8 October 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.8',
+    date: '8 Oct 2026',
+    items: [
+      'Master LOE is the first email template. It opens addressed to the instructing attorneys, and every blank in the selected blocks can be edited.',
+      'Request blocks are ticked individually and stitched into one draft. A leading “Also” is kept only when another request already sits above that block.',
+      'Trello Watcher keeps the case grid low on the wallpaper, copies the full console log, and no longer washes the wallpaper with a light filter or a dark filter that stops when you scroll.',
+    ],
+  },
   {
     version: '1.3.7',
     date: '7 Sep 2026',

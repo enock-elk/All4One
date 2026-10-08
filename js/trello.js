@@ -130,6 +130,34 @@ document.addEventListener('DOMContentLoaded', () => {
         if (logContainer.children.length > 100) logContainer.removeChild(logContainer.lastChild);
     }
 
+    async function copyConsoleLog(event) {
+        event?.preventDefault();
+        event?.stopPropagation();
+        if (!logContainer) return;
+        const lines = [...logContainer.children]
+            .map((node) => (node.textContent || '').replace(/\s+/g, ' ').trim())
+            .filter(Boolean)
+            .reverse();
+        const text = lines.join('\n');
+        try {
+            await navigator.clipboard.writeText(text);
+            showAppToast(text ? 'Console log copied.' : 'Console log is empty.');
+        } catch (err) {
+            showAppToast('Could not copy the console log.');
+        }
+    }
+
+    function setWallpaper(dataUrl) {
+        if (!lockscreen) return;
+        if (dataUrl) {
+            lockscreen.style.backgroundImage = `url(${dataUrl})`;
+            lockscreen.classList.add('has-wallpaper');
+        } else {
+            lockscreen.style.backgroundImage = '';
+            lockscreen.classList.remove('has-wallpaper');
+        }
+    }
+
     function escapeHtml(value) {
         return String(value ?? '')
             .replace(/&/g, '&amp;')
@@ -358,8 +386,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function initVisuals() {
-        const savedBg = localStorage.getItem(PREF_BG);
-        if (savedBg && lockscreen) lockscreen.style.backgroundImage = `url(${savedBg})`;
+        setWallpaper(localStorage.getItem(PREF_BG) || '');
         if (localStorage.getItem(PREF_STEALTH) === 'false' && stealthToggle) stealthToggle.checked = false;
         populateTones();
         const savedMode = localStorage.getItem(PREF_MODE) || 'wake';
@@ -763,10 +790,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (soundToggle) soundToggle.checked = soundToggleActive.checked;
     });
 
+    document.getElementById('trello-log-copy')?.addEventListener('click', copyConsoleLog);
+    document.getElementById('trello-log-copy-active')?.addEventListener('click', copyConsoleLog);
+
     document.getElementById('trello-wallpaper-btn')?.addEventListener('click', () => bgInput?.click());
     document.getElementById('trello-reset-bg')?.addEventListener('click', () => {
         localStorage.removeItem(PREF_BG);
-        if (lockscreen) lockscreen.style.backgroundImage = '';
+        setWallpaper('');
     });
     bgInput?.addEventListener('change', function () {
         const file = this.files?.[0];
@@ -780,7 +810,7 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.onload = (e) => {
             try {
                 localStorage.setItem(PREF_BG, e.target.result);
-                if (lockscreen) lockscreen.style.backgroundImage = `url(${e.target.result})`;
+                setWallpaper(e.target.result);
             } catch (_) {
                 addLog('Could not save background.', 'error');
             }
