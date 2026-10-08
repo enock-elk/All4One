@@ -9,6 +9,8 @@ const PIP_CSS = `
     color: #f1f5f9;
     font-size: 14px;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
   body.is-minimized .pip-body { display: none; }
   .hdr {
@@ -51,7 +53,7 @@ const PIP_CSS = `
     background: rgba(15,23,42,0.65);
   }
   .meta strong { color: #38bdf8; font-size: 15px; font-weight: 800; }
-  .rows { overflow-y: auto; max-height: calc(100vh - 88px); padding: 6px 8px 10px; }
+  .rows { overflow-y: auto; flex: 1; min-height: 0; padding: 6px 8px 12px; }
   .row { border-radius: 8px; margin-bottom: 4px; }
   .row-head {
     display: flex;
@@ -96,15 +98,17 @@ const PIP_CSS = `
 `;
 
 const POPUP_NAME = 'All4OneTrelloBoard';
-const PIP_WIDTH = 280;
-const PIP_MIN_HEIGHT = 160;
-const PIP_MAX_HEIGHT = 480;
-const PIP_MINIMIZED_HEIGHT = 42;
-const ROW_HEIGHT = 38;
+const PIP_WIDTH = 300;
+const PIP_MIN_HEIGHT = 180;
+const PIP_MINIMIZED_HEIGHT = 56;
 
-function calcHeight(bucketCount, minimized = false) {
-    if (minimized) return PIP_MINIMIZED_HEIGHT;
-    return Math.min(PIP_MAX_HEIGHT, Math.max(PIP_MIN_HEIGHT, 78 + bucketCount * ROW_HEIGHT));
+function estimateContentHeight(bucketCount) {
+    return 46 + 40 + 16 + Math.max(0, bucketCount) * 44;
+}
+
+function availableScreenHeight(win) {
+    const screenHeight = win?.screen?.availHeight || window.screen?.availHeight || 900;
+    return Math.max(PIP_MIN_HEIGHT, screenHeight - 24);
 }
 
 function buildShellHtml(buckets, total, escapeHtml, minimized) {
@@ -209,15 +213,29 @@ export function createBoardPip({ escapeHtml, onFocusApp, onClose }) {
         return Boolean(activeWindow());
     }
 
-    function resizeActiveWindow() {
+    function fitActiveWindow() {
         const win = activeWindow();
-        if (!win) return;
-        const height = calcHeight(latestBuckets.length, isMinimized);
-        try {
-            win.resizeTo(PIP_WIDTH, height);
-        } catch (_) {
-            // PiP windows may not support resizeTo in all browsers
-        }
+        if (!win || win.closed) return;
+        const apply = () => {
+            if (!win || win.closed) return;
+            if (isMinimized) {
+                try { win.resizeTo(PIP_WIDTH, PIP_MINIMIZED_HEIGHT); } catch (_) { /* PiP may ignore resize */ }
+                return;
+            }
+            const doc = win.document;
+            const hdr = doc.querySelector('.hdr')?.offsetHeight || 0;
+            const meta = doc.querySelector('.meta')?.offsetHeight || 0;
+            const rows = doc.getElementById('pip-rows');
+            const rowsHeight = rows
+                ? [...rows.children].reduce((sum, el) => sum + el.offsetHeight + 4, 16)
+                : 0;
+            const neededInner = Math.max(PIP_MIN_HEIGHT, hdr + meta + rowsHeight + 4);
+            const chrome = Math.max(0, (win.outerHeight || 0) - (win.innerHeight || 0));
+            const outer = Math.min(availableScreenHeight(win), neededInner + chrome);
+            try { win.resizeTo(PIP_WIDTH, Math.ceil(outer)); } catch (_) { /* PiP may ignore resize */ }
+        };
+        apply();
+        requestAnimationFrame(apply);
     }
 
     function close() {
@@ -233,7 +251,7 @@ export function createBoardPip({ escapeHtml, onFocusApp, onClose }) {
     function toggleMinimized() {
         isMinimized = !isMinimized;
         render(latestBuckets);
-        resizeActiveWindow();
+        fitActiveWindow();
     }
 
     function render(buckets = latestBuckets) {
@@ -259,7 +277,7 @@ export function createBoardPip({ escapeHtml, onFocusApp, onClose }) {
             targetDoc.querySelector(`[data-count="${expandedRow}"]`)?.classList.add('is-open');
         }
 
-        resizeActiveWindow();
+        fitActiveWindow();
     }
 
     async function open(buckets = []) {
@@ -269,13 +287,14 @@ export function createBoardPip({ escapeHtml, onFocusApp, onClose }) {
             return 'update';
         }
 
-        const height = calcHeight(latestBuckets.length, isMinimized);
+        const contentHeight = estimateContentHeight(latestBuckets.length);
+        const openHeight = Math.min(availableScreenHeight(window), contentHeight);
 
         if (window.documentPictureInPicture) {
             try {
                 pipWindow = await window.documentPictureInPicture.requestWindow({
                     width: PIP_WIDTH,
-                    height,
+                    height: openHeight,
                 });
                 mountIntoDocument(pipWindow.document, latestBuckets, escapeHtml, isMinimized);
                 wireDocument(pipWindow.document, {
@@ -288,21 +307,23 @@ export function createBoardPip({ escapeHtml, onFocusApp, onClose }) {
                     pipWindow = null;
                     onClose?.();
                 });
+                fitActiveWindow();
                 return 'pip';
             } catch (err) {
                 console.warn('Document PiP unavailable:', err);
             }
         }
 
+        const popupHeight = Math.min(availableScreenHeight(window), contentHeight + 88);
         const features = [
             `width=${PIP_WIDTH}`,
-            `height=${height}`,
+            `height=${popupHeight}`,
             'menubar=no',
             'toolbar=no',
             'location=no',
             'status=no',
             'resizable=yes',
-            'scrollbars=no',
+            'scrollbars=yes',
         ].join(',');
 
         popupWindow = window.open('about:blank', POPUP_NAME, features);
@@ -323,6 +344,7 @@ export function createBoardPip({ escapeHtml, onFocusApp, onClose }) {
             popupWindow = null;
             onClose?.();
         });
+        fitActiveWindow();
 
         return 'popup';
     }

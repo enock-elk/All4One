@@ -1,8 +1,18 @@
-export const APP_VERSION = '1.3.9';
+export const APP_VERSION = '1.3.10';
 export const APP_RELEASE_DATE = '8 October 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.10',
+    date: '8 Oct 2026',
+    items: [
+      'A later request in the Master LOE draft starts with “Also, kindly” when another request is already above it.',
+      'Discrepancy in Accident Dates asks for the two dates and lets you pick the document each one comes from.',
+      'Trello fullscreen keeps the clock, and the floating board opens tall enough for every watched list.',
+      'Phones use a bottom navigation bar, and the email and affidavit workspaces stack instead of sitting side by side.',
+    ],
+  },
   {
     version: '1.3.9',
     date: '8 Oct 2026',

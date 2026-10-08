@@ -210,6 +210,21 @@ function kubhekaParagraph(hasPriorRequest) {
   return `Also, ${KUBHEKA_APN_HTML.charAt(0).toLowerCase()}${KUBHEKA_APN_HTML.slice(1)}`;
 }
 
+function requestLead(hasPriorRequest) {
+  return hasPriorRequest ? 'Also, kindly' : 'Kindly';
+}
+
+const REPORT_SOURCES = [
+  'OT report',
+  'IP report',
+  'Instruction Email',
+  'Instruction Letter',
+  'RAF Report',
+  'Ortho Report',
+  'Hospital records',
+  'Medico-legal report',
+];
+
 const INFORMAL_EARNINGS_PROOF = [
   'Previous clients.',
   'Previous suppliers.',
@@ -452,7 +467,7 @@ const TEMPLATES = [
         key: 'secName',
         label: 'Confirm name or surname spelling',
         type: 'toggle',
-        guidance: 'Use to confirm the spelling of the claimant’s name or surname. Starts with “Also kindly” only when another request is above it.',
+        guidance: 'Use to confirm the spelling of the claimant’s name or surname. Starts with “Also, kindly” only when another request is above it.',
         loeOnly: true,
       },
       {
@@ -612,28 +627,27 @@ const TEMPLATES = [
 
       if (!wrongfulArrest && vars.secNoIp) {
         pushRequest([
-          'Kindly note that we require an Industrial Psychologist report in order to perform Loss of Earnings calculations.',
+          `${requestLead(hasPriorRequest)} note that we require an Industrial Psychologist report in order to perform Loss of Earnings calculations.`,
           'Kindly assist by providing an Industrial Psychologist report.',
         ].join('<br/><br/>'));
       }
 
       if (!wrongfulArrest && vars.secAccident) {
-        pushRequest(`Kindly assist us by confirming the correct date of accident.${htmlRichList([
+        pushRequest(`${requestLead(hasPriorRequest)} assist us by confirming the correct date of accident.${htmlRichList([
           boldReportLine(vars.accidentOt, vars.accidentOtSource, '[date]', 'OT report'),
           boldReportLine(vars.accidentIp, vars.accidentIpSource, '[date]', 'IP report'),
         ])}`);
       }
 
       if (!wrongfulArrest && vars.secDob) {
-        pushRequest(`Kindly assist us by confirming the claimant\u2019s date of birth.${htmlRichList([
+        pushRequest(`${requestLead(hasPriorRequest)} assist us by confirming the claimant\u2019s date of birth.${htmlRichList([
           boldReportLine(vars.dobOt, vars.dobOtSource, '[date of birth]', 'OT report'),
           boldReportLine(vars.dobIp, vars.dobIpSource, '[date of birth]', 'IP report'),
         ])}`);
       }
 
       if (!wrongfulArrest && vars.secName) {
-        const lead = hasPriorRequest ? 'Also kindly' : 'Kindly';
-        pushRequest(`${lead} assist us by confirming the correct spelling of the claimant\u2019s name.${htmlRichList([
+        pushRequest(`${requestLead(hasPriorRequest)} assist us by confirming the correct spelling of the claimant\u2019s name.${htmlRichList([
           boldReportLine(vars.nameOt, vars.nameOtSource, '[spelling]', 'OT report'),
           boldReportLine(vars.nameIp, vars.nameIpSource, '[spelling]', 'IP report'),
         ])}${orIdDocumentPronoun(masterPronoun(vars))}`);
@@ -654,7 +668,7 @@ const TEMPLATES = [
 
       if (!wrongfulArrest && vars.secFormal) {
         pushRequest([
-          `Kindly assist us by providing the following documents referenced in the IP report:${htmlList(vars.formalDocs, '[Document referenced in the IP report]')}`,
+          `${requestLead(hasPriorRequest)} assist us by providing the following documents referenced in the IP report:${htmlList(vars.formalDocs, '[Document referenced in the IP report]')}`,
           `We note that the claimant was earning the following:${htmlList([withPeriod(filled(vars.formalEarnings, '[earnings description]'))], '[earnings description]')}`,
           KUBHEKA_APN_HTML,
           `Acceptable proof of earnings may include:${htmlList(FORMAL_EARNINGS_PROOF, '')}`,
@@ -749,7 +763,7 @@ const TEMPLATES = [
           inTheLine(vars.dateA, vars.dateASource, '[Date A]', '[Source A]'),
           inTheLine(vars.dateB, vars.dateBSource, '[Date B]', '[Source B]'),
         ], '[Date discrepancy]')}`,
-        `Also kindly assist us by confirming the correct spelling of the claimant\u2019s name.${htmlListWithIdFollowup([
+        `Also, kindly assist us by confirming the correct spelling of the claimant\u2019s name.${htmlListWithIdFollowup([
           inTheLine(vars.nameA, vars.nameASource, '[Spelling A]', '[Source A]'),
           inTheLine(vars.nameB, vars.nameBSource, '[Spelling B]', '[Source B]'),
         ], '[Name discrepancy]', vars.gender)}`,
@@ -872,6 +886,48 @@ const TEMPLATES = [
         SIGN_OFF,
       ].join('<br/><br/>');
       return { subject: this.name, bodyHtml };
+    },
+  },
+  {
+    id: 'draft-disc-accident-dates',
+    name: '(DRAFT) Discrepancy in Accident Dates',
+    fields: [
+      ATTORNEY_FIELD,
+      CLAIMANT_FIELD,
+      GENDER_FIELD,
+      { key: 'dateA', label: 'Date A', type: 'text', placeholder: 'e.g. 14 July 2020' },
+      {
+        key: 'dateASource',
+        label: 'Date A document',
+        type: 'source',
+        default: 'OT report',
+        options: REPORT_SOURCES,
+        guidance: 'Pick the document this date comes from, or type another name. It is written as “in the [document]”.',
+      },
+      { key: 'dateB', label: 'Date B', type: 'text', placeholder: 'e.g. 13 July 2020' },
+      {
+        key: 'dateBSource',
+        label: 'Date B document',
+        type: 'source',
+        default: 'IP report',
+        options: REPORT_SOURCES,
+        guidance: 'Pick the document this date comes from, or type another name.',
+      },
+    ],
+    compile(vars) {
+      const attorney = htmlField(vars, 'attorneyFirstName', '[Attorney]');
+      const shortName = escapeHtml(claimantShortLabel(vars));
+      const bodyHtml = [
+        `Dear ${attorney}`,
+        thankYouLoe(shortName),
+        `Kindly assist us by confirming the correct date of accident.${htmlList([
+          inTheLine(vars.dateA, vars.dateASource, '[Date A]', 'OT report'),
+          inTheLine(vars.dateB, vars.dateBSource, '[Date B]', 'IP report'),
+        ], '[Date discrepancy]')}`,
+        PROCEED_HYPHEN,
+        SIGN_OFF,
+      ].join('<br/><br/>');
+      return { subject: draftSubject(this.name, claimantShortLabel(vars)), bodyHtml };
     },
   },
   {
@@ -1200,6 +1256,39 @@ export default function EmailEngine() {
       );
     }
 
+    if (field.type === 'source') {
+      const value = variables[field.key] || '';
+      const options = field.options || [];
+      return (
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-1.5">
+            {options.map((opt) => {
+              const on = value === opt;
+              return (
+                <button
+                  key={`${field.key}-${opt}`}
+                  type="button"
+                  onClick={() => handleVarChange(field.key, opt)}
+                  className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-all ${on
+                    ? 'bg-amber-500 border-amber-500 text-slate-900'
+                    : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-amber-400'}`}
+                >
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => handleVarChange(field.key, e.target.value)}
+            placeholder="Or type another document"
+            className={INPUT_CLASS}
+          />
+        </div>
+      );
+    }
+
     if (field.type === 'lines') {
       const lines = Array.isArray(variables[field.key]) ? variables[field.key] : [''];
       return (
@@ -1377,12 +1466,12 @@ export default function EmailEngine() {
 
       {/* COLUMN 2: LIVE PREVIEW & EXPORT */}
       <div className="flex-1 flex flex-col relative bg-slate-200/60 dark:bg-[#0f172a]">
-        <div className="h-16 shrink-0 flex items-center justify-between px-6 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md z-10">
+        <div className="workspace-toolbar h-16 shrink-0 flex items-center justify-between px-6 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md z-10">
           <div className="flex items-center gap-2">
             <RefreshCw className="w-4 h-4 text-emerald-500" />
             <span className="text-xs font-bold tracking-wide uppercase text-slate-500 dark:text-slate-400">HTML Compiled</span>
           </div>
-          <div className="flex gap-3">
+          <div className="workspace-actions flex gap-3">
             {gmailLinked ? (
               <button
                 type="button"

@@ -961,7 +961,7 @@ export default function AffidavitAutomation() {
 
       {/* COLUMN 3: WYSIWYG PREVIEW */}
       <div className={`${isFullscreen ? 'fixed inset-0 z-50' : 'flex-1 relative'} flex flex-col bg-slate-200/60 dark:bg-[#0f172a]`}>
-        <div className="h-16 shrink-0 flex items-center justify-between px-6 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md z-10">
+        <div className="workspace-toolbar h-16 shrink-0 flex items-center justify-between px-6 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md z-10">
           <div className="flex items-center gap-2">
             <RefreshCw className="w-4 h-4 text-slate-400 animate-spin-slow" />
             <span className="text-xs font-bold tracking-wide uppercase text-slate-500 dark:text-slate-400">Live Render</span>
@@ -971,7 +971,7 @@ export default function AffidavitAutomation() {
               </span>
             )}
           </div>
-          <div className="flex gap-3">
+          <div className="workspace-actions flex gap-3">
             {previewEdited && (
               <button
                 type="button"
