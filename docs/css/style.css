@@ -986,6 +986,159 @@
   font-variant-numeric: tabular-nums;
 }
 
+@media (max-width: 860px) {
+  #app-view > .flex-1 {
+    min-width: 0;
+    padding-bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  }
+
+  #app-header {
+    height: 3.25rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  #header-title {
+    font-size: 1rem;
+  }
+
+  #app-sidebar,
+  #app-sidebar.is-collapsed {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: auto;
+    z-index: 40;
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    padding: 0.3rem 0.35rem calc(0.3rem + env(safe-area-inset-bottom));
+    overflow-x: auto;
+    border-top: 1px solid rgba(148, 163, 184, 0.2);
+  }
+
+  #sidebar-brand-toggle,
+  #sidebar-collapse-btn,
+  .sidebar-item-pin,
+  .sidebar-nav-sub {
+    display: none !important;
+  }
+
+  #sidebar-nav {
+    flex: 1;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+
+  #app-sidebar > .mt-auto {
+    width: auto;
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+    flex-direction: row;
+    gap: 0.25rem;
+  }
+
+  .sidebar-nav-item {
+    width: auto;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  #app-sidebar .sidebar-nav-btn,
+  #app-sidebar.is-collapsed .sidebar-nav-btn {
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 0.15rem;
+    width: 100%;
+    min-height: 3rem;
+    padding: 0.35rem 0.15rem;
+    text-align: center;
+    border-radius: 0.75rem;
+  }
+
+  #app-sidebar .sidebar-nav-icon,
+  #app-sidebar.is-collapsed .sidebar-nav-btn .sidebar-nav-icon {
+    width: 1.55rem;
+    height: 1.55rem;
+  }
+
+  #app-sidebar .sidebar-nav-label,
+  #app-sidebar.is-collapsed .sidebar-nav-label {
+    opacity: 1;
+    max-width: none;
+    font-size: 0;
+    line-height: 1.1;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  #app-sidebar .sidebar-nav-label::after {
+    content: attr(data-short);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0;
+  }
+
+  #pdf-tool-strip {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #pdf-tool-strip .pdf-tool-btn {
+    flex: 0 0 auto;
+    min-height: 2.75rem;
+  }
+
+  #email-root > div,
+  #affidavit-root > div {
+    flex-direction: column !important;
+    overflow: auto !important;
+  }
+
+  #email-root > div > div,
+  #affidavit-root > div > div {
+    width: 100% !important;
+    max-width: 100%;
+    border-right-width: 0 !important;
+    flex: none !important;
+  }
+
+  #email-root > div > div:first-child {
+    max-height: 52vh;
+  }
+
+  #email-root > div > div:nth-child(2),
+  #affidavit-root > div > div:last-child {
+    min-height: 70vh;
+  }
+
+  .workspace-toolbar {
+    height: auto !important;
+    min-height: 3.25rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.75rem !important;
+  }
+
+  .workspace-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  #app-view input,
+  #app-view select,
+  #app-view textarea {
+    font-size: 16px;
+  }
+}
+
 @keyframes workspace-loader-spin {
   to { transform: rotate(360deg); }
 }

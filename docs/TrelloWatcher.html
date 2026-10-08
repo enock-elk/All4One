@@ -173,12 +173,12 @@
             .trello-clock-time { font-size: 3.2rem; }
             #trello-bucket-grid { grid-auto-columns: minmax(6.5rem, 7.5rem); }
             #trello-log-dock { max-width: min(18rem, 70%); }
+            #trello-monitor > .flex { flex-wrap: wrap; row-gap: 0.5rem; }
         }
         body.trello-fullscreen #app-sidebar,
         body.trello-fullscreen #app-header {
             display: none !important;
         }
-        body.trello-fullscreen #trello-hero,
         body.trello-fullscreen #trello-setup-card,
         body.trello-fullscreen #trello-console-card {
             display: none !important;
@@ -320,8 +320,8 @@
             transition: opacity 0.2s ease;
         }
     </style>
-  <script type="module" crossorigin src="./assets/index-B8qU3ii_.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-D4xSL7tQ.css">
+  <script type="module" crossorigin src="./assets/index-D476X8rP.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Djo0HRHx.css">
 </head>
 <body class="bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
 
@@ -401,7 +401,7 @@
                     <button data-tab="pdf-manager" class="tab-btn sidebar-nav-btn is-active" title="Document Manager" aria-current="page">
                         <span class="sidebar-nav-icon"><i data-lucide="files" class="w-5 h-5"></i></span>
                         <span class="min-w-0">
-                            <span class="sidebar-nav-label">Document Manager</span>
+                            <span class="sidebar-nav-label" data-short="Docs">Document Manager</span>
                             <span class="sidebar-nav-sub">PDF tools &amp; file bay</span>
                         </span>
                     </button>
@@ -414,7 +414,7 @@
                     <button data-tab="dashboard" class="tab-btn sidebar-nav-btn" title="Trello Watcher">
                         <span class="sidebar-nav-icon"><i data-lucide="radar" class="w-5 h-5"></i></span>
                         <span class="min-w-0">
-                            <span class="sidebar-nav-label">Trello Watcher</span>
+                            <span class="sidebar-nav-label" data-short="Trello">Trello Watcher</span>
                             <span class="sidebar-nav-sub">Live board monitor</span>
                         </span>
                     </button>
@@ -427,7 +427,7 @@
                     <button data-tab="casemaker" class="tab-btn sidebar-nav-btn" title="Case Maker">
                         <span class="sidebar-nav-icon"><i data-lucide="sparkles" class="w-5 h-5"></i></span>
                         <span class="min-w-0">
-                            <span class="sidebar-nav-label">Case Maker</span>
+                            <span class="sidebar-nav-label" data-short="Cases">Case Maker</span>
                             <span class="sidebar-nav-sub">RyanGPT builder</span>
                         </span>
                     </button>
@@ -440,7 +440,7 @@
                     <button data-tab="affidavits" class="tab-btn sidebar-nav-btn" title="Affidavit Automation">
                         <span class="sidebar-nav-icon"><i data-lucide="scroll-text" class="w-5 h-5"></i></span>
                         <span class="min-w-0">
-                            <span class="sidebar-nav-label">Affidavit Automation</span>
+                            <span class="sidebar-nav-label" data-short="Affidavit">Affidavit Automation</span>
                             <span class="sidebar-nav-sub">Expert affidavits</span>
                         </span>
                     </button>
@@ -453,7 +453,7 @@
                     <button data-tab="emails" class="tab-btn sidebar-nav-btn" title="Draft Email Generator">
                         <span class="sidebar-nav-icon"><i data-lucide="mail-plus" class="w-5 h-5"></i></span>
                         <span class="min-w-0">
-                            <span class="sidebar-nav-label">Email Generator</span>
+                            <span class="sidebar-nav-label" data-short="Email">Email Generator</span>
                             <span class="sidebar-nav-sub">Client draft emails</span>
                         </span>
                     </button>
@@ -469,7 +469,7 @@
                         <i data-lucide="moon" id="dark-mode-icon" class="w-5 h-5"></i>
                     </span>
                     <span class="min-w-0">
-                        <span class="sidebar-nav-label" id="dark-mode-label">Dark Mode</span>
+                        <span class="sidebar-nav-label" id="dark-mode-label" data-short="Theme">Dark Mode</span>
                         <span class="sidebar-nav-sub">Toggle appearance</span>
                     </span>
                 </button>
@@ -479,7 +479,7 @@
                         <i data-lucide="log-out" class="w-5 h-5"></i>
                     </span>
                     <span class="min-w-0">
-                        <span class="sidebar-nav-label">Sign Out</span>
+                        <span class="sidebar-nav-label" data-short="Out">Sign Out</span>
                         <span class="sidebar-nav-sub">Secure logout</span>
                     </span>
                 </button>
