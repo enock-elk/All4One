@@ -130,6 +130,69 @@ document.addEventListener('DOMContentLoaded', () => {
         if (logContainer.children.length > 100) logContainer.removeChild(logContainer.lastChild);
     }
 
+    function consoleLogText() {
+        if (!logContainer) return '';
+        return [...logContainer.children]
+            .map((node) => (node.textContent || '').replace(/\s+/g, ' ').trim())
+            .filter(Boolean)
+            .reverse()
+            .join('\n');
+    }
+
+    function copyWithSelection(text) {
+        const area = document.createElement('textarea');
+        area.value = text;
+        area.setAttribute('readonly', '');
+        area.style.position = 'fixed';
+        area.style.top = '0';
+        area.style.left = '0';
+        area.style.opacity = '0';
+        document.body.appendChild(area);
+        area.focus();
+        area.select();
+        area.setSelectionRange(0, area.value.length);
+        let ok = false;
+        try {
+            ok = document.execCommand('copy');
+        } catch (_) {
+            ok = false;
+        }
+        area.remove();
+        return ok;
+    }
+
+    async function copyConsoleLog(event) {
+        event?.preventDefault();
+        event?.stopPropagation();
+        const text = consoleLogText();
+        let copied = false;
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(text);
+                copied = true;
+            }
+        } catch (_) {
+            copied = false;
+        }
+        if (!copied) copied = copyWithSelection(text);
+        if (!copied) {
+            showAppToast('Could not copy the console log.');
+            return;
+        }
+        showAppToast(text ? 'Console log copied.' : 'Console log is empty.');
+    }
+
+    function setWallpaper(dataUrl) {
+        if (!lockscreen) return;
+        if (dataUrl) {
+            lockscreen.style.backgroundImage = `url(${dataUrl})`;
+            lockscreen.classList.add('has-wallpaper');
+        } else {
+            lockscreen.style.backgroundImage = '';
+            lockscreen.classList.remove('has-wallpaper');
+        }
+    }
+
     function escapeHtml(value) {
         return String(value ?? '')
             .replace(/&/g, '&amp;')
@@ -358,8 +421,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function initVisuals() {
-        const savedBg = localStorage.getItem(PREF_BG);
-        if (savedBg && lockscreen) lockscreen.style.backgroundImage = `url(${savedBg})`;
+        setWallpaper(localStorage.getItem(PREF_BG) || '');
         if (localStorage.getItem(PREF_STEALTH) === 'false' && stealthToggle) stealthToggle.checked = false;
         populateTones();
         const savedMode = localStorage.getItem(PREF_MODE) || 'wake';
@@ -763,10 +825,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (soundToggle) soundToggle.checked = soundToggleActive.checked;
     });
 
+    document.getElementById('trello-log-copy')?.addEventListener('click', copyConsoleLog);
+    document.getElementById('trello-log-copy-active')?.addEventListener('click', copyConsoleLog);
+
     document.getElementById('trello-wallpaper-btn')?.addEventListener('click', () => bgInput?.click());
     document.getElementById('trello-reset-bg')?.addEventListener('click', () => {
         localStorage.removeItem(PREF_BG);
-        if (lockscreen) lockscreen.style.backgroundImage = '';
+        setWallpaper('');
     });
     bgInput?.addEventListener('change', function () {
         const file = this.files?.[0];
@@ -780,7 +845,7 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.onload = (e) => {
             try {
                 localStorage.setItem(PREF_BG, e.target.result);
-                if (lockscreen) lockscreen.style.backgroundImage = `url(${e.target.result})`;
+                setWallpaper(e.target.result);
             } catch (_) {
                 addLog('Could not save background.', 'error');
             }
