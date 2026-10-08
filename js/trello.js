@@ -130,21 +130,56 @@ document.addEventListener('DOMContentLoaded', () => {
         if (logContainer.children.length > 100) logContainer.removeChild(logContainer.lastChild);
     }
 
+    function consoleLogText() {
+        if (!logContainer) return '';
+        return [...logContainer.children]
+            .map((node) => (node.textContent || '').replace(/\s+/g, ' ').trim())
+            .filter(Boolean)
+            .reverse()
+            .join('\n');
+    }
+
+    function copyWithSelection(text) {
+        const area = document.createElement('textarea');
+        area.value = text;
+        area.setAttribute('readonly', '');
+        area.style.position = 'fixed';
+        area.style.top = '0';
+        area.style.left = '0';
+        area.style.opacity = '0';
+        document.body.appendChild(area);
+        area.focus();
+        area.select();
+        area.setSelectionRange(0, area.value.length);
+        let ok = false;
+        try {
+            ok = document.execCommand('copy');
+        } catch (_) {
+            ok = false;
+        }
+        area.remove();
+        return ok;
+    }
+
     async function copyConsoleLog(event) {
         event?.preventDefault();
         event?.stopPropagation();
-        if (!logContainer) return;
-        const lines = [...logContainer.children]
-            .map((node) => (node.textContent || '').replace(/\s+/g, ' ').trim())
-            .filter(Boolean)
-            .reverse();
-        const text = lines.join('\n');
+        const text = consoleLogText();
+        let copied = false;
         try {
-            await navigator.clipboard.writeText(text);
-            showAppToast(text ? 'Console log copied.' : 'Console log is empty.');
-        } catch (err) {
-            showAppToast('Could not copy the console log.');
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(text);
+                copied = true;
+            }
+        } catch (_) {
+            copied = false;
         }
+        if (!copied) copied = copyWithSelection(text);
+        if (!copied) {
+            showAppToast('Could not copy the console log.');
+            return;
+        }
+        showAppToast(text ? 'Console log copied.' : 'Console log is empty.');
     }
 
     function setWallpaper(dataUrl) {
