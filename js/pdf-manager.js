@@ -1135,7 +1135,14 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.split-mode-btn').forEach((btn) => {
         btn.addEventListener('click', () => setSplitMode(btn.getAttribute('data-split-mode')));
     });
-    document.getElementById('btn-add-range').addEventListener('click', () => addSplitRange());
+    document.getElementById('btn-add-range').addEventListener('click', () => {
+        const rows = document.querySelectorAll('.split-range-row');
+        const cap = splitPageCap();
+        const last = rows[rows.length - 1];
+        const lastTo = Number(last?.querySelector('.split-to')?.value) || 0;
+        const nextFrom = last ? Math.min(cap, lastTo + 1) : 1;
+        addSplitRange(nextFrom, cap);
+    });
     document.getElementById('split-fixed-length').addEventListener('input', () => {
         const input = document.getElementById('split-fixed-length');
         const total = includedPages().length;

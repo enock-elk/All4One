@@ -1036,7 +1036,18 @@
                 <div id="tab-salary" class="tab-content hidden h-full w-full overflow-y-auto">
                     <div class="salary-shell">
                         <header class="salary-hero">
-                            <div class="salary-brand" aria-hidden="true">Actuary<br>Consulting</div>
+                            <div class="salary-brand">
+                                <svg viewBox="0 0 236 72" role="img" aria-label="LCG">
+                                    <rect width="72" height="72" fill="#A98C6C"/>
+                                    <rect x="82" width="72" height="72" fill="#A98C6C"/>
+                                    <rect x="164" width="72" height="72" fill="#A98C6C"/>
+                                    <g fill="#ffffff" font-family="Palatino, 'Palatino Linotype', Georgia, 'Times New Roman', serif" font-size="48" text-anchor="middle">
+                                        <text x="36" y="50">L</text>
+                                        <text x="118" y="50">C</text>
+                                        <text x="200" y="50">G</text>
+                                    </g>
+                                </svg>
+                            </div>
                             <h2>Salary Inflation</h2>
                             <p>Move a salary from one year to another with the December CPI, then the salary premium. How often it is paid stays as you enter it.</p>
                         </header>
@@ -1071,12 +1082,16 @@
                                 <input id="salary-premium" inputmode="decimal" autocomplete="off">
                             </label>
                         </form>
-                        <p id="salary-model-factor" class="salary-note"></p>
                         <section class="salary-result" aria-live="polite">
                             <button type="button" id="salary-copy" class="salary-copy" disabled>Copy</button>
                             <div id="salary-result-amount">Enter an amount</div>
-                            <div id="salary-formula" class="salary-formula"></div>
+                            <p id="salary-factor-line" class="salary-factor-lead"></p>
                             <p id="salary-result-note">Stats SA CPI P0141, December index, plus the 1% premium.</p>
+                            <details class="salary-working">
+                                <summary>Show the working</summary>
+                                <p id="salary-model-factor"></p>
+                                <div id="salary-formula" class="salary-formula"></div>
+                            </details>
                         </section>
                     </div>
                 </div>

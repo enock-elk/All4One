@@ -98,22 +98,9 @@ function appendProduct(parent, steps, premiumText) {
   });
 }
 
-function renderFormula(host, explanation, premiumText, fromYear, toYear) {
+function renderFormula(host, explanation, premiumText) {
   host.replaceChildren();
-  if (!explanation) return;
-
-  const lead = document.createElement('p');
-  lead.className = 'salary-factor-lead';
-  lead.textContent = `Factor ${explanation.factor.toFixed(6)} from ${fromYear} to ${toYear}. The payment frequency is kept as entered.`;
-  host.append(lead);
-
-  if (explanation.direction === 'same') {
-    const same = document.createElement('p');
-    same.className = 'salary-factor-lead';
-    same.textContent = 'Same year, so the factor is 1.';
-    host.append(same);
-    return;
-  }
+  if (!explanation || explanation.direction === 'same') return;
 
   const math = document.createElement('div');
   math.className = 'salary-math';
@@ -152,6 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const futureInput = document.getElementById('salary-future-cpi');
   const premiumInput = document.getElementById('salary-premium');
   const modelLine = document.getElementById('salary-model-factor');
+  const factorLine = document.getElementById('salary-factor-line');
   const resultAmount = document.getElementById('salary-result-amount');
   const formula = document.getElementById('salary-formula');
   const resultNote = document.getElementById('salary-result-note');
@@ -182,6 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const toYear = Number(toInput.value);
     if (!rawAmount || !Number.isFinite(fromYear) || !Number.isFinite(toYear)) {
       resultAmount.textContent = 'Enter an amount and both years';
+      factorLine.textContent = '';
       formula.replaceChildren();
       copyValue = '';
       copyButton.disabled = true;
@@ -193,6 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const explanation = explainSalary({ fromYear, toYear, futureCpi, premium });
     if (projected.amount == null) {
       resultAmount.textContent = 'Enter an amount and both years';
+      factorLine.textContent = '';
       formula.replaceChildren();
       copyValue = '';
       copyButton.disabled = true;
@@ -200,7 +190,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     resultAmount.textContent = `R ${money(projected.amount)} ${frequency.label}`;
-    renderFormula(formula, explanation, premiumText, fromYear, toYear);
+    const sameYear = explanation && explanation.direction === 'same' ? ' Same year, so the factor is 1.' : '';
+    factorLine.textContent = `Factor ${explanation.factor.toFixed(6)} from ${fromYear} to ${toYear}.${sameYear} The payment frequency is kept as entered.`;
+    renderFormula(formula, explanation, premiumText);
     copyValue = projected.amount.toFixed(2);
     copyButton.disabled = false;
     copyButton.textContent = 'Copy';

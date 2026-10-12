@@ -226,11 +226,8 @@ const REPORT_SOURCES = [
 
 const LOS_SOURCES = [
   ...REPORT_SOURCES,
-  'Death Certificate',
   'Post-mortem report',
   'Inquest report',
-  'Unabridged birth certificate',
-  'Marriage certificate',
   'Proof of dependency',
   'Letter of authority',
   'SAPS accident report',
@@ -300,7 +297,7 @@ function initialVariables(template) {
   if (template.fields) {
     const vars = {};
     template.fields.forEach((field) => {
-      if (field.type === 'lines') vars[field.key] = [''];
+      if (field.type === 'lines') vars[field.key] = Array.isArray(field.default) && field.default.length ? [...field.default] : [''];
       else if (field.type === 'toggle') vars[field.key] = Boolean(field.default);
       else vars[field.key] = field.default ?? '';
     });
@@ -795,7 +792,7 @@ const TEMPLATES = [
         showWhen: { key: 'secAccident', equals: true },
         nested: true,
       },
-      reportSourceField('accidentOtSource', 'Source A', 'Death Certificate', {
+      reportSourceField('accidentOtSource', 'Source A', 'Post-mortem report', {
         row: 'accident-a',
         showWhen: { key: 'secAccident', equals: true },
         nested: true,
@@ -858,9 +855,90 @@ const TEMPLATES = [
       if (vars.secAccident !== false) {
         const sameAccidentSource = sameDocument(vars.accidentOtSource, vars.accidentIpSource);
         parts.push(`Kindly assist us by confirming the correct date of accident.${htmlRichList([
-          boldReportLine(vars.accidentOt, vars.accidentOtSource, '[date]', 'Death Certificate', sameAccidentSource ? vars.accidentOtPage : ''),
+          boldReportLine(vars.accidentOt, vars.accidentOtSource, '[date]', 'Post-mortem report', sameAccidentSource ? vars.accidentOtPage : ''),
           boldReportLine(vars.accidentIp, vars.accidentIpSource, '[date]', 'IP report', sameAccidentSource ? vars.accidentIpPage : ''),
         ])}`);
+      }
+      if (vars.secTurnaround !== false) {
+        parts.push('We will provide the report within 24 hours once the abovementioned information is provided and no further information is required.');
+      }
+      parts.push(SIGN_OFF);
+      const generatedSubject = draftSubject(this.name, masterClaimantLabel(vars));
+      return {
+        subject: String(vars.subject || '').trim() || generatedSubject,
+        bodyHtml: parts.join('<br/><br/>'),
+      };
+    },
+  },
+  {
+    id: 'draft-los-dependants',
+    name: '(DRAFT) LOS Dependants',
+    menuLabel: 'LOS Dependants Draft',
+    intro: 'Thanks the attorneys for a Loss of Support calculation for the dependants, then asks for the documents in the IP report.',
+    fields: [
+      {
+        key: 'subject',
+        label: 'Subject',
+        type: 'text',
+        guidance: 'Leave this blank to keep the automatic subject.',
+      },
+      { key: 'recipientName', label: 'Recipient name', type: 'text', placeholder: 'e.g. Nomatshezi' },
+      {
+        key: 'claimantTitle',
+        label: 'Deceased title',
+        type: 'select',
+        default: 'Ms',
+        row: 'claimant',
+        options: [
+          { value: 'Mr/Ms', label: 'Mr/Ms' },
+          { value: 'Mr', label: 'Mr' },
+          { value: 'Ms', label: 'Ms' },
+          { value: 'Mrs', label: 'Mrs' },
+        ],
+      },
+      {
+        key: 'claimantName',
+        label: 'Deceased name',
+        type: 'text',
+        placeholder: 'e.g. T Ntluzo',
+        row: 'claimant',
+      },
+      {
+        key: 'ipDocs',
+        label: 'Documents referenced in the IP report',
+        type: 'lines',
+        placeholder: 'Type a document from the IP report…',
+        default: [
+          'Copy of payslip.',
+          'Copy of the deceased’s death certificate.',
+          'Copy of the post-mortem report.',
+        ],
+      },
+      {
+        key: 'secDependent',
+        label: 'Calculation depends on this information',
+        type: 'toggle',
+        default: true,
+        guidance: 'Adds the note that the calculation depends on the requested information because it increases the claim.',
+      },
+      {
+        key: 'secTurnaround',
+        label: '24-hour turnaround',
+        type: 'toggle',
+        default: true,
+        guidance: 'Adds the note that the report will follow within 24 hours once the information is in and nothing further is required.',
+      },
+    ],
+    compile(vars) {
+      const recipient = escapeHtml(filled(vars.recipientName, 'XXXXX'));
+      const claimant = masterClaimantHtml(vars);
+      const parts = [
+        `Dear ${recipient}`,
+        `Thank you for requesting a Loss of Support calculation for the dependants of ${claimant}.`,
+        `Kindly assist us by providing the following documents referenced in the IP report:${htmlList(vars.ipDocs, '[Document referenced in the IP report]')}`,
+      ];
+      if (vars.secDependent !== false) {
+        parts.push('Kindly note that the calculation is dependent on the information we have requested since it will directly increase the claim.');
       }
       if (vars.secTurnaround !== false) {
         parts.push('We will provide the report within 24 hours once the abovementioned information is provided and no further information is required.');
@@ -1641,7 +1719,6 @@ export default function EmailEngine() {
               </div>
             </div>
 
-            <p className="px-8 pt-4 text-[11px] leading-snug text-slate-500">Edit this email before you copy it or push it to Gmail. Changing the fields on the left replaces your edits.</p>
             <EditablePreview html={compiledContent.htmlBody} previewRef={previewRef} />
           </div>
         </div>

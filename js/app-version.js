@@ -1,8 +1,18 @@
-export const APP_VERSION = '1.3.13';
+export const APP_VERSION = '1.3.14';
 export const APP_RELEASE_DATE = '12 October 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.14',
+    date: '12 Oct 2026',
+    items: [
+      'Salary Inflation carries the LCG mark, and the working stays closed until it is opened.',
+      'LOS Dependants Draft asks for the IP-report documents. Death, birth, and marriage certificates are no longer source choices.',
+      'A new split range starts on the page after the previous range and runs to the end.',
+      'The desktop side menu no longer shows a horizontal scrollbar.',
+    ],
+  },
   {
     version: '1.3.13',
     date: '12 Oct 2026',
