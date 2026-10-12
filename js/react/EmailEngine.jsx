@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, memo } from 'react';
 import { 
   Mail, 
   Send, 
@@ -133,24 +133,22 @@ function draftSubject(draftName, claimantLabel) {
   return `${draftName} \u2014 ${claimantLabel}`;
 }
 
+function gmailBulletList(items) {
+  const rows = (Array.isArray(items) ? items : []).filter((item) => String(item || '').trim()).map((item) => (
+    `<li dir="ltr" style="margin-left:15px"><div>${item}</div></li>`
+  )).join('');
+  if (!rows) return '';
+  return `<ul style="margin-top:0;margin-bottom:0">${rows}</ul>`;
+}
+
 function htmlList(items, emptyPlaceholder) {
   const cleaned = (Array.isArray(items) ? items : []).map((item) => String(item || '').trim()).filter(Boolean);
   const source = cleaned.length ? cleaned : [emptyPlaceholder];
-  const rows = source.map((item) => (
-    `<tr>` +
-      `<td valign="top" style="width:18px; padding:0 8px 2px 0; font-family: Verdana, Geneva, sans-serif; font-size:13px; color:#000; line-height:1.35;">&#8226;</td>` +
-      `<td valign="top" style="padding:0 0 2px 0; font-family: Verdana, Geneva, sans-serif; font-size:13px; color:#000; line-height:1.35;">${escapeHtml(item)}</td>` +
-    `</tr>`
-  )).join('');
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 0 4px; border-collapse:collapse;">${rows}</table>`;
+  return gmailBulletList(source.map((item) => escapeHtml(item)));
 }
 
 function inTheLine(value, source, valuePlaceholder, sourcePlaceholder) {
   return `${filled(value, valuePlaceholder)} in the ${filled(source, sourcePlaceholder)}.`;
-}
-
-function ipDateLine(date, page, datePlaceholder, pagePlaceholder) {
-  return `<strong>${escapeHtml(filled(date, datePlaceholder))}</strong> in the IP report (Page ${escapeHtml(filled(page, pagePlaceholder))}).`;
 }
 
 function thankYouLoe(claimantHtml) {
@@ -172,18 +170,19 @@ function withPeriod(text) {
 }
 
 function htmlRichList(items) {
-  const source = (Array.isArray(items) ? items : []).filter(Boolean);
-  const rows = source.map((item) => (
-    `<tr>` +
-      `<td valign="top" style="width:18px; padding:0 8px 2px 0; font-family: Verdana, Geneva, sans-serif; font-size:13px; color:#000; line-height:1.35;">&#8226;</td>` +
-      `<td valign="top" style="padding:0 0 2px 0; font-family: Verdana, Geneva, sans-serif; font-size:13px; color:#000; line-height:1.35;">${item}</td>` +
-    `</tr>`
-  )).join('');
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 0 4px; border-collapse:collapse;">${rows}</table>`;
+  return gmailBulletList((Array.isArray(items) ? items : []).filter(Boolean));
 }
 
-function boldReportLine(value, source, valuePlaceholder, sourcePlaceholder) {
-  return `<strong>${escapeHtml(filled(value, valuePlaceholder))}</strong> in the ${escapeHtml(filled(source, sourcePlaceholder))}.`;
+function sameDocument(left, right) {
+  const a = String(left || '').trim().toLowerCase();
+  const b = String(right || '').trim().toLowerCase();
+  return Boolean(a && b && a === b);
+}
+
+function boldReportLine(value, source, valuePlaceholder, sourcePlaceholder, page) {
+  const pageText = String(page || '').trim();
+  const pageHtml = pageText ? ` (Page ${escapeHtml(pageText)})` : '';
+  return `<strong>${escapeHtml(filled(value, valuePlaceholder))}</strong> in the ${escapeHtml(filled(source, sourcePlaceholder))}${pageHtml}.`;
 }
 
 function masterClaimantHtml(vars) {
@@ -225,6 +224,18 @@ const REPORT_SOURCES = [
   'Medico-legal report',
 ];
 
+const LOS_SOURCES = [
+  ...REPORT_SOURCES,
+  'Death Certificate',
+  'Post-mortem report',
+  'Inquest report',
+  'Unabridged birth certificate',
+  'Marriage certificate',
+  'Proof of dependency',
+  'Letter of authority',
+  'SAPS accident report',
+];
+
 function reportSourceField(key, label, defaultValue, extra = {}) {
   return {
     key,
@@ -256,8 +267,12 @@ const FORMAL_EARNINGS_PROOF = [
 
 function fieldIsVisible(field, variables) {
   if (field.loeOnly && variables?.audience === 'incident') return false;
-  if (!field.showWhen) return true;
-  return variables?.[field.showWhen.key] === field.showWhen.equals;
+  if (field.showWhen && variables?.[field.showWhen.key] !== field.showWhen.equals) return false;
+  if (field.sameSource) {
+    const [left, right] = field.sameSource;
+    if (!sameDocument(variables?.[left], variables?.[right])) return false;
+  }
+  return true;
 }
 
 function htmlListWithIdFollowup(items, emptyPlaceholder, gender) {
@@ -417,6 +432,29 @@ const TEMPLATES = [
         loeOnly: true,
       }),
       {
+        key: 'accidentOtPage',
+        label: 'Page A',
+        type: 'text',
+        placeholder: 'e.g. 6',
+        row: 'accident-pages',
+        showWhen: { key: 'secAccident', equals: true },
+        sameSource: ['accidentOtSource', 'accidentIpSource'],
+        guidance: 'Both dates are from the same document, so add the page for each one.',
+        nested: true,
+        loeOnly: true,
+      },
+      {
+        key: 'accidentIpPage',
+        label: 'Page B',
+        type: 'text',
+        placeholder: 'e.g. 8',
+        row: 'accident-pages',
+        showWhen: { key: 'secAccident', equals: true },
+        sameSource: ['accidentOtSource', 'accidentIpSource'],
+        nested: true,
+        loeOnly: true,
+      },
+      {
         key: 'secDob',
         label: 'Confirm date of birth',
         type: 'toggle',
@@ -510,10 +548,24 @@ const TEMPLATES = [
       },
       {
         key: 'secPayslips',
-        label: 'Clearer payslips',
+        label: 'Clearer payslips or bank statements',
         type: 'toggle',
-        guidance: 'Use when the payslips provided are illegible.',
+        guidance: 'Use when the payslips or bank statements provided are illegible.',
         loeOnly: true,
+      },
+      {
+        key: 'clearerDocs',
+        label: 'Which documents',
+        type: 'select',
+        default: 'payslips',
+        showWhen: { key: 'secPayslips', equals: true },
+        nested: true,
+        loeOnly: true,
+        options: [
+          { value: 'payslips', label: 'Payslips' },
+          { value: 'bank statements', label: 'Bank statements' },
+          { value: 'payslips and bank statements', label: 'Payslips and bank statements' },
+        ],
       },
       {
         key: 'secInformal',
@@ -615,9 +667,10 @@ const TEMPLATES = [
       }
 
       if (!wrongfulArrest && vars.secAccident) {
+        const sameAccidentSource = sameDocument(vars.accidentOtSource, vars.accidentIpSource);
         pushRequest(`${requestLead(hasPriorRequest)} assist us by confirming the correct date of accident.${htmlRichList([
-          boldReportLine(vars.accidentOt, vars.accidentOtSource, '[date]', 'OT report'),
-          boldReportLine(vars.accidentIp, vars.accidentIpSource, '[date]', 'IP report'),
+          boldReportLine(vars.accidentOt, vars.accidentOtSource, '[date]', 'OT report', sameAccidentSource ? vars.accidentOtPage : ''),
+          boldReportLine(vars.accidentIp, vars.accidentIpSource, '[date]', 'IP report', sameAccidentSource ? vars.accidentIpPage : ''),
         ])}`);
       }
 
@@ -636,7 +689,12 @@ const TEMPLATES = [
       }
 
       if (!wrongfulArrest && vars.secPayslips) {
-        pushRequest(`The payslips provided for ${claimant} are illegible. Will you please provide clearer copies of all payslips in your possession?`);
+        const documents = {
+          payslips: 'payslips',
+          'bank statements': 'bank statements',
+          'payslips and bank statements': 'payslips and bank statements',
+        }[vars.clearerDocs] || 'payslips';
+        pushRequest(`The ${documents} provided for ${claimant} are illegible. Will you please provide clearer copies of all ${documents} in your possession?`);
       }
 
       if (!wrongfulArrest && vars.secInformal) {
@@ -662,6 +720,152 @@ const TEMPLATES = [
       }
       parts.push(SIGN_OFF);
 
+      const generatedSubject = draftSubject(this.name, masterClaimantLabel(vars));
+      return {
+        subject: String(vars.subject || '').trim() || generatedSubject,
+        bodyHtml: parts.join('<br/><br/>'),
+      };
+    },
+  },
+  {
+    id: 'draft-master-los',
+    name: '(DRAFT) Master LOS',
+    menuLabel: 'Master LOS Draft',
+    intro: 'The opening and closing follow the Loss of Earnings draft. This one currently confirms the accident date only. Page numbers appear when both dates come from the same document.',
+    fields: [
+      {
+        key: 'subject',
+        label: 'Subject',
+        type: 'text',
+        guidance: 'Leave this blank to keep the automatic subject.',
+      },
+      { key: 'recipientName', label: 'Recipient name', type: 'text', placeholder: 'e.g. Ntembeko' },
+      {
+        key: 'audience',
+        label: 'Opening',
+        type: 'select',
+        default: 'attorneys',
+        guidance: 'The thank-you goes to the instructing attorneys. The other opening is for an IP or someone else.',
+        options: [
+          { value: 'attorneys', label: 'Loss of Support — instructing attorneys' },
+          { value: 'ip', label: 'Loss of Support — IP or others' },
+        ],
+      },
+      {
+        key: 'claimantTitle',
+        label: 'Claimant title',
+        type: 'select',
+        default: 'Mr/Ms',
+        row: 'claimant',
+        options: [
+          { value: 'Mr/Ms', label: 'Mr/Ms' },
+          { value: 'Mr', label: 'Mr' },
+          { value: 'Ms', label: 'Ms' },
+          { value: 'Mrs', label: 'Mrs' },
+        ],
+      },
+      {
+        key: 'claimantName',
+        label: 'Claimant name',
+        type: 'text',
+        placeholder: 'e.g. L Nkosi',
+        row: 'claimant',
+      },
+      {
+        key: 'attorneyFirm',
+        label: 'Attorney firm',
+        type: 'text',
+        placeholder: 'e.g. Yonela Bodlani Attorneys',
+        showWhen: { key: 'audience', equals: 'ip' },
+        guidance: 'Written into the IP or others greeting only.',
+      },
+      {
+        key: 'secAccident',
+        label: 'Confirm the date of accident',
+        type: 'toggle',
+        default: true,
+        guidance: 'Use to confirm the date of accident.',
+      },
+      {
+        key: 'accidentOt',
+        label: 'Accident date A',
+        type: 'text',
+        placeholder: 'e.g. 14 July 2020',
+        row: 'accident-a',
+        showWhen: { key: 'secAccident', equals: true },
+        nested: true,
+      },
+      reportSourceField('accidentOtSource', 'Source A', 'Death Certificate', {
+        row: 'accident-a',
+        showWhen: { key: 'secAccident', equals: true },
+        nested: true,
+        options: LOS_SOURCES,
+      }),
+      {
+        key: 'accidentIp',
+        label: 'Accident date B',
+        type: 'text',
+        placeholder: 'e.g. 13 July 2020',
+        row: 'accident-b',
+        showWhen: { key: 'secAccident', equals: true },
+        nested: true,
+      },
+      reportSourceField('accidentIpSource', 'Source B', 'IP report', {
+        row: 'accident-b',
+        showWhen: { key: 'secAccident', equals: true },
+        nested: true,
+        options: LOS_SOURCES,
+      }),
+      {
+        key: 'accidentOtPage',
+        label: 'Page A',
+        type: 'text',
+        placeholder: 'e.g. 6',
+        row: 'accident-pages',
+        showWhen: { key: 'secAccident', equals: true },
+        sameSource: ['accidentOtSource', 'accidentIpSource'],
+        guidance: 'Both dates are from the same document, so add the page for each one.',
+        nested: true,
+      },
+      {
+        key: 'accidentIpPage',
+        label: 'Page B',
+        type: 'text',
+        placeholder: 'e.g. 8',
+        row: 'accident-pages',
+        showWhen: { key: 'secAccident', equals: true },
+        sameSource: ['accidentOtSource', 'accidentIpSource'],
+        nested: true,
+      },
+      {
+        key: 'secTurnaround',
+        label: '24-hour turnaround',
+        type: 'toggle',
+        default: true,
+        guidance: 'Adds the note that the report will follow within 24 hours once the information is in and nothing further is required.',
+      },
+    ],
+    compile(vars) {
+      const recipient = escapeHtml(filled(vars.recipientName, 'XXXXX'));
+      const claimant = masterClaimantHtml(vars);
+      const parts = [`Dear ${recipient}`];
+      if (vars.audience === 'ip') {
+        const firm = escapeHtml(filled(vars.attorneyFirm, 'XXXXX Attorneys'));
+        parts.push(`Kindly note that we are undertaking Loss of Support Calculations for ${claimant} on behalf of <strong>${firm}</strong>.`);
+      } else {
+        parts.push(`Thank you for requesting a Loss of Support calculation for ${claimant}.`);
+      }
+      if (vars.secAccident !== false) {
+        const sameAccidentSource = sameDocument(vars.accidentOtSource, vars.accidentIpSource);
+        parts.push(`Kindly assist us by confirming the correct date of accident.${htmlRichList([
+          boldReportLine(vars.accidentOt, vars.accidentOtSource, '[date]', 'Death Certificate', sameAccidentSource ? vars.accidentOtPage : ''),
+          boldReportLine(vars.accidentIp, vars.accidentIpSource, '[date]', 'IP report', sameAccidentSource ? vars.accidentIpPage : ''),
+        ])}`);
+      }
+      if (vars.secTurnaround !== false) {
+        parts.push('We will provide the report within 24 hours once the abovementioned information is provided and no further information is required.');
+      }
+      parts.push(SIGN_OFF);
       const generatedSubject = draftSubject(this.name, masterClaimantLabel(vars));
       return {
         subject: String(vars.subject || '').trim() || generatedSubject,
@@ -742,36 +946,6 @@ const TEMPLATES = [
     },
   },
   {
-    id: 'draft-disc-accident-dates-ip',
-    name: '(DRAFT) Discrepancy in Accident Dates within IP',
-    menuLabel: '(Legacy draft) Discrepancy in Accident Dates within IP',
-    legacy: true,
-    fields: [
-      ATTORNEY_FIELD,
-      CLAIMANT_FIELD,
-      GENDER_FIELD,
-      { key: 'dateA', label: 'Date A', type: 'text', placeholder: 'e.g. 15 January 2015', row: 'date-a' },
-      { key: 'dateAPage', label: 'Page A', type: 'text', placeholder: 'e.g. 6', row: 'date-a' },
-      { key: 'dateB', label: 'Date B', type: 'text', placeholder: 'e.g. 15 January 2020', row: 'date-b' },
-      { key: 'dateBPage', label: 'Page B', type: 'text', placeholder: 'e.g. 8', row: 'date-b' },
-    ],
-    compile(vars) {
-      const attorney = htmlField(vars, 'attorneyFirstName', '[Attorney]');
-      const shortName = escapeHtml(claimantShortLabel(vars));
-      const bodyHtml = [
-        `Dear ${attorney}`,
-        thankYouLoe(shortName),
-        `Kindly assist us by confirming the correct date of accident.${htmlRichList([
-          ipDateLine(vars.dateA, vars.dateAPage, '[Date A]', '[Page A]'),
-          ipDateLine(vars.dateB, vars.dateBPage, '[Date B]', '[Page B]'),
-        ])}`,
-        TURNAROUND,
-        SIGN_OFF,
-      ].join('<br/><br/>');
-      return { subject: draftSubject(this.name, claimantShortLabel(vars)), bodyHtml };
-    },
-  },
-  {
     id: 'draft-link-not-opening',
     name: '(DRAFT) Link Not Opening',
     menuLabel: '(Legacy draft) Link Not Opening',
@@ -793,6 +967,32 @@ const TEMPLATES = [
   },
 ];
 
+const EditablePreview = memo(function EditablePreview({ html, previewRef }) {
+  useEffect(() => {
+    const node = previewRef.current;
+    if (!node) return;
+    node.innerHTML = html;
+  }, [html, previewRef]);
+
+  return (
+    <div
+      ref={previewRef}
+      className="email-preview-body p-8 pt-3 text-sm text-black leading-relaxed min-h-[400px] outline-none"
+      contentEditable
+      suppressContentEditableWarning
+      spellCheck
+      aria-label="Email text"
+    />
+  );
+});
+
+const EMAIL_SPLIT_KEY = 'all4one_email_inputs_width';
+
+function readEmailInputsWidth() {
+  const saved = Number(localStorage.getItem(EMAIL_SPLIT_KEY));
+  return Number.isFinite(saved) && saved >= 280 ? saved : 380;
+}
+
 export default function EmailEngine() {
   const [selectedTemplateId, setSelectedTemplateId] = useState(TEMPLATES[0].id);
   const [variables, setVariables] = useState(() => initialVariables(TEMPLATES[0]));
@@ -804,6 +1004,9 @@ export default function EmailEngine() {
   const [isPushing, setIsPushing] = useState(false);
   const [gmailLinked, setGmailLinked] = useState(() => isGmailConnected());
   const [sourceMode, setSourceMode] = useState({});
+  const [inputsWidth, setInputsWidth] = useState(readEmailInputsWidth);
+  const inputsWidthRef = useRef(inputsWidth);
+  const previewRef = useRef(null);
 
   useEffect(() => {
     let cancel = false;
@@ -883,6 +1086,45 @@ export default function EmailEngine() {
     return compilePlaceholderTemplate(template, variables);
   }, [selectedTemplateId, variables]);
 
+  const currentHtmlBody = () => previewRef.current?.innerHTML || compiledContent.htmlBody;
+
+  const setSplitWidth = (next, boundsWidth) => {
+    const max = Math.max(280, (boundsWidth || next) - 320);
+    const width = Math.round(Math.min(max, Math.max(280, next)));
+    inputsWidthRef.current = width;
+    setInputsWidth(width);
+    try { localStorage.setItem(EMAIL_SPLIT_KEY, String(width)); } catch { /* private mode */ }
+  };
+
+  const beginSplitDrag = (event) => {
+    if (window.matchMedia('(max-width: 860px)').matches) return;
+    event.preventDefault();
+    const handle = event.currentTarget;
+    handle.setPointerCapture(event.pointerId);
+    const startX = event.clientX;
+    const startWidth = inputsWidthRef.current;
+    const root = handle.parentElement;
+    const move = (ev) => {
+      setSplitWidth(startWidth + (ev.clientX - startX), root.getBoundingClientRect().width);
+    };
+    const end = () => {
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', end);
+      handle.removeEventListener('pointercancel', end);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+  };
+
+  const nudgeSplit = (event) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    const root = event.currentTarget.parentElement;
+    const delta = event.key === 'ArrowRight' ? 24 : -24;
+    setSplitWidth(inputsWidthRef.current + delta, root.getBoundingClientRect().width);
+  };
+
   const logEmailUsage = (action, deliveryChannel) => {
     const payload = {
       action: 'LOG_EMAIL_USAGE',
@@ -905,9 +1147,10 @@ export default function EmailEngine() {
   };
 
   const copyToClipboard = () => {
+    const htmlBody = currentHtmlBody();
     try {
-      const blobHtml = new Blob([compiledContent.htmlBody], { type: "text/html" });
-      const blobText = new Blob([compiledContent.htmlBody.replace(/<[^>]*>?/gm, '')], { type: "text/plain" });
+      const blobHtml = new Blob([htmlBody], { type: "text/html" });
+      const blobText = new Blob([htmlBody.replace(/<[^>]*>?/gm, '')], { type: "text/plain" });
       const data = [new ClipboardItem({ "text/plain": blobText, "text/html": blobHtml })];
 
       navigator.clipboard.write(data).then(() => {
@@ -916,7 +1159,7 @@ export default function EmailEngine() {
         setTimeout(() => setStatus({ msg: '', type: '' }), 3000);
       });
     } catch (err) {
-      navigator.clipboard.writeText(compiledContent.htmlBody.replace(/<br\/>/g, '\n').replace(/<[^>]*>?/gm, ''));
+      navigator.clipboard.writeText(htmlBody.replace(/<br\/>/g, '\n').replace(/<[^>]*>?/gm, ''));
       setStatus({ msg: 'Plain text copied to clipboard.', type: 'success' });
       logEmailUsage('Copy plain text', 'Clipboard');
     }
@@ -942,7 +1185,7 @@ export default function EmailEngine() {
   const pushDraftViaGmailApi = async () => {
     await createGmailDraft({
       subject: compiledContent.subject,
-      htmlBody: compiledContent.htmlBody,
+      htmlBody: currentHtmlBody(),
     });
     logEmailUsage('Push to Gmail', 'Gmail OAuth');
     setStatus({
@@ -971,7 +1214,7 @@ export default function EmailEngine() {
       const payload = {
         action: 'CREATE_DRAFT',
         subject: compiledContent.subject,
-        htmlBody: compiledContent.htmlBody,
+        htmlBody: currentHtmlBody(),
       };
 
       const res = await fetch(GAS_API_URL, {
@@ -1203,10 +1446,10 @@ export default function EmailEngine() {
   };
 
   return (
-    <div className="h-full flex overflow-hidden bg-slate-50 dark:bg-slate-900/50">
+    <div className="email-split h-full flex overflow-hidden bg-slate-50 dark:bg-slate-900/50">
       
       {/* COLUMN 1: TEMPLATE & VARIABLES */}
-      <div className="w-[380px] shrink-0 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-white dark:bg-slate-800 z-10">
+      <div className="email-inputs shrink-0 flex flex-col bg-white dark:bg-slate-800 z-10" style={{ width: inputsWidth }}>
         <div className="p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
           <h2 className="text-lg font-bold flex items-center gap-2 mb-1 text-slate-800 dark:text-slate-100">
             <Mail className="text-amber-500 w-5 h-5" /> Communications
@@ -1309,8 +1552,20 @@ export default function EmailEngine() {
         </div>
       </div>
 
+      <div
+        className="email-split-handle"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize the form and the preview"
+        aria-valuemin={280}
+        aria-valuenow={Math.round(inputsWidth)}
+        tabIndex={0}
+        onPointerDown={beginSplitDrag}
+        onKeyDown={nudgeSplit}
+      />
+
       {/* COLUMN 2: LIVE PREVIEW & EXPORT */}
-      <div className="flex-1 flex flex-col relative bg-slate-200/60 dark:bg-[#0f172a]">
+      <div className="flex-1 min-w-0 flex flex-col relative bg-slate-200/60 dark:bg-[#0f172a]">
         <div className="workspace-toolbar h-16 shrink-0 flex items-center justify-between px-6 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md z-10">
           <div className="flex items-center gap-2">
             <RefreshCw className="w-4 h-4 text-emerald-500" />
@@ -1386,10 +1641,8 @@ export default function EmailEngine() {
               </div>
             </div>
 
-            <div
-              className="email-preview-body p-8 text-sm text-black leading-relaxed min-h-[400px] outline-none"
-              dangerouslySetInnerHTML={{ __html: compiledContent.htmlBody }}
-            />
+            <p className="px-8 pt-4 text-[11px] leading-snug text-slate-500">Edit this email before you copy it or push it to Gmail. Changing the fields on the left replaces your edits.</p>
+            <EditablePreview html={compiledContent.htmlBody} previewRef={previewRef} />
           </div>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { projectSalary } from '../js/salary-cpi.js';
+import { explainSalary, projectSalary } from '../js/salary-cpi.js';
 
 const f2023 = 97.1 / 92.3 + 0.01;
 const f2024 = 100 / 97.1 + 0.01;
@@ -51,5 +51,16 @@ const from1980 = projectSalary({
   premium: 0.01,
 });
 assert.ok(Math.abs(from1980.factor - 1.01) < 1e-12);
+
+[ [2023, 2026], [2034, 2026], [1970, 1985], [2026, 2026], [1980, 1981] ].forEach(([fromYear, toYear]) => {
+  const projected = projectSalary({ amount: 1, fromYear, toYear, futureCpi: 1.05, premium: 0.01 });
+  const explained = explainSalary({ fromYear, toYear, futureCpi: 1.05, premium: 0.01 });
+  assert.ok(Math.abs(projected.factor - explained.factor) < 1e-9, `${fromYear} to ${toYear}`);
+});
+
+const backFuture = explainSalary({ fromYear: 2034, toYear: 2026, futureCpi: 1.05, premium: 0.01 });
+assert.equal(backFuture.direction, 'back');
+assert.equal(backFuture.steps.length, 8);
+assert.ok(backFuture.steps.every((step) => step.kind === 'future'));
 
 console.log('salary inflation checks passed');

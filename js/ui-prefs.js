@@ -11,7 +11,7 @@ export const TAB_META = {
     casemaker: { label: 'Case Maker', short: 'RyanGPT case builder', icon: 'sparkles' },
     affidavits: { label: 'Affidavit Generator', short: 'Expert affidavit drafts', icon: 'scroll-text' },
     emails: { label: 'Draft Email Generator', short: 'Client email templates', icon: 'mail-plus' },
-    salary: { label: 'Salary Inflation', short: 'LOE CPI calculator', icon: 'trending-up' },
+    salary: { label: 'Salary Inflation', short: 'CPI calculator', icon: 'trending-up' },
 };
 
 export const NAV_TAB_ORDER = Object.keys(TAB_META);

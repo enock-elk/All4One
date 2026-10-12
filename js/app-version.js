@@ -1,8 +1,18 @@
-export const APP_VERSION = '1.3.12';
+export const APP_VERSION = '1.3.13';
 export const APP_RELEASE_DATE = '12 October 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.13',
+    date: '12 Oct 2026',
+    items: [
+      'Salary Inflation takes any year, remembers how often the amount is paid, and shows the factor as fractions.',
+      'The email form and preview can be resized, and the preview can be edited before it is copied or pushed.',
+      'Clearer payslips can also ask for bank statements, and bullets are Gmail lists.',
+      'Master LOE asks for page numbers when both accident dates come from the same document. Master LOS Draft sits under it.',
+    ],
+  },
   {
     version: '1.3.12',
     date: '12 Oct 2026',

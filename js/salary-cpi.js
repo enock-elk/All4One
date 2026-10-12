@@ -89,3 +89,39 @@ export function projectSalary({ amount, fromYear, toYear, futureCpi = DEFAULT_FU
   }
   return { factor, amount: value * factor };
 }
+
+export function explainSalary({ fromYear, toYear, futureCpi = DEFAULT_FUTURE_CPI, premium = DEFAULT_PREMIUM }) {
+  const from = Number(fromYear);
+  const to = Number(toYear);
+  const future = Number(futureCpi);
+  const prem = Number(premium);
+  if (![from, to, future, prem].every(Number.isFinite)) return null;
+  if (from === to) return { direction: 'same', steps: [], factor: 1, premium: prem };
+
+  const forward = to > from;
+  const start = forward ? from : to;
+  const end = forward ? to : from;
+  const steps = [];
+  for (let year = start; year < end; year += 1) {
+    const current = DECEMBER_CPI[year];
+    const prior = DECEMBER_CPI[year - 1];
+    if (current != null && prior != null && prior !== 0) {
+      steps.push({
+        year,
+        kind: 'ratio',
+        numerator: current,
+        denominator: prior,
+        cpi: current / prior,
+        salary: current / prior + prem,
+      });
+    } else if (year <= CPI_FIRST_YEAR) {
+      steps.push({ year, kind: 'base', cpi: 1, salary: 1 + prem });
+    } else {
+      steps.push({ year, kind: 'future', cpi: future, salary: future + prem });
+    }
+  }
+
+  let factor = steps.reduce((product, step) => product * step.salary, 1);
+  if (!forward) factor = 1 / factor;
+  return { direction: forward ? 'forward' : 'back', steps, factor, premium: prem };
+}
