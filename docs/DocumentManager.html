@@ -111,19 +111,78 @@
         html:not(.dark) #trello-log-dock-toggle {
             color: #1e293b !important;
         }
-        .trello-log-copy {
-            font-size: 11px;
+        .trello-log-copy,
+        .trello-btn,
+        .trello-btn-choice,
+        .trello-btn-icon {
+            align-items: center;
+            justify-content: center;
+            gap: 0.35rem;
+            min-height: 2rem;
+            padding: 0.35rem 0.75rem;
+            border-radius: 0.65rem;
+            border: 1px solid rgba(255, 255, 255, 0.42);
+            background: rgba(15, 23, 42, 0.62);
+            color: #f8fafc;
+            font-size: 0.75rem;
             font-weight: 700;
+            line-height: 1.2;
+            letter-spacing: 0.01em;
+            cursor: pointer;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.18);
+        }
+        .trello-log-copy,
+        .trello-btn:not(.hidden),
+        .trello-btn-choice,
+        .trello-btn-icon {
+            display: inline-flex;
+        }
+        .trello-log-copy {
+            font-size: 0.68rem;
             letter-spacing: 0.04em;
             text-transform: uppercase;
-            padding: 4px 8px;
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.12);
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            color: inherit;
         }
-        .trello-log-copy:hover {
-            background: rgba(255, 255, 255, 0.22);
+        .trello-log-copy:hover,
+        .trello-btn:hover,
+        .trello-btn-choice:hover {
+            background: rgba(15, 23, 42, 0.82);
+            border-color: rgba(255, 255, 255, 0.62);
+        }
+        .trello-btn-danger {
+            background: rgba(190, 18, 60, 0.38);
+            border-color: rgba(251, 113, 133, 0.75);
+            color: #fff1f2;
+        }
+        .trello-btn-danger:hover {
+            background: rgba(190, 18, 60, 0.58);
+        }
+        .trello-btn-choice {
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 0.15rem;
+            width: 100%;
+            min-height: 3.5rem;
+            padding: 0.7rem 0.85rem;
+            border-radius: 0.85rem;
+            text-align: left;
+        }
+        .trello-btn-kicker {
+            font-size: 0.68rem;
+            font-weight: 600;
+            color: rgba(248, 250, 252, 0.72);
+        }
+        .trello-btn-icon {
+            width: 2.5rem;
+            height: 2.5rem;
+            flex: none;
+            padding: 0;
+            border-color: #0369a1;
+            background: #0284c7;
+            color: #fff;
+        }
+        .trello-btn-icon:hover {
+            background: #0369a1;
         }
         .trello-clock-time {
             font-size: 4.5rem;
@@ -144,9 +203,12 @@
             border: 1px solid rgba(255,255,255,0.12);
         }
         .trello-mode-active {
-            background: rgba(56, 189, 248, 0.18) !important;
-            border-color: rgb(56, 189, 248) !important;
+            background: #0284c7 !important;
+            border-color: #0369a1 !important;
             color: #fff !important;
+        }
+        .trello-mode-active .trello-btn-kicker {
+            color: rgba(255, 255, 255, 0.9) !important;
         }
         .trello-bucket-card {
             width: auto;
@@ -383,21 +445,50 @@
         html:not(.dark) .trello-bucket-name {
             color: #475569;
         }
-        html:not(.dark) .trello-mode-active {
-            background: rgba(14, 165, 233, 0.12) !important;
-            border-color: #38bdf8 !important;
-            color: #0f172a !important;
+        html:not(.dark) .trello-log-copy,
+        html:not(.dark) .trello-btn,
+        html:not(.dark) .trello-btn-choice {
+            background: #f8fafc;
+            border-color: #94a3b8;
+            color: #0f172a;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+        }
+        html:not(.dark) .trello-log-copy:hover,
+        html:not(.dark) .trello-btn:hover,
+        html:not(.dark) .trello-btn-choice:hover {
+            background: #e2e8f0;
+            border-color: #64748b;
+        }
+        html:not(.dark) .trello-btn-danger {
+            background: #fff1f2;
+            border-color: #e11d48;
+            color: #be123c;
+        }
+        html:not(.dark) .trello-btn-danger:hover {
+            background: #ffe4e6;
+        }
+        html:not(.dark) .trello-btn-choice .trello-btn-kicker {
+            color: #475569;
+        }
+        html:not(.dark) .trello-mode-active,
+        html:not(.dark) .trello-mode-active:hover {
+            background: #0284c7 !important;
+            border-color: #0369a1 !important;
+            color: #fff !important;
+        }
+        html:not(.dark) .trello-mode-active .trello-btn-kicker {
+            color: rgba(255, 255, 255, 0.92) !important;
+        }
+        html:not(.dark) .trello-btn-icon,
+        html:not(.dark) .trello-btn-icon:hover {
+            background: #0284c7;
+            border-color: #0369a1;
+            color: #fff;
         }
         html:not(.dark) #trello-log-container {
             background: #f1f5f9 !important;
             color: #047857 !important;
             border-color: #cbd5e1 !important;
-        }
-        html:not(.dark) .trello-glass .trello-log-copy,
-        html:not(.dark) #trello-monitor .trello-log-copy {
-            background: #f8fafc;
-            border-color: #cbd5e1;
-            color: #334155;
         }
         html:not(.dark) #trello-monitor .text-sky-400,
         html:not(.dark) #trello-lockscreen .text-sky-400 {
@@ -427,8 +518,8 @@
             transition: opacity 0.2s ease;
         }
     </style>
-  <script type="module" crossorigin src="./assets/index-DrtKXZLo.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-CESAWpAc.css">
+  <script type="module" crossorigin src="./assets/index-DRoQSMZv.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CnhzZB7-.css">
 </head>
 <body class="bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
 
@@ -708,12 +799,12 @@
                                         </div>
                                         <span id="pdf-stats-count" class="text-xs text-slate-500">0 pages</span>
                                         <div class="flex items-center gap-3 ml-auto">
-                                            <button id="btn-clear-bay" class="text-xs text-rose-500 hover:text-rose-600 font-medium disabled:opacity-50 disabled:cursor-not-allowed" disabled>Clear Bay</button>
+                                            <button id="btn-clear-bay" class="pdf-bay-btn pdf-bay-btn-danger" disabled>Clear Bay</button>
                                             <label class="flex items-center gap-2 text-xs font-medium text-slate-500">
                                                 <input type="checkbox" id="pdf-select-all" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" disabled>
                                                 Include all pages
                                             </label>
-                                            <button id="btn-download-current" class="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed" disabled title="Build a PDF from included pages and rotations">Download current</button>
+                                            <button id="btn-download-current" class="pdf-bay-btn pdf-bay-btn-primary" disabled title="Build a PDF from included pages and rotations">Download current</button>
                                         </div>
                                     </div>
                                     <p id="pdf-bay-banner" class="hidden px-4 py-2 text-xs bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-b border-emerald-100 dark:border-emerald-800"></p>
@@ -779,7 +870,7 @@
                                     </div>
                                     <div id="split-custom-wrap" class="space-y-3">
                                         <div id="split-ranges" class="space-y-2"></div>
-                                        <button type="button" id="btn-add-range" class="text-sm text-blue-600 hover:text-blue-700 font-medium">+ Add Range</button>
+                                        <button type="button" id="btn-add-range" class="pdf-bay-btn pdf-bay-btn-ghost">+ Add Range</button>
                                     </div>
                                     <div id="split-fixed-wrap" class="hidden space-y-2">
                                         <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Split into page ranges of <span id="split-fixed-max-hint" class="normal-case tracking-normal font-medium text-slate-400"></span></label>
@@ -867,8 +958,8 @@
                                         <i data-lucide="settings-2" class="w-5 h-5 text-sky-400"></i> Board &amp; lists
                                     </h3>
                                     <div class="flex items-center gap-2">
-                                        <button type="button" id="trello-wallpaper-btn" class="text-xs px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20" title="Upload background">Wallpaper</button>
-                                        <button type="button" id="trello-reset-bg" class="text-xs px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20" title="Reset background">Reset</button>
+                                        <button type="button" id="trello-wallpaper-btn" class="trello-btn" title="Upload background">Wallpaper</button>
+                                        <button type="button" id="trello-reset-bg" class="trello-btn" title="Reset background">Reset</button>
                                         <input type="file" id="trello-bg-input" accept="image/*" class="hidden">
                                     </div>
                                 </div>
@@ -885,7 +976,7 @@
                                     <div class="space-y-4 min-w-0">
                                     <div class="flex items-center justify-between gap-2">
                                         <p id="trello-user-label" class="text-sm text-white/70">Connected</p>
-                                        <button id="btn-trello-disconnect" class="text-xs text-rose-300 hover:text-rose-200 font-medium">Disconnect</button>
+                                        <button id="btn-trello-disconnect" class="trello-btn trello-btn-danger">Disconnect</button>
                                     </div>
                                     <div>
                                         <label class="text-[10px] font-bold uppercase tracking-wider text-white/50 mb-1 block">Board</label>
@@ -903,13 +994,13 @@
                                     <div>
                                         <label class="text-[10px] font-bold uppercase tracking-wider text-white/50 mb-2 block">Alert type</label>
                                         <div class="grid grid-cols-2 gap-2">
-                                            <button type="button" id="trello-mode-wake" class="trello-mode-active rounded-xl border border-white/15 px-3 py-2 text-left">
+                                            <button type="button" id="trello-mode-wake" class="trello-btn-choice trello-mode-active">
                                                 <div class="text-sm font-bold">Wake Me Up</div>
-                                                <div class="text-[10px] text-white/60">Continuous loop</div>
+                                                <div class="trello-btn-kicker">Continuous loop</div>
                                             </button>
-                                            <button type="button" id="trello-mode-notify" class="rounded-xl border border-white/15 px-3 py-2 text-left">
+                                            <button type="button" id="trello-mode-notify" class="trello-btn-choice">
                                                 <div class="text-sm font-bold">Notification</div>
-                                                <div class="text-[10px] text-white/60">One-time chime</div>
+                                                <div class="trello-btn-kicker">One-time chime</div>
                                             </button>
                                         </div>
                                     </div>
@@ -927,7 +1018,7 @@
                                     <div class="flex items-center gap-2">
                                         <label class="text-sm shrink-0">Alert sound</label>
                                         <select id="trello-tone-select" class="flex-1 bg-black/30 border border-white/15 text-white text-sm rounded-lg p-2 outline-none"></select>
-                                        <button type="button" id="trello-test-sound" class="w-10 h-10 rounded-lg bg-sky-500 text-white font-bold" title="Test sound">▶</button>
+                                        <button type="button" id="trello-test-sound" class="trello-btn-icon" title="Test sound" aria-label="Test sound"><i data-lucide="play" class="w-4 h-4"></i></button>
                                     </div>
                                     <p id="trello-custom-sound-status" class="hidden text-xs text-sky-300">Custom loaded</p>
                                     <input type="file" id="trello-sound-input" accept="audio/*" class="hidden">
@@ -984,10 +1075,10 @@
                                         Background sound
                                         <input type="checkbox" id="trello-stealth-toggle-active" class="rounded border-white/30 text-sky-500" checked>
                                     </label>
-                                    <button type="button" id="btn-trello-float-open" class="text-xs font-bold uppercase tracking-wide text-emerald-200 border border-emerald-400/50 px-3 py-1 rounded-md hover:bg-emerald-500/20" title="Open floating board window">Float board</button>
-                                    <button type="button" id="btn-trello-fullscreen" class="text-xs font-bold uppercase tracking-wide text-sky-200 border border-sky-400/50 px-3 py-1 rounded-md hover:bg-sky-500/20">Fullscreen</button>
-                                    <button type="button" id="btn-trello-exit-fs" class="hidden text-xs font-bold uppercase tracking-wide text-white/80 border border-white/30 px-3 py-1 rounded-md hover:bg-white/10">Exit</button>
-                                    <button type="button" class="text-xs font-bold uppercase tracking-wide text-rose-300 border border-rose-400/50 px-3 py-1 rounded-md" onclick="document.getElementById('btn-trello-stop').click()">Stop</button>
+                                    <button type="button" id="btn-trello-float-open" class="trello-btn" title="Open floating board window">Float board</button>
+                                    <button type="button" id="btn-trello-fullscreen" class="trello-btn">Fullscreen</button>
+                                    <button type="button" id="btn-trello-exit-fs" class="trello-btn hidden">Exit</button>
+                                    <button type="button" class="trello-btn trello-btn-danger" onclick="document.getElementById('btn-trello-stop').click()">Stop</button>
                                 </div>
                             </div>
                             <p class="text-center text-sm text-white/80 mt-2 uppercase tracking-wide">
