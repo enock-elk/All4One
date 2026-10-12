@@ -74,6 +74,7 @@
 
 #sidebar-nav {
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
@@ -112,6 +113,12 @@
 #app-sidebar.is-collapsed .sidebar-collapse-btn,
 #app-sidebar.is-collapsed .sidebar-item-pin {
   display: none;
+}
+
+#app-sidebar.is-collapsed .sidebar-nav-item,
+#app-sidebar.is-collapsed .sidebar-nav-btn {
+  min-width: 0;
+  max-width: 100%;
 }
 
 #app-sidebar.is-collapsed .sidebar-nav-btn {
@@ -1371,18 +1378,18 @@
 }
 
 .salary-brand {
-  display: inline-block;
+  display: inline-flex;
   margin-bottom: 0.85rem;
-  padding: 0.7rem 1.3rem;
+  padding: 0.55rem 0.7rem;
   border-radius: 0.85rem;
   background: #fff;
-  color: #8a6840;
-  font-family: Georgia, "Times New Roman", serif;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  line-height: 1.15;
-  font-size: 0.78rem;
+  line-height: 0;
+}
+
+.salary-brand svg {
+  display: block;
+  width: 9.6rem;
+  height: auto;
 }
 
 .salary-hero h2 {
@@ -1496,10 +1503,6 @@
 }
 
 .salary-formula {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.55rem 0.45rem;
   margin-top: 0.85rem;
   color: #3f2e1e;
   font-size: 1rem;
@@ -1507,11 +1510,45 @@
 }
 
 .salary-factor-lead {
-  flex: 1 0 100%;
-  margin: 0;
+  margin: 0.55rem 0 0;
+  padding-right: 4.5rem;
   font-size: 0.95rem;
   font-weight: 650;
   line-height: 1.4;
+}
+
+.salary-result #salary-result-note {
+  padding: 0.7rem 0 0;
+  background: transparent;
+}
+
+.salary-working {
+  margin-top: 0.85rem;
+  border-top: 1px solid #e6d3b4;
+  padding-top: 0.7rem;
+}
+
+.salary-working:not([open]) > :not(summary) {
+  display: none;
+}
+
+.salary-working summary {
+  cursor: pointer;
+  color: #6d4b28;
+  font-size: 0.95rem;
+  font-weight: 750;
+}
+
+.salary-working summary:focus-visible {
+  outline: 2px solid #b8883d;
+  outline-offset: 3px;
+}
+
+.salary-working p {
+  margin: 0.7rem 0 0;
+  color: #5c4636;
+  font-size: 0.95rem;
+  line-height: 1.5;
 }
 
 .salary-math {
@@ -1598,8 +1635,15 @@ html.dark .salary-field select {
 }
 
 html.dark #salary-result-amount,
-html.dark .salary-formula {
+html.dark .salary-formula,
+html.dark .salary-factor-lead,
+html.dark .salary-working summary,
+html.dark .salary-working p {
   color: #f8f1e7;
+}
+
+html.dark .salary-working {
+  border-top-color: #5c4632;
 }
 
 html.dark .math-term {
