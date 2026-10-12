@@ -1,8 +1,17 @@
-export const APP_VERSION = '1.3.14';
+export const APP_VERSION = '1.3.15';
 export const APP_RELEASE_DATE = '12 October 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.15',
+    date: '12 Oct 2026',
+    items: [
+      'Trello Watcher and Document Manager controls use the same button style.',
+      'Email Generator asks before connecting Gmail, and confirms when the account is connected.',
+      'Master LOS starts with only the 24-hour close, thanks the dependants, and can ask for the IP-report documents.',
+    ],
+  },
   {
     version: '1.3.14',
     date: '12 Oct 2026',

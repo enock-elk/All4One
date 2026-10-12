@@ -20,6 +20,7 @@ import {
   clearGmailToken,
   describeGmailConnectError,
 } from '../gmail-draft.js';
+import { showAppToast } from '../ui-prefs.js';
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbw-M9kVkSSXKuJ49tohaconx99-l5VcbU1xSNeUTccX2gs0prok3LltyTyO7mdNKtm8/exec";
 
 const INPUT_CLASS = "w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm outline-none focus:border-amber-500 dark:text-white transition-all";
@@ -728,7 +729,7 @@ const TEMPLATES = [
     id: 'draft-master-los',
     name: '(DRAFT) Master LOS',
     menuLabel: 'Master LOS Draft',
-    intro: 'The opening and closing follow the Loss of Earnings draft. This one currently confirms the accident date only. Page numbers appear when both dates come from the same document.',
+    intro: 'Only the 24-hour close starts selected. The thank-you is for the dependants. Page numbers appear when both accident dates come from the same document.',
     fields: [
       {
         key: 'subject',
@@ -752,7 +753,7 @@ const TEMPLATES = [
         key: 'claimantTitle',
         label: 'Claimant title',
         type: 'select',
-        default: 'Mr/Ms',
+        default: 'Ms',
         row: 'claimant',
         options: [
           { value: 'Mr/Ms', label: 'Mr/Ms' },
@@ -780,7 +781,6 @@ const TEMPLATES = [
         key: 'secAccident',
         label: 'Confirm the date of accident',
         type: 'toggle',
-        default: true,
         guidance: 'Use to confirm the date of accident.',
       },
       {
@@ -835,6 +835,25 @@ const TEMPLATES = [
         nested: true,
       },
       {
+        key: 'secIpDocs',
+        label: 'Dependants documents',
+        type: 'toggle',
+        guidance: 'Asks for the documents in the IP report, then notes that the calculation depends on them.',
+      },
+      {
+        key: 'ipDocs',
+        label: 'Documents',
+        type: 'lines',
+        placeholder: 'Type a document from the IP report…',
+        showWhen: { key: 'secIpDocs', equals: true },
+        nested: true,
+        default: [
+          'Copy of payslip.',
+          'Copy of the deceased’s death certificate.',
+          'Copy of the post-mortem report.',
+        ],
+      },
+      {
         key: 'secTurnaround',
         label: '24-hour turnaround',
         type: 'toggle',
@@ -846,99 +865,25 @@ const TEMPLATES = [
       const recipient = escapeHtml(filled(vars.recipientName, 'XXXXX'));
       const claimant = masterClaimantHtml(vars);
       const parts = [`Dear ${recipient}`];
+      let hasPriorRequest = false;
       if (vars.audience === 'ip') {
         const firm = escapeHtml(filled(vars.attorneyFirm, 'XXXXX Attorneys'));
         parts.push(`Kindly note that we are undertaking Loss of Support Calculations for ${claimant} on behalf of <strong>${firm}</strong>.`);
       } else {
-        parts.push(`Thank you for requesting a Loss of Support calculation for ${claimant}.`);
+        parts.push(`Thank you for requesting a Loss of Support calculation for the dependants of ${claimant}.`);
       }
-      if (vars.secAccident !== false) {
+      if (vars.secAccident) {
         const sameAccidentSource = sameDocument(vars.accidentOtSource, vars.accidentIpSource);
-        parts.push(`Kindly assist us by confirming the correct date of accident.${htmlRichList([
+        parts.push(`${requestLead(hasPriorRequest)} assist us by confirming the correct date of accident.${htmlRichList([
           boldReportLine(vars.accidentOt, vars.accidentOtSource, '[date]', 'Post-mortem report', sameAccidentSource ? vars.accidentOtPage : ''),
           boldReportLine(vars.accidentIp, vars.accidentIpSource, '[date]', 'IP report', sameAccidentSource ? vars.accidentIpPage : ''),
         ])}`);
+        hasPriorRequest = true;
       }
-      if (vars.secTurnaround !== false) {
-        parts.push('We will provide the report within 24 hours once the abovementioned information is provided and no further information is required.');
-      }
-      parts.push(SIGN_OFF);
-      const generatedSubject = draftSubject(this.name, masterClaimantLabel(vars));
-      return {
-        subject: String(vars.subject || '').trim() || generatedSubject,
-        bodyHtml: parts.join('<br/><br/>'),
-      };
-    },
-  },
-  {
-    id: 'draft-los-dependants',
-    name: '(DRAFT) LOS Dependants',
-    menuLabel: 'LOS Dependants Draft',
-    intro: 'Thanks the attorneys for a Loss of Support calculation for the dependants, then asks for the documents in the IP report.',
-    fields: [
-      {
-        key: 'subject',
-        label: 'Subject',
-        type: 'text',
-        guidance: 'Leave this blank to keep the automatic subject.',
-      },
-      { key: 'recipientName', label: 'Recipient name', type: 'text', placeholder: 'e.g. Nomatshezi' },
-      {
-        key: 'claimantTitle',
-        label: 'Deceased title',
-        type: 'select',
-        default: 'Ms',
-        row: 'claimant',
-        options: [
-          { value: 'Mr/Ms', label: 'Mr/Ms' },
-          { value: 'Mr', label: 'Mr' },
-          { value: 'Ms', label: 'Ms' },
-          { value: 'Mrs', label: 'Mrs' },
-        ],
-      },
-      {
-        key: 'claimantName',
-        label: 'Deceased name',
-        type: 'text',
-        placeholder: 'e.g. T Ntluzo',
-        row: 'claimant',
-      },
-      {
-        key: 'ipDocs',
-        label: 'Documents referenced in the IP report',
-        type: 'lines',
-        placeholder: 'Type a document from the IP report…',
-        default: [
-          'Copy of payslip.',
-          'Copy of the deceased’s death certificate.',
-          'Copy of the post-mortem report.',
-        ],
-      },
-      {
-        key: 'secDependent',
-        label: 'Calculation depends on this information',
-        type: 'toggle',
-        default: true,
-        guidance: 'Adds the note that the calculation depends on the requested information because it increases the claim.',
-      },
-      {
-        key: 'secTurnaround',
-        label: '24-hour turnaround',
-        type: 'toggle',
-        default: true,
-        guidance: 'Adds the note that the report will follow within 24 hours once the information is in and nothing further is required.',
-      },
-    ],
-    compile(vars) {
-      const recipient = escapeHtml(filled(vars.recipientName, 'XXXXX'));
-      const claimant = masterClaimantHtml(vars);
-      const parts = [
-        `Dear ${recipient}`,
-        `Thank you for requesting a Loss of Support calculation for the dependants of ${claimant}.`,
-        `Kindly assist us by providing the following documents referenced in the IP report:${htmlList(vars.ipDocs, '[Document referenced in the IP report]')}`,
-      ];
-      if (vars.secDependent !== false) {
+      if (vars.secIpDocs) {
+        parts.push(`${requestLead(hasPriorRequest)} assist us by providing the following documents referenced in the IP report:${htmlList(vars.ipDocs, '[Document referenced in the IP report]')}`);
         parts.push('Kindly note that the calculation is dependent on the information we have requested since it will directly increase the claim.');
+        hasPriorRequest = true;
       }
       if (vars.secTurnaround !== false) {
         parts.push('We will provide the report within 24 hours once the abovementioned information is provided and no further information is required.');
@@ -1081,6 +1026,7 @@ export default function EmailEngine() {
   const [status, setStatus] = useState({ msg: '', type: '' });
   const [isPushing, setIsPushing] = useState(false);
   const [gmailLinked, setGmailLinked] = useState(() => isGmailConnected());
+  const [gmailPromptOpen, setGmailPromptOpen] = useState(false);
   const [sourceMode, setSourceMode] = useState({});
   const [inputsWidth, setInputsWidth] = useState(readEmailInputsWidth);
   const inputsWidthRef = useRef(inputsWidth);
@@ -1088,9 +1034,20 @@ export default function EmailEngine() {
 
   useEffect(() => {
     let cancel = false;
-    restoreGmailSession().then((ok) => {
-      if (!cancel && ok) setGmailLinked(true);
-    });
+    (async () => {
+      if (isGmailConnected()) {
+        setGmailLinked(true);
+        return;
+      }
+      const ok = await restoreGmailSession();
+      if (cancel) return;
+      if (ok) {
+        setGmailLinked(true);
+        return;
+      }
+      if (sessionStorage.getItem('all4one_gmail_prompt_dismissed') === '1') return;
+      setGmailPromptOpen(true);
+    })();
     return () => { cancel = true; };
   }, []);
 
@@ -1244,14 +1201,21 @@ export default function EmailEngine() {
   };
 
   const connectGmail = async () => {
+    setGmailPromptOpen(false);
     setStatus({ msg: 'Connecting Google account for Gmail drafts...', type: 'info' });
     try {
       await requestGmailAccessToken();
       setGmailLinked(true);
+      showAppToast('Gmail connected. You can push drafts to this account.');
       setStatus({ msg: 'Gmail connected. You can push drafts directly.', type: 'success' });
     } catch (err) {
       setStatus({ msg: describeGmailConnectError(err), type: 'error' });
     }
+  };
+
+  const dismissGmailPrompt = () => {
+    sessionStorage.setItem('all4one_gmail_prompt_dismissed', '1');
+    setGmailPromptOpen(false);
   };
 
   const disconnectGmail = () => {
@@ -1524,7 +1488,19 @@ export default function EmailEngine() {
   };
 
   return (
-    <div className="email-split h-full flex overflow-hidden bg-slate-50 dark:bg-slate-900/50">
+    <div className="email-split relative h-full flex overflow-hidden bg-slate-50 dark:bg-slate-900/50">
+      {gmailPromptOpen ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/45 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-800" role="dialog" aria-modal="true" aria-labelledby="gmail-connect-title">
+            <h3 id="gmail-connect-title" className="text-lg font-bold text-slate-900 dark:text-white">Connect Gmail?</h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">Drafts can be pushed straight into Gmail. Connect this browser to your Google account?</p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={dismissGmailPrompt} className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700">Not now</button>
+              <button type="button" onClick={connectGmail} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">Connect</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       
       {/* COLUMN 1: TEMPLATE & VARIABLES */}
       <div className="email-inputs shrink-0 flex flex-col bg-white dark:bg-slate-800 z-10" style={{ width: inputsWidth }}>

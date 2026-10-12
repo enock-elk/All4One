@@ -9,6 +9,7 @@ const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.compose';
 const GMAIL_IDENTITY_SCOPE = 'https://www.googleapis.com/auth/userinfo.profile';
 const TOKEN_KEY = 'all4one_gmail_access_token';
 const TOKEN_EXP_KEY = 'all4one_gmail_token_exp';
+const LINKED_KEY = 'all4one_gmail_linked';
 const CLIENT_ID_CACHE_KEY = 'all4one_google_web_client_id';
 
 /** Optional override in index.html: window.ALL4ONE_GMAIL_CLIENT_ID = '....apps.googleusercontent.com' */
@@ -61,13 +62,19 @@ function cacheToken(token, expiresInSeconds = 3500) {
   const exp = String(Date.now() + expiresInSeconds * 1000);
   writeStore(localStorage, TOKEN_KEY, token);
   writeStore(localStorage, TOKEN_EXP_KEY, exp);
+  writeStore(localStorage, LINKED_KEY, '1');
   removeStore(sessionStorage, TOKEN_KEY);
   removeStore(sessionStorage, TOKEN_EXP_KEY);
+}
+
+function hasPriorGmailGrant() {
+  return readStore(localStorage, LINKED_KEY) === '1' || Boolean(readStore(localStorage, TOKEN_KEY));
 }
 
 export function clearGmailToken() {
   removeStore(localStorage, TOKEN_KEY);
   removeStore(localStorage, TOKEN_EXP_KEY);
+  removeStore(localStorage, LINKED_KEY);
   removeStore(sessionStorage, TOKEN_KEY);
   removeStore(sessionStorage, TOKEN_EXP_KEY);
 }
@@ -197,10 +204,11 @@ function requestGmailAccessTokenViaGis(clientId, { prompt = 'consent' } = {}) {
 
 export async function restoreGmailSession() {
   if (getCachedToken()) return true;
+  if (!hasPriorGmailGrant()) return false;
   try {
     const clientId = await discoverGoogleWebClientId();
     if (!clientId) return false;
-    await requestGmailAccessTokenViaGis(clientId, { prompt: '' });
+    await requestGmailAccessTokenViaGis(clientId, { prompt: 'none' });
     return Boolean(getCachedToken());
   } catch (err) {
     console.warn('Silent Gmail refresh was not available.', err);
