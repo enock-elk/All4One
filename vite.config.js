@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const DEEP_LINK_RE = /^\/(DocumentManager|TrelloWatcher|CaseMaker|AffidavitAutomation|EmailGenerator)(\/index\.html)?\/?$/;
+const DEEP_LINK_RE = /^\/(DocumentManager|TrelloWatcher|CaseMaker|AffidavitAutomation|EmailGenerator|SalaryInflation)(\/index\.html)?\/?$/;
 
 function rewriteDeepLinks() {
     return {

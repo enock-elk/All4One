@@ -10,6 +10,7 @@ const TAB_SLUGS = [
   'CaseMaker',
   'AffidavitAutomation',
   'EmailGenerator',
+  'SalaryInflation',
 ];
 
 if (!existsSync(dist)) {

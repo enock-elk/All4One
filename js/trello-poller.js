@@ -91,6 +91,7 @@ export function createTrelloWatcher(postMessage) {
                                 type: 'alarm',
                                 cardName: newCard.name,
                                 listName: target.name,
+                                listId: target.id,
                             });
                             alarmTriggered = true;
                         }

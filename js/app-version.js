@@ -1,8 +1,19 @@
-export const APP_VERSION = '1.3.11';
-export const APP_RELEASE_DATE = '8 October 2026';
+export const APP_VERSION = '1.3.12';
+export const APP_RELEASE_DATE = '12 October 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.12',
+    date: '12 Oct 2026',
+    items: [
+      'Phones open every workspace, Dark Mode, Sign Out, and Install app from the header menu.',
+      'Salary Inflation brings an amount from one year to another with the LOE December CPI plus the 1% premium.',
+      'Trello lists can be muted, the setup is a wide box, the case counter can be dragged, and alert sound and background sound are separate.',
+      'Gmail stays connected between visits. Push to Gmail waits until Gmail is connected, and draft notices clear on their own.',
+      'The signature email address uses the same grey as E. Kept legacy drafts use the Master LOE closing, and covered drafts are removed.',
+    ],
+  },
   {
     version: '1.3.11',
     date: '8 Oct 2026',

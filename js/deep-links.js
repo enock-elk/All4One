@@ -9,6 +9,7 @@ export const TAB_SLUGS = {
     casemaker: 'CaseMaker',
     affidavits: 'AffidavitAutomation',
     emails: 'EmailGenerator',
+    salary: 'SalaryInflation',
 };
 
 const SLUG_ALIASES = {
@@ -43,6 +44,11 @@ const SLUG_ALIASES = {
     emails: 'emails',
     email: 'emails',
     communications: 'emails',
+
+    salaryinflation: 'salary',
+    'salary-inflation': 'salary',
+    salary: 'salary',
+    cpi: 'salary',
 };
 
 function normalizeToken(value) {

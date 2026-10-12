@@ -10,6 +10,7 @@ import { applyFirstVisitPin, bindTabHistory, resolveIncomingTab, syncTabUrl } fr
 import { beginLazyTabLoad } from './workspace-loader.js';
 import './pdf-manager.js';
 import './trello.js';
+import './salary-inflation.js';
 
 registerReactTabs();
 
@@ -75,7 +76,8 @@ document.addEventListener('DOMContentLoaded', () => {
         'dashboard': 'Trello Watcher',
         'casemaker': 'Case Maker',
         'affidavits': 'Affidavit Generator',
-        'emails': 'Draft Email Generator'
+        'emails': 'Draft Email Generator',
+        'salary': 'Salary Inflation',
     };
 
     // --- Dark Mode Initialization & Logic ---

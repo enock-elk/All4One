@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>All4One — SalaryInflation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script>
+        (function () {
+            try { sessionStorage.setItem('all4one_deep_link', '/SalaryInflation' + location.search + location.hash); } catch (e) {}
+            if (!location.hostname.endsWith('github.io')) {
+                location.replace('/?tab=SalaryInflation' + (location.hash || ''));
+                return;
+            }
+            var parts = location.pathname.split('/').filter(Boolean);
+            var repo = parts[0] || 'All4One';
+            location.replace('/' + repo + '/docs/SalaryInflation' + location.search + location.hash);
+        })();
+    </script>
+</head>
+<body>
+    <p style="font-family:ui-sans-serif,system-ui,sans-serif;padding:2rem;color:#64748b;">Opening SalaryInflation…</p>
+</body>
+</html>

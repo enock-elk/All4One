@@ -20,6 +20,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const PREF_CUSTOM_SOUND = 'watcher_custom_sound';
     const PREF_BG = 'watcher_bg';
     const PREF_FLOAT_POPUP = 'trello_float_popup_enabled';
+    const PREF_MUTED = 'trello_muted_lists';
+    const PREF_MONITOR_POS = 'trello_monitor_pos';
 
     const TONES = [
         { value: 'default', label: 'Default Siren' },
@@ -67,6 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const soundToggle = document.getElementById('trello-sound-toggle');
     const soundToggleActive = document.getElementById('trello-sound-toggle-active');
     const stealthToggle = document.getElementById('trello-stealth-toggle');
+    const stealthToggleActive = document.getElementById('trello-stealth-toggle-active');
     const testBtn = document.getElementById('trello-test-sound');
     const customSoundStatus = document.getElementById('trello-custom-sound-status');
     const soundInput = document.getElementById('trello-sound-input');
@@ -424,7 +427,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function initVisuals() {
         setWallpaper(localStorage.getItem(PREF_BG) || '');
-        if (localStorage.getItem(PREF_STEALTH) === 'false' && stealthToggle) stealthToggle.checked = false;
+        if (localStorage.getItem(PREF_STEALTH) === 'false') {
+            if (stealthToggle) stealthToggle.checked = false;
+            if (stealthToggleActive) stealthToggleActive.checked = false;
+        }
         populateTones();
         const savedMode = localStorage.getItem(PREF_MODE) || 'wake';
         setAlertMode(savedMode, false);
@@ -494,18 +500,31 @@ document.addEventListener('DOMContentLoaded', () => {
         if (btnStart) btnStart.disabled = selectedTargets().length === 0 || Boolean(worker || mainWatcher);
     }
 
+    function mutedListIds() {
+        try {
+            const saved = JSON.parse(localStorage.getItem(PREF_MUTED) || '[]');
+            return new Set(Array.isArray(saved) ? saved : []);
+        } catch {
+            return new Set();
+        }
+    }
+
     function renderBucketGrid(buckets) {
         if (!bucketGrid) return;
         if (!buckets?.length) {
             bucketGrid.innerHTML = '';
             return;
         }
-        bucketGrid.innerHTML = buckets.map((b) => `
+        const muted = mutedListIds();
+        bucketGrid.innerHTML = buckets.map((b) => {
+            const isMuted = b.id && muted.has(b.id);
+            return `
             <div class="trello-bucket-card">
                 <div class="trello-bucket-count">${escapeHtml(String(b.count))}</div>
                 <div class="trello-bucket-name">${escapeHtml(b.name)}</div>
-            </div>
-        `).join('');
+                <button type="button" class="trello-bucket-mute${isMuted ? ' is-muted' : ''}" data-list-id="${escapeHtml(b.id || '')}" aria-pressed="${isMuted ? 'true' : 'false'}">${isMuted ? 'Muted' : 'Mute'}</button>
+            </div>`;
+        }).join('');
         latestBuckets = buckets || [];
     }
 
@@ -528,15 +547,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function promptFloatPopup() {
+        const decline = () => {
+            localStorage.setItem(PREF_FLOAT_POPUP, 'false');
+        };
         showActionToast({
-            message: 'Open a floating Trello board window? It stays on top and can be moved outside All4One (like YouTube PiP).',
+            message: 'Open a floating Trello board window? It stays on top and can be moved outside All4One.',
             primaryLabel: 'Open board',
             secondaryLabel: 'Not now',
+            duration: 5000,
             onPrimary: () => { void showBoardPip(); },
             onSecondary: () => {
-                localStorage.setItem(PREF_FLOAT_POPUP, 'false');
-                showAppToast('Re-open anytime from the Board button on Trello Watcher.');
+                decline();
+                showAppToast('Re-open anytime from Float board on Trello Watcher.');
             },
+            onTimeout: decline,
         });
     }
 
@@ -645,6 +669,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 addLog(data.msg, data.isError ? 'error' : 'info');
                 break;
             case 'alarm':
+                if (data.listId && mutedListIds().has(data.listId)) {
+                    addLog(`Muted list: new card [${data.cardName}] in [${data.listName}]`, 'info');
+                    break;
+                }
                 if (soundToggleActive?.checked && !isAlarmPlaying) {
                     triggerAlarm(data.cardName, data.listName);
                 } else {
@@ -830,10 +858,123 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    stealthToggle?.addEventListener('change', () => {
-        localStorage.setItem(PREF_STEALTH, stealthToggle.checked ? 'true' : 'false');
-        if (!stealthToggle.checked) stopSilentNoise();
+    let stealthGuard = false;
+
+    function setStealthChecked(on) {
+        stealthGuard = true;
+        if (stealthToggle) stealthToggle.checked = on;
+        if (stealthToggleActive) stealthToggleActive.checked = on;
+        stealthGuard = false;
+    }
+
+    function commitStealth(on) {
+        setStealthChecked(on);
+        localStorage.setItem(PREF_STEALTH, on ? 'true' : 'false');
+        if (!on) stopSilentNoise();
         else if (worker || mainWatcher) startSilentNoise();
+    }
+
+    function requestStealthOff() {
+        setStealthChecked(false);
+        showActionToast({
+            message: 'Background sound keeps Trello Watcher alive if the browser slows this tab or closes it. Are you sure you want it off?',
+            primaryLabel: 'Turn off',
+            secondaryLabel: 'Keep it on',
+            duration: 3000,
+            onPrimary: () => commitStealth(false),
+            onSecondary: () => commitStealth(true),
+            onTimeout: () => commitStealth(false),
+        });
+    }
+
+    function onStealthToggle(event) {
+        if (stealthGuard) return;
+        if (event.target.checked) {
+            commitStealth(true);
+            return;
+        }
+        requestStealthOff();
+    }
+
+    stealthToggle?.addEventListener('change', onStealthToggle);
+    stealthToggleActive?.addEventListener('change', onStealthToggle);
+
+    bucketGrid?.addEventListener('click', (event) => {
+        const btn = event.target.closest('.trello-bucket-mute');
+        if (!btn) return;
+        const id = btn.getAttribute('data-list-id');
+        if (!id) return;
+        const next = mutedListIds();
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        localStorage.setItem(PREF_MUTED, JSON.stringify([...next]));
+        const muted = next.has(id);
+        btn.classList.toggle('is-muted', muted);
+        btn.textContent = muted ? 'Muted' : 'Mute';
+        btn.setAttribute('aria-pressed', muted ? 'true' : 'false');
+    });
+
+    function placeMonitor(left, top) {
+        if (!monitorSection) return;
+        monitorSection.classList.add('is-moved');
+        monitorSection.style.left = `${left}px`;
+        monitorSection.style.top = `${top}px`;
+        monitorSection.style.bottom = 'auto';
+        monitorSection.style.right = 'auto';
+        monitorSection.style.transform = 'none';
+    }
+
+    function clampMonitor(left, top) {
+        if (!lockscreen || !monitorSection) return { left, top };
+        const parent = lockscreen.getBoundingClientRect();
+        const rect = monitorSection.getBoundingClientRect();
+        const maxLeft = Math.max(0, parent.width - rect.width);
+        const maxTop = Math.max(0, parent.height - rect.height);
+        return {
+            left: Math.min(Math.max(0, left), maxLeft),
+            top: Math.min(Math.max(0, top), maxTop),
+        };
+    }
+
+    function restoreMonitorPosition() {
+        let saved = null;
+        try { saved = JSON.parse(localStorage.getItem(PREF_MONITOR_POS) || 'null'); } catch { saved = null; }
+        if (!saved || !Number.isFinite(saved.left) || !Number.isFinite(saved.top)) return;
+        placeMonitor(saved.left, saved.top);
+        const fitted = clampMonitor(saved.left, saved.top);
+        placeMonitor(fitted.left, fitted.top);
+    }
+
+    const monitorGrip = document.getElementById('trello-monitor-grip');
+    monitorGrip?.addEventListener('pointerdown', (event) => {
+        if (!monitorSection || !lockscreen) return;
+        if (event.button != null && event.button !== 0) return;
+        event.preventDefault();
+        const parent = lockscreen.getBoundingClientRect();
+        const rect = monitorSection.getBoundingClientRect();
+        const offsetX = event.clientX - rect.left;
+        const offsetY = event.clientY - rect.top;
+        const move = (ev) => {
+            const bounds = lockscreen.getBoundingClientRect();
+            const width = monitorSection.getBoundingClientRect().width;
+            const height = monitorSection.getBoundingClientRect().height;
+            const left = Math.min(Math.max(0, ev.clientX - bounds.left - offsetX), Math.max(0, bounds.width - width));
+            const top = Math.min(Math.max(0, ev.clientY - bounds.top - offsetY), Math.max(0, bounds.height - height));
+            placeMonitor(left, top);
+        };
+        const up = () => {
+            window.removeEventListener('pointermove', move);
+            window.removeEventListener('pointerup', up);
+            const bounds = lockscreen.getBoundingClientRect();
+            const next = monitorSection.getBoundingClientRect();
+            localStorage.setItem(PREF_MONITOR_POS, JSON.stringify({
+                left: next.left - bounds.left,
+                top: next.top - bounds.top,
+            }));
+        };
+        placeMonitor(rect.left - parent.left, rect.top - parent.top);
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
     });
 
     soundToggle?.addEventListener('change', () => {
@@ -909,6 +1050,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setupCard?.classList.add('hidden');
         consoleCard?.classList.add('hidden');
         monitorSection?.classList.remove('hidden');
+        restoreMonitorPosition();
         showWatchConsole();
         setLogDockOpen(false);
         renderBucketGrid(targets.map((t) => ({ ...t, count: '-', cards: [] })));

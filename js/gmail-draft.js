@@ -35,21 +35,41 @@ function loadGisScript() {
   });
 }
 
+function readStore(store, key) {
+  try { return store.getItem(key); } catch { return null; }
+}
+
+function writeStore(store, key, value) {
+  try { store.setItem(key, value); } catch { /* private mode or a full disk */ }
+}
+
+function removeStore(store, key) {
+  try { store.removeItem(key); } catch { /* ignore */ }
+}
+
 function getCachedToken() {
-  const token = sessionStorage.getItem(TOKEN_KEY);
-  const exp = Number(sessionStorage.getItem(TOKEN_EXP_KEY) || 0);
-  if (token && exp > Date.now() + 60_000) return token;
+  const token = readStore(localStorage, TOKEN_KEY) || readStore(sessionStorage, TOKEN_KEY);
+  const exp = Number(readStore(localStorage, TOKEN_EXP_KEY) || readStore(sessionStorage, TOKEN_EXP_KEY) || 0);
+  if (token && exp > Date.now() + 60_000) {
+    if (!readStore(localStorage, TOKEN_KEY)) cacheToken(token, Math.max(60, Math.round((exp - Date.now()) / 1000)));
+    return token;
+  }
   return null;
 }
 
 function cacheToken(token, expiresInSeconds = 3500) {
-  sessionStorage.setItem(TOKEN_KEY, token);
-  sessionStorage.setItem(TOKEN_EXP_KEY, String(Date.now() + expiresInSeconds * 1000));
+  const exp = String(Date.now() + expiresInSeconds * 1000);
+  writeStore(localStorage, TOKEN_KEY, token);
+  writeStore(localStorage, TOKEN_EXP_KEY, exp);
+  removeStore(sessionStorage, TOKEN_KEY);
+  removeStore(sessionStorage, TOKEN_EXP_KEY);
 }
 
 export function clearGmailToken() {
-  sessionStorage.removeItem(TOKEN_KEY);
-  sessionStorage.removeItem(TOKEN_EXP_KEY);
+  removeStore(localStorage, TOKEN_KEY);
+  removeStore(localStorage, TOKEN_EXP_KEY);
+  removeStore(sessionStorage, TOKEN_KEY);
+  removeStore(sessionStorage, TOKEN_EXP_KEY);
 }
 
 export function isGmailConnected() {
@@ -68,7 +88,7 @@ async function discoverGoogleWebClientId() {
   const configured = getGmailClientId();
   if (configured) return configured;
 
-  const cached = sessionStorage.getItem(CLIENT_ID_CACHE_KEY);
+  const cached = readStore(localStorage, CLIENT_ID_CACHE_KEY) || readStore(sessionStorage, CLIENT_ID_CACHE_KEY);
   if (cached) return cached;
 
   const apiKey = firebaseApiKey();
@@ -84,7 +104,7 @@ async function discoverGoogleWebClientId() {
   const match = String(data.authUri || '').match(/[?&]client_id=([^&]+)/);
   if (!match) return '';
   const clientId = decodeURIComponent(match[1]);
-  sessionStorage.setItem(CLIENT_ID_CACHE_KEY, clientId);
+  writeStore(localStorage, CLIENT_ID_CACHE_KEY, clientId);
   return clientId;
 }
 
@@ -149,7 +169,7 @@ function extractGoogleAccessToken(result, credential) {
   );
 }
 
-function requestGmailAccessTokenViaGis(clientId) {
+function requestGmailAccessTokenViaGis(clientId, { prompt = 'consent' } = {}) {
   return loadGisScript().then(() => new Promise((resolve, reject) => {
     const client = window.google.accounts.oauth2.initTokenClient({
       client_id: clientId,
@@ -171,8 +191,21 @@ function requestGmailAccessTokenViaGis(clientId) {
         reject(new Error(err?.message || err?.type || 'Gmail sign-in popup was closed.'));
       },
     });
-    client.requestAccessToken({ prompt: 'consent' });
+    client.requestAccessToken({ prompt });
   }));
+}
+
+export async function restoreGmailSession() {
+  if (getCachedToken()) return true;
+  try {
+    const clientId = await discoverGoogleWebClientId();
+    if (!clientId) return false;
+    await requestGmailAccessTokenViaGis(clientId, { prompt: '' });
+    return Boolean(getCachedToken());
+  } catch (err) {
+    console.warn('Silent Gmail refresh was not available.', err);
+    return false;
+  }
 }
 
 async function requestGmailAccessTokenViaFirebase() {

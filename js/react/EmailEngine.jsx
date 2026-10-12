@@ -16,6 +16,7 @@ import {
   createGmailDraft,
   isGmailConnected,
   requestGmailAccessToken,
+  restoreGmailSession,
   clearGmailToken,
   describeGmailConnectError,
 } from '../gmail-draft.js';
@@ -53,7 +54,7 @@ const getSignatureHtml = () => `
     <strong style="color: ${SIG.label};">M</strong>&nbsp;082 374 5552
   </p>
   <p style="margin: 0; color: ${SIG.text};">
-    <strong style="color: ${SIG.label};">E</strong>&nbsp;<a href="mailto:namir@actuaryconsulting.co.za" style="color: ${SIG.link}; text-decoration: underline;">namir@actuaryconsulting.co.za</a>&nbsp;&nbsp;&nbsp;
+    <strong style="color: ${SIG.label};">E</strong>&nbsp;<a href="mailto:namir@actuaryconsulting.co.za" style="color: ${SIG.label}; text-decoration: underline;">namir@actuaryconsulting.co.za</a>&nbsp;&nbsp;&nbsp;
     <strong style="color: ${SIG.label};">W</strong>&nbsp;<a href="https://actuaryconsulting.co.za" target="_blank" rel="noopener noreferrer" style="color: ${SIG.link}; text-decoration: underline;">actuaryconsulting.co.za</a>
   </p>
 </div>
@@ -75,8 +76,7 @@ const getSignatureHtml = () => `
 `;
 
 const KUBHEKA_APN_HTML = 'In accordance with the precedent set by the court in <em>Kubheka v RAF</em> (5 November 2025) and the Advisory Practice Note issued by the Actuarial Society of South Africa (APN 702), we are required to obtain all available supporting documentation related to earnings referenced in the Industrial Psychologist report. Compliance with these requirements is important to ensure adherence to professional standards.';
-const PROCEED_HYPHEN = 'We will be able to proceed with the actuarial calculations once the above-mentioned information has been provided.';
-const PROCEED_SPACE = 'We will be able to proceed with the actuarial calculations once the above mentioned information has been provided.';
+const TURNAROUND = 'We will provide the report within 24 hours once the abovementioned information is provided and no further information is required.';
 const SIGN_OFF = 'Kind regards<br/>Namir';
 const GENDER_OPTIONS = [
   { value: 'Male', label: 'Male' },
@@ -150,11 +150,11 @@ function inTheLine(value, source, valuePlaceholder, sourcePlaceholder) {
 }
 
 function ipDateLine(date, page, datePlaceholder, pagePlaceholder) {
-  return `${filled(date, datePlaceholder)} in the IP report (Page ${filled(page, pagePlaceholder)}).`;
+  return `<strong>${escapeHtml(filled(date, datePlaceholder))}</strong> in the IP report (Page ${escapeHtml(filled(page, pagePlaceholder))}).`;
 }
 
 function thankYouLoe(claimantHtml) {
-  return `Thank you for requesting a Loss of Earnings calculation for ${claimantHtml}.`;
+  return `Thank you for requesting a Loss of Earnings calculation for <strong>${claimantHtml}</strong>.`;
 }
 
 function orIdDocumentLine(gender) {
@@ -326,6 +326,7 @@ const TEMPLATES = [
   {
     id: 'draft-master-loe',
     name: '(DRAFT) Master LOE',
+    menuLabel: 'Master LOE Draft',
     intro: 'Tick only the blocks this email needs. Notes under each block stay in the form and are left out of the draft. A block that starts with “Also” uses that word only when another request is already above it; otherwise it starts with “Kindly” or “In accordance”.',
     fields: [
       {
@@ -669,94 +670,37 @@ const TEMPLATES = [
     },
   },
   {
-    id: 'loe-report',
-    name: 'Standard LOE Dispatch',
-    subject: 'Actuarial Report: <<Claimant Name>> / <<Case Ref>>',
-    body: `Dear <<Attorney First Name>>,\n\nAttached please find our Actuarial Report calculating the Loss of Earnings in respect of <<Claimant Name>>.\n\nOur fee note is attached for your kind attention. Please ensure payment is processed within <<Payment Terms>> days.\n\nShould you require any amendments or further scenarios, please do not hesitate to contact our offices.\n\nKind regards,\nNamir`
-  },
-  {
     id: 'info-req',
     name: 'Missing Information Request',
-    subject: 'URGENT INFO REQUIRED: <<Claimant Name>>',
-    body: `Dear <<Attorney First Name>>\n\nThank you for requesting a Loss of Earnings calculation for <<Claimant Name>>.\n\nKindly assist us by confirming the following outstanding information:\n<<Missing Information Details>>\n\nWe will be able to proceed with the actuarial calculations once the above-mentioned information has been provided.\n\nKind regards\nNamir`
-  },
-  {
-    id: 'amendment',
-    name: 'Amended Report Dispatch',
-    subject: 'AMENDED Actuarial Report: <<Claimant Name>>',
-    body: `Dear <<Attorney First Name>>,\n\nAs requested, please find attached the AMENDED Actuarial Report for <<Claimant Name>>.\n\nThe amendments reflect the following changes:\n<<Amendment Details>>\n\nWe trust you find the above in order.\n\nKind regards,\nNamir`
-  },
-  {
-    id: 'draft-earnings',
-    name: '(DRAFT) Request for claimant earnings',
+    legacy: true,
     fields: [
       ATTORNEY_FIELD,
       CLAIMANT_FIELD,
-      GENDER_FIELD,
-      { key: 'attorneyFirm', label: 'Attorney firm', type: 'text', placeholder: 'e.g. Yonela Bodlani Attorneys' },
       {
-        key: 'documentLines',
-        label: 'Documents requested',
+        key: 'missingDetails',
+        label: 'Outstanding information',
         type: 'lines',
-        placeholder: 'Type a custom earnings document…',
-        presets: EARNINGS_DOCUMENT_PRESETS,
+        placeholder: 'Type an outstanding item…',
       },
     ],
     compile(vars) {
       const attorney = htmlField(vars, 'attorneyFirstName', '[Attorney]');
-      const shortName = escapeHtml(claimantShortLabel(vars));
-      const firm = htmlField(vars, 'attorneyFirm', '[Attorney firm]');
+      const claimant = escapeHtml(filled(vars.claimantFullName, '[Claimant]'));
       const bodyHtml = [
         `Dear ${attorney}`,
-        'I trust you are well.',
-        `Kindly note that we are undertaking Loss of Earnings Calculations for <strong>${shortName}</strong> on behalf of ${firm}.`,
-        KUBHEKA_APN_HTML,
-        `Kindly assist us by providing the following documents referenced in your report:${htmlList(vars.documentLines, '[Documents requested]')}`,
-        'We will provide the report within 24 hours once the abovementioned information is provided and no further information is required.',
+        thankYouLoe(claimant),
+        `Kindly assist us by confirming the following outstanding information:${htmlList(vars.missingDetails, '[Outstanding information]')}`,
+        TURNAROUND,
         SIGN_OFF,
       ].join('<br/><br/>');
-      return { subject: draftSubject(this.name, claimantShortLabel(vars)), bodyHtml };
-    },
-  },
-  {
-    id: 'draft-disc-accident-first-name',
-    name: '(DRAFT) Discrepancy in Accident Date & First Name',
-    fields: [
-      ATTORNEY_FIELD,
-      CLAIMANT_FIELD,
-      GENDER_FIELD,
-      { key: 'dateA', label: 'Date A', type: 'text', placeholder: 'e.g. 14 July 2020', row: 'date-a' },
-      { key: 'dateASource', label: 'Source A', type: 'text', placeholder: 'e.g. RAF report', row: 'date-a' },
-      { key: 'dateB', label: 'Date B', type: 'text', placeholder: 'e.g. 13 July 2020', row: 'date-b' },
-      { key: 'dateBSource', label: 'Source B', type: 'text', placeholder: 'e.g. IP report', row: 'date-b' },
-      { key: 'nameA', label: 'Spelling A', type: 'text', placeholder: 'e.g. Rofhiwa', row: 'name-a' },
-      { key: 'nameASource', label: 'Source A', type: 'text', placeholder: 'e.g. Instruction letter', row: 'name-a' },
-      { key: 'nameB', label: 'Spelling B', type: 'text', placeholder: 'e.g. Rofhiwe', row: 'name-b' },
-      { key: 'nameBSource', label: 'Source B', type: 'text', placeholder: 'e.g. IP report', row: 'name-b' },
-    ],
-    compile(vars) {
-      const attorney = htmlField(vars, 'attorneyFirstName', '[Attorney]');
-      const shortName = escapeHtml(claimantShortLabel(vars));
-      const bodyHtml = [
-        `Dear ${attorney}`,
-        thankYouLoe(shortName),
-        `Kindly assist us by confirming the correct date of accident.${htmlList([
-          inTheLine(vars.dateA, vars.dateASource, '[Date A]', '[Source A]'),
-          inTheLine(vars.dateB, vars.dateBSource, '[Date B]', '[Source B]'),
-        ], '[Date discrepancy]')}`,
-        `Also, kindly assist us by confirming the correct spelling of the claimant\u2019s name.${htmlListWithIdFollowup([
-          inTheLine(vars.nameA, vars.nameASource, '[Spelling A]', '[Source A]'),
-          inTheLine(vars.nameB, vars.nameBSource, '[Spelling B]', '[Source B]'),
-        ], '[Name discrepancy]', vars.gender)}`,
-        PROCEED_HYPHEN,
-        SIGN_OFF,
-      ].join('<br/><br/>');
-      return { subject: draftSubject(this.name, claimantShortLabel(vars)), bodyHtml };
+      return { subject: `URGENT INFO REQUIRED: ${filled(vars.claimantFullName, '[Claimant]')}`, bodyHtml };
     },
   },
   {
     id: 'draft-missing-gender',
     name: '(DRAFT) Missing Gender Info',
+    menuLabel: '(Legacy draft) Missing Gender Info',
+    legacy: true,
     fields: [
       ATTORNEY_FIELD,
       CLAIMANT_FIELD,
@@ -766,9 +710,9 @@ const TEMPLATES = [
       const fullName = escapeHtml(claimantFullLabel(vars));
       const bodyHtml = [
         `Dear ${attorney}`,
-        'I trust that you are well.',
-        `Kindly confirm whether ${fullName} is a male or female.`,
-        PROCEED_SPACE,
+        thankYouLoe(fullName),
+        `Kindly confirm whether <strong>${fullName}</strong> is a male or female.`,
+        TURNAROUND,
         SIGN_OFF,
       ].join('<br/><br/>');
       return { subject: draftSubject(this.name, claimantFullLabel(vars)), bodyHtml };
@@ -777,6 +721,8 @@ const TEMPLATES = [
   {
     id: 'draft-missing-accident-date',
     name: '(DRAFT) Missing Accident Date',
+    menuLabel: '(Legacy draft) Missing Accident Date',
+    legacy: true,
     fields: [
       ATTORNEY_FIELD,
       CLAIMANT_FIELD,
@@ -789,123 +735,7 @@ const TEMPLATES = [
         `Dear ${attorney}`,
         thankYouLoe(shortName),
         'The date of accident was not provided. Kindly assist by providing the date of accident.',
-        PROCEED_SPACE,
-        SIGN_OFF,
-      ].join('<br/><br/>');
-      return { subject: draftSubject(this.name, claimantShortLabel(vars)), bodyHtml };
-    },
-  },
-  {
-    id: 'draft-disc-surname',
-    name: '(DRAFT) Discrepancy in Surname',
-    fields: [
-      ATTORNEY_FIELD,
-      CLAIMANT_FIELD,
-      GENDER_FIELD,
-      { key: 'surnameA', label: 'Surname A', type: 'text', placeholder: 'e.g. Sethlabane', row: 'surname-a' },
-      { key: 'surnameASource', label: 'Source A', type: 'text', placeholder: 'e.g. OT report', row: 'surname-a' },
-      { key: 'surnameB', label: 'Surname B', type: 'text', placeholder: 'e.g. Setlhabane', row: 'surname-b' },
-      { key: 'surnameBSource', label: 'Source B', type: 'text', placeholder: 'e.g. IP report', row: 'surname-b' },
-    ],
-    compile(vars) {
-      const attorney = htmlField(vars, 'attorneyFirstName', '[Attorney]');
-      const shortName = escapeHtml(claimantShortLabel(vars));
-      const bodyHtml = [
-        `Dear ${attorney}`,
-        thankYouLoe(shortName),
-        `Kindly assist us by confirming the correct spelling of the claimant\u2019s surname.${htmlListWithIdFollowup([
-          inTheLine(vars.surnameA, vars.surnameASource, '[Surname A]', '[Source A]'),
-          inTheLine(vars.surnameB, vars.surnameBSource, '[Surname B]', '[Source B]'),
-        ], '[Surname discrepancy]', vars.gender)}`,
-        PROCEED_HYPHEN,
-        SIGN_OFF,
-      ].join('<br/><br/>');
-      return { subject: draftSubject(this.name, claimantShortLabel(vars)), bodyHtml };
-    },
-  },
-  {
-    id: 'draft-disc-first-name',
-    name: '(DRAFT) Discrepancy in First Name',
-    fields: [
-      ATTORNEY_FIELD,
-      CLAIMANT_FIELD,
-      GENDER_FIELD,
-      { key: 'nameA', label: 'Spelling A', type: 'text', placeholder: 'e.g. Sipiwe', row: 'name-a' },
-      { key: 'nameASource', label: 'Source A', type: 'text', placeholder: 'e.g. Email', row: 'name-a' },
-      { key: 'nameB', label: 'Spelling B', type: 'text', placeholder: 'e.g. Simphiwe', row: 'name-b' },
-      { key: 'nameBSource', label: 'Source B', type: 'text', placeholder: 'e.g. IP report', row: 'name-b' },
-    ],
-    compile(vars) {
-      const attorney = htmlField(vars, 'attorneyFirstName', '[Attorney]');
-      const shortName = escapeHtml(claimantShortLabel(vars));
-      const bodyHtml = [
-        `Dear ${attorney}`,
-        thankYouLoe(shortName),
-        `Kindly assist us by confirming the correct spelling of the claimant\u2019s name.${htmlListWithIdFollowup([
-          inTheLine(vars.nameA, vars.nameASource, '[Spelling A]', '[Source A]'),
-          inTheLine(vars.nameB, vars.nameBSource, '[Spelling B]', '[Source B]'),
-        ], '[Name discrepancy]', vars.gender)}`,
-        PROCEED_HYPHEN,
-        SIGN_OFF,
-      ].join('<br/><br/>');
-      return { subject: draftSubject(this.name, claimantShortLabel(vars)), bodyHtml };
-    },
-  },
-  {
-    id: 'draft-link-not-opening',
-    name: '(DRAFT) Link Not Opening',
-    fields: [
-      { key: 'contactFirstName', label: 'Contact first name', type: 'text', placeholder: 'e.g. Pelisa' },
-    ],
-    compile(vars) {
-      const contact = htmlField(vars, 'contactFirstName', '[Name]');
-      const bodyHtml = [
-        `Good day ${contact}`,
-        'Thank you for your email.',
-        'Please kindly note we are unable to view the link. Please kindly share access openly.',
-        'Apologies for any inconvience.',
-        SIGN_OFF,
-      ].join('<br/><br/>');
-      return { subject: this.name, bodyHtml };
-    },
-  },
-  {
-    id: 'draft-disc-accident-dates',
-    name: '(DRAFT) Discrepancy in Accident Dates',
-    fields: [
-      ATTORNEY_FIELD,
-      CLAIMANT_FIELD,
-      GENDER_FIELD,
-      { key: 'dateA', label: 'Date A', type: 'text', placeholder: 'e.g. 14 July 2020' },
-      {
-        key: 'dateASource',
-        label: 'Date A document',
-        type: 'source',
-        default: 'OT report',
-        options: REPORT_SOURCES,
-        guidance: 'Pick the document this date comes from, or type another name. It is written as “in the [document]”.',
-      },
-      { key: 'dateB', label: 'Date B', type: 'text', placeholder: 'e.g. 13 July 2020' },
-      {
-        key: 'dateBSource',
-        label: 'Date B document',
-        type: 'source',
-        default: 'IP report',
-        options: REPORT_SOURCES,
-        guidance: 'Pick the document this date comes from, or type another name.',
-      },
-    ],
-    compile(vars) {
-      const attorney = htmlField(vars, 'attorneyFirstName', '[Attorney]');
-      const shortName = escapeHtml(claimantShortLabel(vars));
-      const bodyHtml = [
-        `Dear ${attorney}`,
-        thankYouLoe(shortName),
-        `Kindly assist us by confirming the correct date of accident.${htmlList([
-          inTheLine(vars.dateA, vars.dateASource, '[Date A]', 'OT report'),
-          inTheLine(vars.dateB, vars.dateBSource, '[Date B]', 'IP report'),
-        ], '[Date discrepancy]')}`,
-        PROCEED_HYPHEN,
+        TURNAROUND,
         SIGN_OFF,
       ].join('<br/><br/>');
       return { subject: draftSubject(this.name, claimantShortLabel(vars)), bodyHtml };
@@ -914,6 +744,8 @@ const TEMPLATES = [
   {
     id: 'draft-disc-accident-dates-ip',
     name: '(DRAFT) Discrepancy in Accident Dates within IP',
+    menuLabel: '(Legacy draft) Discrepancy in Accident Dates within IP',
+    legacy: true,
     fields: [
       ATTORNEY_FIELD,
       CLAIMANT_FIELD,
@@ -929,36 +761,34 @@ const TEMPLATES = [
       const bodyHtml = [
         `Dear ${attorney}`,
         thankYouLoe(shortName),
-        `Kindly assist us by confirming the correct date of accident.${htmlList([
+        `Kindly assist us by confirming the correct date of accident.${htmlRichList([
           ipDateLine(vars.dateA, vars.dateAPage, '[Date A]', '[Page A]'),
           ipDateLine(vars.dateB, vars.dateBPage, '[Date B]', '[Page B]'),
-        ], '[Date discrepancy]')}`,
-        PROCEED_HYPHEN,
+        ])}`,
+        TURNAROUND,
         SIGN_OFF,
       ].join('<br/><br/>');
       return { subject: draftSubject(this.name, claimantShortLabel(vars)), bodyHtml };
     },
   },
   {
-    id: 'draft-no-ip-report',
-    name: '(DRAFT) No IP Report',
+    id: 'draft-link-not-opening',
+    name: '(DRAFT) Link Not Opening',
+    menuLabel: '(Legacy draft) Link Not Opening',
+    legacy: true,
     fields: [
-      ATTORNEY_FIELD,
-      CLAIMANT_FIELD,
-      GENDER_FIELD,
+      { key: 'contactFirstName', label: 'Contact first name', type: 'text', placeholder: 'e.g. Pelisa' },
     ],
     compile(vars) {
-      const attorney = htmlField(vars, 'attorneyFirstName', '[Attorney]');
-      const shortName = escapeHtml(claimantShortLabel(vars));
+      const contact = htmlField(vars, 'contactFirstName', '[Name]');
       const bodyHtml = [
-        `Dear ${attorney}`,
-        thankYouLoe(shortName),
-        'Kindly note that we require an Industrial Psychologist report in order to perform Loss of Earnings calculations.',
-        'Kindly assist by providing an Industrial Psychologist report.',
-        PROCEED_SPACE,
+        `Good day ${contact}`,
+        'Thank you for your email.',
+        'Please kindly note we are unable to view the link. Please kindly share access openly.',
+        'Apologies for any inconvience.',
         SIGN_OFF,
       ].join('<br/><br/>');
-      return { subject: draftSubject(this.name, claimantShortLabel(vars)), bodyHtml };
+      return { subject: this.name, bodyHtml };
     },
   },
 ];
@@ -974,6 +804,21 @@ export default function EmailEngine() {
   const [isPushing, setIsPushing] = useState(false);
   const [gmailLinked, setGmailLinked] = useState(() => isGmailConnected());
   const [sourceMode, setSourceMode] = useState({});
+
+  useEffect(() => {
+    let cancel = false;
+    restoreGmailSession().then((ok) => {
+      if (!cancel && ok) setGmailLinked(true);
+    });
+    return () => { cancel = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!status.msg) return undefined;
+    const ms = status.type === 'error' ? 8000 : 4000;
+    const timer = window.setTimeout(() => setStatus({ msg: '', type: '' }), ms);
+    return () => window.clearTimeout(timer);
+  }, [status]);
 
   const selectedTemplate = TEMPLATES.find((t) => t.id === selectedTemplateId) || TEMPLATES[0];
 
@@ -1107,6 +952,10 @@ export default function EmailEngine() {
   };
 
   const pushToGmail = async () => {
+    if (!gmailLinked) {
+      setStatus({ msg: 'Connect Gmail before pushing a draft.', type: 'error' });
+      return;
+    }
     setIsPushing(true);
     setStatus({ msg: 'Pushing draft to Gmail...', type: 'info' });
 
@@ -1379,9 +1228,14 @@ export default function EmailEngine() {
                 onChange={(e) => setSelectedTemplateId(e.target.value)}
                 className="w-full pl-9 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm font-medium outline-none focus:ring-2 focus:ring-amber-500/20 text-slate-900 dark:text-white transition-all appearance-none cursor-pointer"
               >
-                {TEMPLATES.map(t => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
+                {TEMPLATES.filter((t) => !t.legacy).map((t) => (
+                  <option key={t.id} value={t.id}>{t.menuLabel || t.name}</option>
                 ))}
+                <optgroup label="Legacy Drafts">
+                  {TEMPLATES.filter((t) => t.legacy).map((t) => (
+                    <option key={t.id} value={t.id}>{t.menuLabel || t.name}</option>
+                  ))}
+                </optgroup>
               </select>
             </div>
             {selectedTemplate.intro ? (
@@ -1467,10 +1321,10 @@ export default function EmailEngine() {
               <button
                 type="button"
                 onClick={disconnectGmail}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300"
-                title="Disconnect Gmail OAuth"
+                className="px-2 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
+                title="Disconnect Gmail so a different account can be used"
               >
-                <CheckCircle2 className="w-4 h-4" /> Gmail connected
+                Disconnect
               </button>
             ) : (
               <button
@@ -1490,8 +1344,9 @@ export default function EmailEngine() {
             </button>
             <button 
               onClick={pushToGmail} 
-              disabled={isPushing}
-              className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50"
+              disabled={!gmailLinked || isPushing}
+              title={gmailLinked ? 'Create a Gmail draft' : 'Connect Gmail to push this draft'}
+              className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all active:scale-95 disabled:cursor-not-allowed disabled:active:scale-100 ${gmailLinked ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/20 disabled:opacity-50' : 'bg-slate-300 text-slate-500 shadow-none dark:bg-slate-700 dark:text-slate-400'}`}
             >
               {isPushing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} 
               Push to Gmail

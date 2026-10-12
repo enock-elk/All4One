@@ -11,6 +11,7 @@ export const TAB_META = {
     casemaker: { label: 'Case Maker', short: 'RyanGPT case builder', icon: 'sparkles' },
     affidavits: { label: 'Affidavit Generator', short: 'Expert affidavit drafts', icon: 'scroll-text' },
     emails: { label: 'Draft Email Generator', short: 'Client email templates', icon: 'mail-plus' },
+    salary: { label: 'Salary Inflation', short: 'LOE CPI calculator', icon: 'trending-up' },
 };
 
 export const NAV_TAB_ORDER = Object.keys(TAB_META);
@@ -172,6 +173,7 @@ export function initSidebarCollapse() {
     const brand = document.getElementById('sidebar-brand-toggle');
     const collapse = document.getElementById('sidebar-collapse-btn');
     brand?.addEventListener('click', () => {
+        if (window.matchMedia('(max-width: 860px)').matches) return;
         setSidebarCollapsed(!isSidebarCollapsed());
     });
     collapse?.addEventListener('click', () => {
@@ -198,6 +200,7 @@ export function initWorkspacePrefs() {
 }
 
 let toastTimer = null;
+let actionToastTimer = null;
 
 export function showAppToast(message, duration = 2600) {
     const el = document.getElementById('app-toast');
@@ -210,7 +213,7 @@ export function showAppToast(message, duration = 2600) {
     toastTimer = setTimeout(() => el.classList.add('hidden'), duration);
 }
 
-export function showActionToast({ message, primaryLabel, onPrimary, secondaryLabel = 'Not now', onSecondary }) {
+export function showActionToast({ message, primaryLabel, onPrimary, secondaryLabel = 'Not now', onSecondary, duration = 0, onTimeout }) {
     const el = document.getElementById('app-toast-actions');
     const msg = document.getElementById('app-toast-actions-msg');
     const primary = document.getElementById('app-toast-actions-primary');
@@ -218,12 +221,18 @@ export function showActionToast({ message, primaryLabel, onPrimary, secondaryLab
     if (!el || !msg || !primary || !secondary) return;
 
     document.getElementById('app-toast')?.classList.add('hidden');
+    clearTimeout(actionToastTimer);
+    actionToastTimer = null;
 
     msg.textContent = message;
     primary.textContent = primaryLabel;
     secondary.textContent = secondaryLabel;
 
-    const close = () => el.classList.add('hidden');
+    const close = () => {
+        clearTimeout(actionToastTimer);
+        actionToastTimer = null;
+        el.classList.add('hidden');
+    };
 
     const onPrimaryClick = () => {
         close();
@@ -242,9 +251,21 @@ export function showActionToast({ message, primaryLabel, onPrimary, secondaryLab
 
     el.classList.remove('hidden');
     el.style.opacity = '1';
+
+    if (duration > 0) {
+        actionToastTimer = setTimeout(() => {
+            actionToastTimer = null;
+            if (el.classList.contains('hidden')) return;
+            el.classList.add('hidden');
+            if (onTimeout) onTimeout();
+            else onSecondary?.();
+        }, duration);
+    }
 }
 
 export function hideActionToast() {
+    clearTimeout(actionToastTimer);
+    actionToastTimer = null;
     document.getElementById('app-toast-actions')?.classList.add('hidden');
 }
 

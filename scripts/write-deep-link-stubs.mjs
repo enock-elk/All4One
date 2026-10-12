@@ -7,6 +7,7 @@ const slugs = [
     'CaseMaker',
     'AffidavitAutomation',
     'EmailGenerator',
+    'SalaryInflation',
 ];
 
 const root = resolve(import.meta.dirname, '..');
