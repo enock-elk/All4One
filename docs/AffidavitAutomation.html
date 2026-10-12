@@ -220,10 +220,17 @@
             #trello-bucket-grid .trello-bucket-card {
                 scroll-snap-align: start;
             }
-            #app-toast,
-            #app-toast-actions {
-                bottom: calc(5.4rem + env(safe-area-inset-bottom));
+            #app-toast {
+                bottom: calc(1rem + env(safe-area-inset-bottom));
                 width: min(92vw, 24rem);
+            }
+            #app-toast-actions {
+                top: 4.25rem;
+                right: 0.75rem;
+                left: auto;
+                bottom: auto;
+                transform: none;
+                width: min(92vw, 22rem);
             }
         }
         body.trello-fullscreen #app-sidebar,
@@ -248,6 +255,55 @@
             max-width: min(1400px, 96vw);
             margin: 0;
             max-height: none;
+        }
+        #trello-monitor.is-moved,
+        body.trello-fullscreen #trello-monitor.is-moved {
+            position: absolute;
+            bottom: auto;
+            right: auto;
+            transform: none;
+            margin: 0;
+        }
+        .trello-monitor-grip {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.75rem;
+            height: 1.75rem;
+            border-radius: 0.5rem;
+            color: rgba(255,255,255,0.7);
+            cursor: grab;
+            touch-action: none;
+        }
+        .trello-monitor-grip:active { cursor: grabbing; }
+        .trello-bucket-card { position: relative; padding-bottom: 1.55rem; }
+        .trello-bucket-mute {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border: 0;
+            border-top: 1px solid rgba(255,255,255,0.08);
+            background: rgba(15, 23, 42, 0.45);
+            color: #cbd5e1;
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            padding: 0.18rem 0.25rem;
+            border-radius: 0 0 11px 11px;
+            cursor: pointer;
+        }
+        .trello-bucket-mute.is-muted { color: #fbbf24; background: rgba(120, 53, 15, 0.35); }
+        .trello-setup-columns {
+            display: grid;
+            gap: 1.25rem;
+            align-items: start;
+        }
+        @media (min-width: 861px) {
+            .trello-setup-columns {
+                grid-template-columns: minmax(0, 1.15fr) minmax(17rem, 0.85fr);
+            }
         }
         body.trello-fullscreen #trello-bucket-grid {
             grid-auto-columns: minmax(8.5rem, 10.5rem);
@@ -371,8 +427,8 @@
             transition: opacity 0.2s ease;
         }
     </style>
-  <script type="module" crossorigin src="./assets/index-B-dLgZWp.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-CJ4sO-hq.css">
+  <script type="module" crossorigin src="./assets/index-CRZ6tHKq.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Cv2c1M-2.css">
 </head>
 <body class="bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
 
@@ -512,10 +568,23 @@
                         <i data-lucide="pin" class="w-3 h-3"></i>
                     </button>
                 </div>
+
+                <div class="sidebar-nav-item">
+                    <button data-tab="salary" class="tab-btn sidebar-nav-btn" title="Salary Inflation">
+                        <span class="sidebar-nav-icon"><i data-lucide="trending-up" class="w-5 h-5"></i></span>
+                        <span class="min-w-0">
+                            <span class="sidebar-nav-label" data-short="Salary">Salary Inflation</span>
+                            <span class="sidebar-nav-sub">LOE CPI calculator</span>
+                        </span>
+                    </button>
+                    <button type="button" class="sidebar-item-pin" data-pin-tab="salary" title="Pin Salary Inflation as default" aria-label="Pin Salary Inflation as default">
+                        <i data-lucide="pin" class="w-3 h-3"></i>
+                    </button>
+                </div>
             </nav>
 
             <div id="sidebar-footer" class="mt-auto flex flex-col gap-1.5 w-full pt-4 border-t border-slate-800/80">
-                <p class="mobile-menu-title">Menu</p>
+                <p class="mobile-menu-title">Account</p>
                 <button type="button" id="pwa-install-btn" class="sidebar-nav-btn pwa-install-btn w-full" hidden>
                     <span class="sidebar-nav-icon"><i data-lucide="download" class="w-5 h-5"></i></span>
                     <span class="min-w-0">
@@ -551,7 +620,7 @@
             <!-- Dynamic Header -->
             <header id="app-header" class="h-16 shrink-0 flex items-center justify-between px-8 z-10">
                 <div class="header-context flex items-center gap-3">
-                    <button type="button" id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="sidebar-footer">
+                    <button type="button" id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="app-sidebar">
                         <i data-lucide="menu" class="w-5 h-5"></i>
                     </button>
                     <div class="header-context-mark" aria-hidden="true">
@@ -784,7 +853,7 @@
                 <div id="tab-dashboard" class="tab-content hidden h-full w-full overflow-hidden relative">
                     <div id="trello-lockscreen" class="trello-lockscreen absolute inset-0 overflow-hidden dark:text-white text-slate-800">
                         <div id="trello-lockscreen-scroll" class="absolute inset-0 overflow-y-auto">
-                        <div class="relative z-10 w-full max-w-xl mx-auto px-4 pt-10 pb-10 flex flex-col items-center">
+                        <div class="relative z-10 w-full max-w-6xl mx-auto px-4 pt-8 pb-10 flex flex-col items-center">
                             <div id="trello-hero" class="text-center mb-6">
                                 <div id="trello-clock-time" class="trello-clock-time">--:--</div>
                                 <div id="trello-clock-date" class="trello-clock-date">loading...</div>
@@ -812,7 +881,8 @@
                                     </button>
                                 </div>
 
-                                <div id="trello-setup-panel" class="hidden space-y-4">
+                                <div id="trello-setup-panel" class="hidden trello-setup-columns">
+                                    <div class="space-y-4 min-w-0">
                                     <div class="flex items-center justify-between gap-2">
                                         <p id="trello-user-label" class="text-sm text-white/70">Connected</p>
                                         <button id="btn-trello-disconnect" class="text-xs text-rose-300 hover:text-rose-200 font-medium">Disconnect</button>
@@ -825,7 +895,7 @@
                                     </div>
                                     <div>
                                         <label class="text-[10px] font-bold uppercase tracking-wider text-white/50 mb-1 block">Lists to watch (max 10)</label>
-                                        <div id="trello-list-checkboxes" class="max-h-48 overflow-y-auto space-y-1 rounded-xl border border-white/15 p-2 bg-black/20">
+                                        <div id="trello-list-checkboxes" class="max-h-72 overflow-y-auto space-y-1 rounded-xl border border-white/15 p-2 bg-black/20">
                                             <p class="text-xs text-white/50 p-2">Select a board.</p>
                                         </div>
                                     </div>
@@ -844,6 +914,8 @@
                                         </div>
                                     </div>
 
+                                    </div>
+                                    <div class="space-y-4 min-w-0">
                                     <div class="flex items-center justify-between">
                                         <span class="text-sm">Sound enabled</span>
                                         <label class="inline-flex items-center cursor-pointer">
@@ -879,6 +951,7 @@
                                             <i data-lucide="square" class="w-4 h-4"></i> Stop
                                         </button>
                                     </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -897,12 +970,19 @@
                         <div id="trello-monitor" class="hidden trello-glass rounded-2xl p-4 shadow-2xl">
                             <div class="flex items-center justify-between gap-3">
                                 <div class="flex items-center gap-2 text-emerald-400 text-xs font-extrabold tracking-wider uppercase">
+                                    <button type="button" id="trello-monitor-grip" class="trello-monitor-grip" aria-label="Drag the case counter" title="Drag">
+                                        <i data-lucide="grip-horizontal" class="w-4 h-4"></i>
+                                    </button>
                                     <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Active
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <label class="flex items-center gap-2 text-xs text-white/70">
-                                        Sound
+                                        Alert sound
                                         <input type="checkbox" id="trello-sound-toggle-active" class="rounded border-white/30 text-sky-500" checked>
+                                    </label>
+                                    <label class="flex items-center gap-2 text-xs text-white/70">
+                                        Background sound
+                                        <input type="checkbox" id="trello-stealth-toggle-active" class="rounded border-white/30 text-sky-500" checked>
                                     </label>
                                     <button type="button" id="btn-trello-float-open" class="text-xs font-bold uppercase tracking-wide text-emerald-200 border border-emerald-400/50 px-3 py-1 rounded-md hover:bg-emerald-500/20" title="Open floating board window">Float board</button>
                                     <button type="button" id="btn-trello-fullscreen" class="text-xs font-bold uppercase tracking-wide text-sky-200 border border-sky-400/50 px-3 py-1 rounded-md hover:bg-sky-500/20">Fullscreen</button>
@@ -953,6 +1033,52 @@
                     <div id="email-root" class="h-full"></div>
                 </div>
 
+                <div id="tab-salary" class="tab-content hidden h-full w-full overflow-y-auto p-4 lg:p-6">
+                    <div class="max-w-3xl mx-auto pb-10">
+                        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 sm:p-6">
+                            <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">Salary Inflation</h2>
+                            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Bring a salary to another year with the 10 March 2026 LOE model: December Stats SA CPI, then the 1% salary premium. The payment frequency is a label only.</p>
+                            <form id="salary-form" class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                    Amount
+                                    <input id="salary-amount" inputmode="decimal" placeholder="e.g. 15000" class="mt-1 w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm outline-none focus:border-amber-500">
+                                </label>
+                                <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                    Paid
+                                    <select id="salary-frequency" class="mt-1 w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm outline-none focus:border-amber-500">
+                                        <option value="month">per month</option>
+                                        <option value="week">per week</option>
+                                        <option value="year">per year</option>
+                                        <option value="fortnight">per fortnight</option>
+                                    </select>
+                                </label>
+                                <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                    Source year
+                                    <select id="salary-from-year" class="mt-1 w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm outline-none focus:border-amber-500"></select>
+                                </label>
+                                <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                    Target year
+                                    <select id="salary-to-year" class="mt-1 w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm outline-none focus:border-amber-500"></select>
+                                </label>
+                                <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                    Future CPI %
+                                    <input id="salary-future-cpi" inputmode="decimal" class="mt-1 w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm outline-none focus:border-amber-500">
+                                </label>
+                                <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                    Salary premium %
+                                    <input id="salary-premium" inputmode="decimal" class="mt-1 w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm outline-none focus:border-amber-500">
+                                </label>
+                            </form>
+                            <p id="salary-model-factor" class="mt-4 text-xs leading-relaxed text-slate-500 dark:text-slate-400"></p>
+                            <div class="mt-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 p-4">
+                                <div id="salary-result-amount" class="text-2xl font-extrabold text-slate-900 dark:text-white">Enter an amount</div>
+                                <p id="salary-result-factor" class="mt-1 text-sm text-slate-600 dark:text-slate-300"></p>
+                                <p id="salary-result-note" class="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">Stats SA CPI P0141, December index, plus the 1% premium from the 10 March 2026 LOE model.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </main>
         </div>
     </div>
@@ -961,7 +1087,7 @@
 
     <div id="app-toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] px-4 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-medium shadow-2xl border border-white/10 max-w-[90vw]"></div>
 
-    <div id="app-toast-actions" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[71] px-4 py-3 rounded-xl bg-slate-900 text-white text-sm shadow-2xl border border-white/10 max-w-[min(92vw,28rem)]">
+    <div id="app-toast-actions" class="hidden fixed top-20 right-4 z-[71] px-4 py-3 rounded-xl bg-slate-900 text-white text-sm shadow-2xl border border-white/10 max-w-[min(92vw,22rem)]">
         <p id="app-toast-actions-msg" class="font-medium mb-3"></p>
         <div class="flex items-center justify-end gap-2">
             <button type="button" id="app-toast-actions-secondary" class="toast-action-btn toast-action-ghost">Not now</button>
