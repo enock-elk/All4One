@@ -599,8 +599,8 @@ const previewPdfCache = new Map();
 const previewBitmapCache = new Map();
 const PREVIEW_BITMAP_LIMIT = 10;
 
-function previewBitmapKey(item) {
-    return `${item.fileId}:${item.pageIndex}`;
+function previewBitmapKey(item, scale) {
+    return `${item.fileId}:${item.pageIndex}:${scale || ''}`;
 }
 
 async function getCachedPreviewPdf(fileId, bytes, passwords) {
@@ -635,7 +635,7 @@ export function previewScaleForDisplay() {
 }
 
 export async function getPageBitmap(item, { scale, passwordsStr = '' } = {}) {
-    const key = previewBitmapKey(item);
+    const key = previewBitmapKey(item, scale);
     if (previewBitmapCache.has(key)) return previewBitmapCache.get(key);
     await ensurePdfEngine();
     const renderScale = scale || previewScaleForDisplay();

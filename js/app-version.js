@@ -1,8 +1,17 @@
-export const APP_VERSION = '1.3.15';
-export const APP_RELEASE_DATE = '12 October 2026';
+export const APP_VERSION = '1.3.16';
+export const APP_RELEASE_DATE = '13 October 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.16',
+    date: '13 Oct 2026',
+    items: [
+      'Formal and informal earnings can leave out the IP-document list. The Kubheka paragraph is written once, on the first earnings block, and the informal request sentence can be edited.',
+      'The 24-hour close is always in the draft.',
+      'Clear Bay sits on the right of the bay controls, and the page preview shows one sharp page.',
+    ],
+  },
   {
     version: '1.3.15',
     date: '12 Oct 2026',

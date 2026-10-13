@@ -245,6 +245,8 @@ function reportSourceField(key, label, defaultValue, extra = {}) {
   };
 }
 
+const INFORMAL_REQUEST_DEFAULT = 'Please also provide the post-accident proof of earnings showing she earned [amount] per month as a self-employed informal trader from [period] to date:';
+
 const INFORMAL_EARNINGS_PROOF = [
   'Previous clients.',
   'Previous suppliers.',
@@ -340,7 +342,7 @@ const TEMPLATES = [
     id: 'draft-master-loe',
     name: '(DRAFT) Master LOE',
     menuLabel: 'Master LOE Draft',
-    intro: 'Tick only the blocks this email needs. Notes under each block stay in the form and are left out of the draft. A block that starts with “Also” uses that word only when another request is already above it; otherwise it starts with “Kindly” or “In accordance”.',
+    intro: 'Tick only the blocks this email needs. Notes under each block stay in the form and are left out of the draft. A block that starts with “Also” uses that word only when another request is already above it; otherwise it starts with “Kindly” or “In accordance”. The 24-hour close is always included. The Kubheka paragraph is written once, on the first earnings block.',
     fields: [
       {
         key: 'subject',
@@ -566,45 +568,28 @@ const TEMPLATES = [
         ],
       },
       {
-        key: 'secInformal',
-        label: 'Informal earnings proof',
-        type: 'toggle',
-        guidance: 'Use to ask for proof of earnings for informal or self-employed work. The Kubheka paragraph drops “Also” when no request sits above this block.',
-        loeOnly: true,
-      },
-      {
-        key: 'informalDocs',
-        label: 'Documents referenced in the IP report',
-        type: 'lines',
-        placeholder: 'Type a document from the IP report…',
-        presets: EARNINGS_DOCUMENT_PRESETS,
-        showWhen: { key: 'secInformal', equals: true },
-        nested: true,
-        loeOnly: true,
-      },
-      {
-        key: 'informalBusiness',
-        label: 'Informal business and period',
-        type: 'text',
-        placeholder: 'e.g. spaza shop, January 2022 to March 2024',
-        showWhen: { key: 'secInformal', equals: true },
-        nested: true,
-        loeOnly: true,
-      },
-      {
         key: 'secFormal',
         label: 'Formal earnings proof',
         type: 'toggle',
-        guidance: 'Use to obtain proof of earnings for formal employment.',
+        guidance: 'Use to obtain proof of earnings for formal employment. The Kubheka paragraph is included here when this is the first earnings block.',
+        loeOnly: true,
+      },
+      {
+        key: 'secFormalDocs',
+        label: 'Documents referenced in the IP report',
+        type: 'toggle',
+        guidance: 'Optional. Leave this off to leave that document list out of the draft.',
+        showWhen: { key: 'secFormal', equals: true },
+        nested: true,
         loeOnly: true,
       },
       {
         key: 'formalDocs',
-        label: 'Documents referenced in the IP report',
+        label: 'Documents',
         type: 'lines',
         placeholder: 'Type a document from the IP report…',
         presets: EARNINGS_DOCUMENT_PRESETS,
-        showWhen: { key: 'secFormal', equals: true },
+        showWhen: { key: 'secFormalDocs', equals: true },
         nested: true,
         loeOnly: true,
       },
@@ -612,8 +597,45 @@ const TEMPLATES = [
         key: 'formalEarnings',
         label: 'Formal earnings and period',
         type: 'text',
-        placeholder: 'e.g. R15 000 per month at ABC Stores, January 2022 to March 2024',
+        placeholder: 'e.g. R3 000 per month while working as a Domestic worker for Ms Zungu until the date of the accident',
         showWhen: { key: 'secFormal', equals: true },
+        nested: true,
+        loeOnly: true,
+      },
+      {
+        key: 'secInformal',
+        label: 'Informal earnings proof',
+        type: 'toggle',
+        guidance: 'Use to ask for proof of earnings for informal or self-employed work. The Kubheka paragraph is not repeated when the formal block above already includes it.',
+        loeOnly: true,
+      },
+      {
+        key: 'secInformalDocs',
+        label: 'Documents referenced in the IP report',
+        type: 'toggle',
+        guidance: 'Optional. Leave this off to leave that document list out of the draft.',
+        showWhen: { key: 'secInformal', equals: true },
+        nested: true,
+        loeOnly: true,
+      },
+      {
+        key: 'informalDocs',
+        label: 'Documents',
+        type: 'lines',
+        placeholder: 'Type a document from the IP report…',
+        presets: EARNINGS_DOCUMENT_PRESETS,
+        showWhen: { key: 'secInformalDocs', equals: true },
+        nested: true,
+        loeOnly: true,
+      },
+      {
+        key: 'informalRequest',
+        label: 'Informal earnings request',
+        type: 'textarea',
+        default: INFORMAL_REQUEST_DEFAULT,
+        placeholder: INFORMAL_REQUEST_DEFAULT,
+        guidance: 'This sentence is written into the draft as you type it.',
+        showWhen: { key: 'secInformal', equals: true },
         nested: true,
         loeOnly: true,
       },
@@ -624,13 +646,6 @@ const TEMPLATES = [
         placeholder: 'Wrongful Arrest',
         showWhen: { key: 'audience', equals: 'incident' },
         guidance: 'Used in the Wrongful Arrest thank-you. Leave blank for Wrongful Arrest.',
-      },
-      {
-        key: 'secTurnaround',
-        label: '24-hour turnaround',
-        type: 'toggle',
-        default: true,
-        guidance: 'Adds the note that the report will follow within 24 hours once the information is in and nothing further is required.',
       },
     ],
     compile(vars) {
@@ -695,27 +710,42 @@ const TEMPLATES = [
         pushRequest(`The ${documents} provided for ${claimant} are illegible. Will you please provide clearer copies of all ${documents} in your possession?`);
       }
 
-      if (!wrongfulArrest && vars.secInformal) {
-        pushRequest([
-          kubhekaParagraph(hasPriorRequest),
-          `Kindly assist us by providing the following documents referenced in the IP report:${htmlList(vars.informalDocs, '[Document referenced in the IP report]')}`,
-          `Also, please provide the proof of earnings for the <strong>${escapeHtml(filled(vars.informalBusiness, '[informal business and period]'))}</strong>:`,
-          `Acceptable proof of self-employed earnings if no formal records can be provided may include affidavits or confirmation from:${htmlList(INFORMAL_EARNINGS_PROOF, '')}`,
-        ].join('<br/><br/>'));
-      }
+      let kubhekaUsed = false;
+      const takeKubheka = () => {
+        if (kubhekaUsed) return '';
+        kubhekaUsed = true;
+        return kubhekaParagraph(hasPriorRequest);
+      };
 
       if (!wrongfulArrest && vars.secFormal) {
-        pushRequest([
-          `${requestLead(hasPriorRequest)} assist us by providing the following documents referenced in the IP report:${htmlList(vars.formalDocs, '[Document referenced in the IP report]')}`,
-          `We note that the claimant was earning the following:${htmlList([withPeriod(filled(vars.formalEarnings, '[earnings description]'))], '[earnings description]')}`,
-          KUBHEKA_APN_HTML,
-          `Acceptable proof of earnings may include:${htmlList(FORMAL_EARNINGS_PROOF, '')}`,
-        ].join('<br/><br/>'));
+        const chunks = [];
+        if (vars.secFormalDocs) {
+          chunks.push(`${requestLead(hasPriorRequest)} assist us by providing the following documents referenced in the IP report:${htmlList(vars.formalDocs, '[Document referenced in the IP report]')}`);
+        }
+        chunks.push(`We note that the claimant was earning the following:${htmlList([withPeriod(filled(vars.formalEarnings, '[earnings description]'))], '[earnings description]')}`);
+        const kubheka = takeKubheka();
+        if (kubheka) chunks.push(kubheka);
+        chunks.push(`Acceptable proof of earnings may include:${htmlList(FORMAL_EARNINGS_PROOF, '')}`);
+        pushRequest(chunks.join('<br/><br/>'));
       }
 
-      if (vars.secTurnaround !== false) {
-        parts.push('We will provide the report within 24 hours once the abovementioned information is provided and no further information is required.');
+      if (!wrongfulArrest && vars.secInformal) {
+        const chunks = [];
+        if (vars.secInformalDocs) {
+          chunks.push(`${requestLead(hasPriorRequest)} assist us by providing the following documents referenced in the IP report:${htmlList(vars.informalDocs, '[Document referenced in the IP report]')}`);
+        }
+        chunks.push(escapeHtml(filled(vars.informalRequest, INFORMAL_REQUEST_DEFAULT)));
+        const kubheka = takeKubheka();
+        if (kubheka) chunks.push(kubheka);
+        chunks.push(`Acceptable proof of self-employed earnings if no formal records can be provided may include affidavits or confirmation from:${htmlList(INFORMAL_EARNINGS_PROOF, '')}`);
+        pushRequest(chunks.join('<br/><br/>'));
       }
+
+      if (!wrongfulArrest && (vars.secFormal || vars.secInformal)) {
+        parts.push('Kindly note that the calculation is dependent on the information we have requested since it will directly increase the claim.');
+      }
+
+      parts.push(TURNAROUND);
       parts.push(SIGN_OFF);
 
       const generatedSubject = draftSubject(this.name, masterClaimantLabel(vars));
@@ -729,7 +759,7 @@ const TEMPLATES = [
     id: 'draft-master-los',
     name: '(DRAFT) Master LOS',
     menuLabel: 'Master LOS Draft',
-    intro: 'Only the 24-hour close starts selected. The thank-you is for the dependants. Page numbers appear when both accident dates come from the same document.',
+    intro: 'The 24-hour close is always included. The thank-you is for the dependants. Page numbers appear when both accident dates come from the same document.',
     fields: [
       {
         key: 'subject',
@@ -853,13 +883,6 @@ const TEMPLATES = [
           'Copy of the post-mortem report.',
         ],
       },
-      {
-        key: 'secTurnaround',
-        label: '24-hour turnaround',
-        type: 'toggle',
-        default: true,
-        guidance: 'Adds the note that the report will follow within 24 hours once the information is in and nothing further is required.',
-      },
     ],
     compile(vars) {
       const recipient = escapeHtml(filled(vars.recipientName, 'XXXXX'));
@@ -885,9 +908,7 @@ const TEMPLATES = [
         parts.push('Kindly note that the calculation is dependent on the information we have requested since it will directly increase the claim.');
         hasPriorRequest = true;
       }
-      if (vars.secTurnaround !== false) {
-        parts.push('We will provide the report within 24 hours once the abovementioned information is provided and no further information is required.');
-      }
+      parts.push(TURNAROUND);
       parts.push(SIGN_OFF);
       const generatedSubject = draftSubject(this.name, masterClaimantLabel(vars));
       return {
@@ -1081,7 +1102,12 @@ export default function EmailEngine() {
   }, [selectedTemplateId]);
 
   const handleVarChange = (key, val) => {
-    setVariables(prev => ({ ...prev, [key]: val }));
+    setVariables((prev) => {
+      const next = { ...prev, [key]: val };
+      if (key === 'secFormal' && !val) next.secFormalDocs = false;
+      if (key === 'secInformal' && !val) next.secInformalDocs = false;
+      return next;
+    });
   };
 
   const handleLineChange = (key, index, value) => {
@@ -1471,6 +1497,18 @@ export default function EmailEngine() {
             <Plus className="w-4 h-4" /> Add custom line
           </button>
         </div>
+      );
+    }
+
+    if (field.type === 'textarea') {
+      return (
+        <textarea
+          value={variables[field.key] || ''}
+          onChange={(e) => handleVarChange(field.key, e.target.value)}
+          placeholder={field.placeholder || `Enter ${field.label}...`}
+          rows={3}
+          className={`${INPUT_CLASS} resize-y`}
+        />
       );
     }
 

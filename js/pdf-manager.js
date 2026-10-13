@@ -633,6 +633,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function fitPreviewMedia(node, pixelWidth, pixelHeight) {
+        const frame = node.parentElement;
+        const maxW = Math.max(1, frame?.clientWidth || pixelWidth);
+        const maxH = Math.max(1, frame?.clientHeight || pixelHeight);
+        const ratio = pixelWidth / pixelHeight;
+        let cssW = maxW;
+        let cssH = cssW / ratio;
+        if (cssH > maxH) {
+            cssH = maxH;
+            cssW = cssH * ratio;
+        }
+        node.style.width = `${Math.max(1, Math.floor(cssW))}px`;
+        node.style.height = `${Math.max(1, Math.floor(cssH))}px`;
+    }
+
     function drawPreviewFromBitmap(bitmap, rotation) {
         if (!previewCanvas || !bitmap) return;
         const rot = (normalizeRotation(rotation) * Math.PI) / 180;
@@ -645,13 +660,15 @@ document.addEventListener('DOMContentLoaded', () => {
         previewCanvas.width = bw;
         previewCanvas.height = bh;
         const ctx = previewCanvas.getContext('2d', { alpha: false });
+        ctx.imageSmoothingEnabled = false;
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, bw, bh);
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
+        ctx.save();
         ctx.translate(bw / 2, bh / 2);
         ctx.rotate(rot);
         ctx.drawImage(bitmap, -w / 2, -h / 2);
+        ctx.restore();
+        fitPreviewMedia(previewCanvas, bw, bh);
         previewCanvas.classList.remove('hidden');
         previewImage?.classList.add('hidden');
     }
@@ -723,10 +740,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         syncPreviewRotateUi(page.rotation || 0);
 
-        if (page.thumbUrl && previewImage && !previewBitmap) {
+        previewCanvas?.classList.add('hidden');
+        if (page.thumbUrl && previewImage) {
+            previewImage.onload = () => {
+                if (previewCanvas && !previewCanvas.classList.contains('hidden')) return;
+                fitPreviewMedia(previewImage, previewImage.naturalWidth || 1, previewImage.naturalHeight || 1);
+            };
             previewImage.src = page.thumbUrl;
             previewImage.style.transform = `rotate(${page.rotation || 0}deg)`;
             previewImage.classList.remove('hidden');
+        } else {
+            previewImage?.classList.add('hidden');
         }
 
         const specs = pageSpecs([page])[0];
