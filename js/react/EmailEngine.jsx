@@ -18,6 +18,7 @@ import {
   requestGmailAccessToken,
   restoreGmailSession,
   clearGmailToken,
+  hasPriorGmailGrant,
   describeGmailConnectError,
 } from '../gmail-draft.js';
 import { showAppToast } from '../ui-prefs.js';
@@ -55,7 +56,7 @@ const getSignatureHtml = () => `
     <strong style="color: ${SIG.label};">M</strong>&nbsp;082 374 5552
   </p>
   <p style="margin: 0; color: ${SIG.text};">
-    <strong style="color: ${SIG.label};">E</strong>&nbsp;<a href="mailto:namir@actuaryconsulting.co.za" style="color: ${SIG.label}; text-decoration: underline;">namir@actuaryconsulting.co.za</a>&nbsp;&nbsp;&nbsp;
+    <strong style="color: ${SIG.label};">E</strong>&nbsp;<a href="mailto:namir@actuaryconsulting.co.za" style="color: ${SIG.link}; text-decoration: underline;">namir@actuaryconsulting.co.za</a>&nbsp;&nbsp;&nbsp;
     <strong style="color: ${SIG.label};">W</strong>&nbsp;<a href="https://actuaryconsulting.co.za" target="_blank" rel="noopener noreferrer" style="color: ${SIG.link}; text-decoration: underline;">actuaryconsulting.co.za</a>
   </p>
 </div>
@@ -741,10 +742,6 @@ const TEMPLATES = [
         pushRequest(chunks.join('<br/><br/>'));
       }
 
-      if (!wrongfulArrest && (vars.secFormal || vars.secInformal)) {
-        parts.push('Kindly note that the calculation is dependent on the information we have requested since it will directly increase the claim.');
-      }
-
       parts.push(TURNAROUND);
       parts.push(SIGN_OFF);
 
@@ -1066,10 +1063,31 @@ export default function EmailEngine() {
         setGmailLinked(true);
         return;
       }
+      setGmailLinked(false);
+      if (hasPriorGmailGrant()) return;
       if (sessionStorage.getItem('all4one_gmail_prompt_dismissed') === '1') return;
       setGmailPromptOpen(true);
     })();
     return () => { cancel = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancel = false;
+    const onVisible = async () => {
+      if (document.visibilityState !== 'visible') return;
+      if (isGmailConnected()) {
+        setGmailLinked(true);
+        return;
+      }
+      if (!hasPriorGmailGrant()) return;
+      const ok = await restoreGmailSession();
+      if (!cancel) setGmailLinked(ok);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      cancel = true;
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, []);
 
   useEffect(() => {
@@ -1327,6 +1345,7 @@ export default function EmailEngine() {
       });
     } catch (err) {
       console.error(err);
+      if (!isGmailConnected()) setGmailLinked(false);
       const msg = describeGmailConnectError(err);
       if (/oauth|gmail|token|configured|authorized domain|sign-in method/i.test(msg)) {
         setStatus({

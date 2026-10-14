@@ -1,8 +1,18 @@
-export const APP_VERSION = '1.3.16';
-export const APP_RELEASE_DATE = '13 October 2026';
+export const APP_VERSION = '1.3.17';
+export const APP_RELEASE_DATE = '14 October 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.17',
+    date: '14 Oct 2026',
+    items: [
+      'The signature email address uses the same blue as the website link.',
+      'The sentence that the calculation depends on the requested information stays with the Wrongful Arrest date-of-incident block.',
+      'Gmail renews a previous connection when you come back. Push stays off until that connection is live again.',
+      'Trello Watcher keeps Alert type with the sound and start controls.',
+    ],
+  },
   {
     version: '1.3.16',
     date: '13 Oct 2026',

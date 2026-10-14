@@ -10,6 +10,7 @@ const GMAIL_IDENTITY_SCOPE = 'https://www.googleapis.com/auth/userinfo.profile';
 const TOKEN_KEY = 'all4one_gmail_access_token';
 const TOKEN_EXP_KEY = 'all4one_gmail_token_exp';
 const LINKED_KEY = 'all4one_gmail_linked';
+const HINT_KEY = 'all4one_gmail_login_hint';
 const CLIENT_ID_CACHE_KEY = 'all4one_google_web_client_id';
 
 /** Optional override in index.html: window.ALL4ONE_GMAIL_CLIENT_ID = '....apps.googleusercontent.com' */
@@ -67,16 +68,40 @@ function cacheToken(token, expiresInSeconds = 3500) {
   removeStore(sessionStorage, TOKEN_EXP_KEY);
 }
 
-function hasPriorGmailGrant() {
+export function hasPriorGmailGrant() {
   return readStore(localStorage, LINKED_KEY) === '1' || Boolean(readStore(localStorage, TOKEN_KEY));
 }
 
-export function clearGmailToken() {
+function loginHint() {
+  return readStore(localStorage, HINT_KEY) || '';
+}
+
+function rememberLoginHint(email) {
+  const clean = String(email || '').trim();
+  if (clean.includes('@')) writeStore(localStorage, HINT_KEY, clean);
+}
+
+function rememberGmailAccount(accessToken) {
+  if (!accessToken) return;
+  fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data) => rememberLoginHint(data?.emailAddress))
+    .catch(() => {});
+}
+
+export function clearLiveGmailToken() {
   removeStore(localStorage, TOKEN_KEY);
   removeStore(localStorage, TOKEN_EXP_KEY);
-  removeStore(localStorage, LINKED_KEY);
   removeStore(sessionStorage, TOKEN_KEY);
   removeStore(sessionStorage, TOKEN_EXP_KEY);
+}
+
+export function clearGmailToken() {
+  clearLiveGmailToken();
+  removeStore(localStorage, LINKED_KEY);
+  removeStore(localStorage, HINT_KEY);
 }
 
 export function isGmailConnected() {
@@ -177,10 +202,12 @@ function extractGoogleAccessToken(result, credential) {
 }
 
 function requestGmailAccessTokenViaGis(clientId, { prompt = 'consent' } = {}) {
+  const hint = loginHint();
   return loadGisScript().then(() => new Promise((resolve, reject) => {
     const client = window.google.accounts.oauth2.initTokenClient({
       client_id: clientId,
       scope: `${GMAIL_SCOPE} ${GMAIL_IDENTITY_SCOPE}`,
+      ...(hint ? { hint } : {}),
       callback: (resp) => {
         if (resp.error) {
           reject(new Error(resp.error_description || resp.error));
@@ -192,23 +219,29 @@ function requestGmailAccessTokenViaGis(clientId, { prompt = 'consent' } = {}) {
         }
         cacheToken(resp.access_token, Number(resp.expires_in) || 3500);
         captureGoogleIdentity(resp.access_token);
+        rememberGmailAccount(resp.access_token);
         resolve(resp.access_token);
       },
       error_callback: (err) => {
         reject(new Error(err?.message || err?.type || 'Gmail sign-in popup was closed.'));
       },
     });
-    client.requestAccessToken({ prompt });
+    client.requestAccessToken(hint ? { prompt, hint } : { prompt });
   }));
+}
+
+async function refreshGmailAccessTokenSilently() {
+  if (!hasPriorGmailGrant()) return null;
+  const clientId = await discoverGoogleWebClientId();
+  if (!clientId) return null;
+  return requestGmailAccessTokenViaGis(clientId, { prompt: 'none' });
 }
 
 export async function restoreGmailSession() {
   if (getCachedToken()) return true;
   if (!hasPriorGmailGrant()) return false;
   try {
-    const clientId = await discoverGoogleWebClientId();
-    if (!clientId) return false;
-    await requestGmailAccessTokenViaGis(clientId, { prompt: 'none' });
+    await refreshGmailAccessTokenSilently();
     return Boolean(getCachedToken());
   } catch (err) {
     console.warn('Silent Gmail refresh was not available.', err);
@@ -259,14 +292,30 @@ async function requestGmailAccessTokenViaFirebase() {
   }
 
   rememberWorkspaceName(result?.user?.displayName || result?.user?.email || '');
+  rememberLoginHint(result?.user?.email || '');
   cacheToken(accessToken);
   captureGoogleIdentity(accessToken);
+  rememberGmailAccount(accessToken);
   return accessToken;
 }
 
-export async function requestGmailAccessToken() {
+export async function requestGmailAccessToken({ interactive = true } = {}) {
   const cached = getCachedToken();
   if (cached) return cached;
+
+  if (!interactive) {
+    if (hasPriorGmailGrant()) {
+      try {
+        const refreshed = await refreshGmailAccessTokenSilently();
+        if (refreshed) return refreshed;
+      } catch (err) {
+        console.warn('Silent Gmail refresh was not available.', err);
+      }
+    }
+    const expired = new Error('Gmail session expired. Connect Gmail again.');
+    expired.code = 'gmail/session-expired';
+    throw expired;
+  }
 
   try {
     const clientId = await discoverGoogleWebClientId();
@@ -327,15 +376,7 @@ function toBase64Url(str) {
   return utf8ToBase64(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-export async function createGmailDraft({ subject, htmlBody, to, cc }) {
-  const token = await requestGmailAccessToken();
-  const raw = toBase64Url(buildMimeMessage({
-    to: to || 'namir@actuaryconsulting.co.za',
-    cc: cc || 'actuarialteam@actuaryconsulting.co.za',
-    subject: subject || '(DRAFT) Email',
-    htmlBody: htmlBody || '',
-  }));
-
+async function postGmailDraft(token, raw) {
   const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/drafts', {
     method: 'POST',
     headers: {
@@ -344,10 +385,34 @@ export async function createGmailDraft({ subject, htmlBody, to, cc }) {
     },
     body: JSON.stringify({ message: { raw } }),
   });
-
   const data = await res.json().catch(() => ({}));
+  return { res, data };
+}
+
+export async function createGmailDraft({ subject, htmlBody, to, cc }) {
+  const raw = toBase64Url(buildMimeMessage({
+    to: to || 'namir@actuaryconsulting.co.za',
+    cc: cc || 'actuarialteam@actuaryconsulting.co.za',
+    subject: subject || '(DRAFT) Email',
+    htmlBody: htmlBody || '',
+  }));
+
+  let token = await requestGmailAccessToken({ interactive: false });
+  let { res, data } = await postGmailDraft(token, raw);
+  if (res.status === 401) {
+    clearLiveGmailToken();
+    try {
+      token = await requestGmailAccessToken({ interactive: false });
+    } catch {
+      const expired = new Error('Gmail session expired. Connect Gmail again.');
+      expired.code = 'gmail/session-expired';
+      throw expired;
+    }
+    ({ res, data } = await postGmailDraft(token, raw));
+  }
+
   if (!res.ok) {
-    if (res.status === 401) clearGmailToken();
+    if (res.status === 401) clearLiveGmailToken();
     throw new Error(data?.error?.message || `Gmail API error (HTTP ${res.status})`);
   }
 
