@@ -1,8 +1,18 @@
-export const APP_VERSION = '1.3.17';
-export const APP_RELEASE_DATE = '14 October 2026';
+export const APP_VERSION = '1.3.18';
+export const APP_RELEASE_DATE = '19 October 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.18',
+    date: '19 Oct 2026',
+    items: [
+      'Email drafts have a Reset button that clears the current template fields.',
+      'Muted Trello lists no longer fire alerts when the fallback worker is in use.',
+      'Gmail no longer prompts or opens Google auth when Communications loads; connect only when you choose.',
+      'Accident Page A and Page B sit to the right of Source A when both dates share a document.',
+    ],
+  },
   {
     version: '1.3.17',
     date: '14 Oct 2026',

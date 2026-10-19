@@ -668,8 +668,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!data.isError && /Sync OK\. Tracking/i.test(data.msg || '')) break;
                 addLog(data.msg, data.isError ? 'error' : 'info');
                 break;
-            case 'alarm':
-                if (data.listId && mutedListIds().has(data.listId)) {
+            case 'alarm': {
+                const muted = mutedListIds();
+                const listMuted = (data.listId && muted.has(data.listId))
+                    || (data.listName && [...muted].some((id) => {
+                        const bucket = latestBuckets.find((b) => b.id === id);
+                        return bucket && bucket.name === data.listName;
+                    }));
+                if (listMuted) {
                     addLog(`Muted list: new card [${data.cardName}] in [${data.listName}]`, 'info');
                     break;
                 }
@@ -679,6 +685,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     addLog(`ALARM: New card [${data.cardName}] in [${data.listName}]`, 'alarm');
                 }
                 break;
+            }
             case 'stats':
                 if (totalCards) totalCards.textContent = String(data.total ?? 0);
                 if (data.buckets) {

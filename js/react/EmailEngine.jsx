@@ -8,7 +8,8 @@ import {
   AlertCircle,
   FileText,
   Plus,
-  Minus
+  Minus,
+  RotateCcw,
 } from 'lucide-react';
 import { AC_LOGO_DATA_URI } from './ac-logo-b64.js';
 import { getWorkspaceName } from '../workspace-identity.js';
@@ -437,11 +438,11 @@ const TEMPLATES = [
         label: 'Page A',
         type: 'text',
         placeholder: 'e.g. 6',
-        row: 'accident-pages',
+        row: 'accident-a',
         showWhen: { key: 'secAccident', equals: true },
         sameSource: ['accidentOtSource', 'accidentIpSource'],
-        guidance: 'Both dates are from the same document, so add the page for each one.',
         nested: true,
+        compact: true,
         loeOnly: true,
       },
       {
@@ -449,10 +450,11 @@ const TEMPLATES = [
         label: 'Page B',
         type: 'text',
         placeholder: 'e.g. 8',
-        row: 'accident-pages',
+        row: 'accident-a',
         showWhen: { key: 'secAccident', equals: true },
         sameSource: ['accidentOtSource', 'accidentIpSource'],
         nested: true,
+        compact: true,
         loeOnly: true,
       },
       {
@@ -845,21 +847,22 @@ const TEMPLATES = [
         label: 'Page A',
         type: 'text',
         placeholder: 'e.g. 6',
-        row: 'accident-pages',
+        row: 'accident-a',
         showWhen: { key: 'secAccident', equals: true },
         sameSource: ['accidentOtSource', 'accidentIpSource'],
-        guidance: 'Both dates are from the same document, so add the page for each one.',
         nested: true,
+        compact: true,
       },
       {
         key: 'accidentIpPage',
         label: 'Page B',
         type: 'text',
         placeholder: 'e.g. 8',
-        row: 'accident-pages',
+        row: 'accident-a',
         showWhen: { key: 'secAccident', equals: true },
         sameSource: ['accidentOtSource', 'accidentIpSource'],
         nested: true,
+        compact: true,
       },
       {
         key: 'secIpDocs',
@@ -1044,31 +1047,15 @@ export default function EmailEngine() {
   const [status, setStatus] = useState({ msg: '', type: '' });
   const [isPushing, setIsPushing] = useState(false);
   const [gmailLinked, setGmailLinked] = useState(() => isGmailConnected());
-  const [gmailPromptOpen, setGmailPromptOpen] = useState(false);
   const [sourceMode, setSourceMode] = useState({});
   const [inputsWidth, setInputsWidth] = useState(readEmailInputsWidth);
   const inputsWidthRef = useRef(inputsWidth);
   const previewRef = useRef(null);
 
   useEffect(() => {
-    let cancel = false;
-    (async () => {
-      if (isGmailConnected()) {
-        setGmailLinked(true);
-        return;
-      }
-      const ok = await restoreGmailSession();
-      if (cancel) return;
-      if (ok) {
-        setGmailLinked(true);
-        return;
-      }
-      setGmailLinked(false);
-      if (hasPriorGmailGrant()) return;
-      if (sessionStorage.getItem('all4one_gmail_prompt_dismissed') === '1') return;
-      setGmailPromptOpen(true);
-    })();
-    return () => { cancel = true; };
+    // Only use a cached token on load. Never open Google auth or a connect
+    // prompt until the user clicks Connect Gmail / Push to Gmail.
+    setGmailLinked(isGmailConnected());
   }, []);
 
   useEffect(() => {
@@ -1079,7 +1066,11 @@ export default function EmailEngine() {
         setGmailLinked(true);
         return;
       }
-      if (!hasPriorGmailGrant()) return;
+      if (!hasPriorGmailGrant()) {
+        setGmailLinked(false);
+        return;
+      }
+      // Silent renew only — no consent UI (prompt: 'none').
       const ok = await restoreGmailSession();
       if (!cancel) setGmailLinked(ok);
     };
@@ -1245,7 +1236,6 @@ export default function EmailEngine() {
   };
 
   const connectGmail = async () => {
-    setGmailPromptOpen(false);
     setStatus({ msg: 'Connecting Google account for Gmail drafts...', type: 'info' });
     try {
       await requestGmailAccessToken();
@@ -1257,15 +1247,17 @@ export default function EmailEngine() {
     }
   };
 
-  const dismissGmailPrompt = () => {
-    sessionStorage.setItem('all4one_gmail_prompt_dismissed', '1');
-    setGmailPromptOpen(false);
-  };
-
   const disconnectGmail = () => {
     clearGmailToken();
     setGmailLinked(false);
     setStatus({ msg: 'Gmail disconnected.', type: 'info' });
+  };
+
+  const resetDraftFields = () => {
+    const template = TEMPLATES.find((t) => t.id === selectedTemplateId) || TEMPLATES[0];
+    setVariables(initialVariables(template));
+    setSourceMode({});
+    setStatus({ msg: 'Draft fields cleared.', type: 'info' });
   };
 
   const pushDraftViaGmailApi = async () => {
@@ -1544,21 +1536,21 @@ export default function EmailEngine() {
     );
   };
 
+  const rowLayoutClass = (row) => {
+    if (row.length <= 1) return '';
+    if (row.some((field) => field.compact)) return 'flex flex-wrap items-end gap-2';
+    return 'grid grid-cols-2 gap-2';
+  };
+
+  const fieldCellClass = (field, row) => {
+    const nested = row.length === 1 && field.nested ? 'pl-3 border-l-2 border-amber-200 dark:border-amber-800' : '';
+    if (field.compact) return `min-w-0 w-[4.75rem] shrink-0 ${nested}`;
+    if (row.some((item) => item.compact)) return `min-w-0 flex-1 basis-[8rem] ${nested}`;
+    return `min-w-0 ${nested}`;
+  };
+
   return (
     <div className="email-split relative h-full flex overflow-hidden bg-slate-50 dark:bg-slate-900/50">
-      {gmailPromptOpen ? (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/45 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-800" role="dialog" aria-modal="true" aria-labelledby="gmail-connect-title">
-            <h3 id="gmail-connect-title" className="text-lg font-bold text-slate-900 dark:text-white">Connect Gmail?</h3>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">Drafts can be pushed straight into Gmail. Connect this browser to your Google account?</p>
-            <div className="mt-5 flex justify-end gap-2">
-              <button type="button" onClick={dismissGmailPrompt} className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700">Not now</button>
-              <button type="button" onClick={connectGmail} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">Connect</button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-      
       {/* COLUMN 1: TEMPLATE & VARIABLES */}
       <div className="email-inputs shrink-0 flex flex-col bg-white dark:bg-slate-800 z-10" style={{ width: inputsWidth }}>
         <div className="p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
@@ -1598,13 +1590,23 @@ export default function EmailEngine() {
           </div>
 
           <div className="p-5 rounded-2xl border border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-slate-900/50">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between gap-2 mb-4">
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 2. Template Variables
               </label>
-              <span className="bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-bold px-2 py-1 rounded-full border border-amber-500/20">
-                {fieldCount} DETECTED
-              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={resetDraftFields}
+                  title="Clear all fields for this draft"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 transition-all"
+                >
+                  <RotateCcw className="w-3 h-3" /> Reset
+                </button>
+                <span className="bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-bold px-2 py-1 rounded-full border border-amber-500/20">
+                  {fieldCount} DETECTED
+                </span>
+              </div>
             </div>
 
             {structuredFields ? (
@@ -1612,12 +1614,12 @@ export default function EmailEngine() {
                 {structuredRows.map((row) => (
                   <div
                     key={row.map((field) => field.key).join('-')}
-                    className={row.length > 1 ? 'grid grid-cols-2 gap-2' : ''}
+                    className={rowLayoutClass(row)}
                   >
                     {row.map((field) => (
                       <div
                         key={field.key}
-                        className={`min-w-0 ${row.length === 1 && field.nested ? 'pl-3 border-l-2 border-amber-200 dark:border-amber-800' : ''}`}
+                        className={fieldCellClass(field, row)}
                       >
                         {field.type === 'toggle' ? null : (
                           <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">{field.label}</label>
