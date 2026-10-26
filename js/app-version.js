@@ -1,8 +1,17 @@
-export const APP_VERSION = '1.3.20';
+export const APP_VERSION = '1.3.21';
 export const APP_RELEASE_DATE = '26 October 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.21',
+    date: '26 Oct 2026',
+    items: [
+      'Claimant title and name share one input row; example uses Tanaka Christopher Mokgoro → TC Mokgoro.',
+      'Other sources use an Other | typed-name chrome; matching sources embed page numbers on the far right.',
+      'Validation red shades only the input, not the whole block. Copy HTML blocks on the same missing fields as Push (Subject still optional).',
+    ],
+  },
   {
     version: '1.3.20',
     date: '26 Oct 2026',
