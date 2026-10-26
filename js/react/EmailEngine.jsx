@@ -28,11 +28,12 @@ import {
 import { showAppToast } from '../ui-prefs.js';
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbw-M9kVkSSXKuJ49tohaconx99-l5VcbU1xSNeUTccX2gs0prok3LltyTyO7mdNKtm8/exec";
 
-const INPUT_CLASS = "w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm outline-none focus:border-amber-500 dark:text-white transition-all";
-const INPUT_BLOCKING_CLASS = "w-full p-3 rounded-xl border border-rose-300/80 dark:border-rose-400/50 bg-rose-50/50 dark:bg-rose-950/20 text-sm outline-none focus:border-rose-400 dark:text-white transition-all";
-const CHROME_CLASS = "flex items-stretch rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-hidden focus-within:border-amber-500 transition-all";
-const CHROME_BLOCKING_CLASS = "flex items-stretch rounded-xl border border-rose-300/80 dark:border-rose-400/50 bg-rose-50/50 dark:bg-rose-950/20 overflow-hidden focus-within:border-rose-400 transition-all";
-const CHROME_INNER = "border-0 bg-transparent text-sm outline-none dark:text-white";
+const INPUT_CLASS = "w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm outline-none focus:border-amber-500 text-slate-900 dark:text-slate-100 dark:[color-scheme:dark] transition-all";
+const INPUT_BLOCKING_CLASS = "w-full p-3 rounded-xl border border-rose-300/80 dark:border-rose-400/50 bg-rose-50/50 dark:bg-rose-950/20 text-sm outline-none focus:border-rose-400 text-slate-900 dark:text-slate-100 dark:[color-scheme:dark] transition-all";
+const CHROME_CLASS = "flex items-stretch rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-hidden focus-within:border-amber-500 dark:[color-scheme:dark] transition-all";
+const CHROME_BLOCKING_CLASS = "flex items-stretch rounded-xl border border-rose-300/80 dark:border-rose-400/50 bg-rose-50/50 dark:bg-rose-950/20 overflow-hidden focus-within:border-rose-400 dark:[color-scheme:dark] transition-all";
+const CHROME_INNER = "border-0 bg-transparent text-sm outline-none text-slate-900 dark:text-slate-100";
+const NATIVE_OPTION_CLASS = "bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100";
 
 // Brand colours from official Actuary Consulting signature
 const SIG = {
@@ -386,6 +387,39 @@ function collectGmailPushErrors(template, variables, { requireSubject = true } =
     });
 
   return { keys: [...keys], labels };
+}
+
+/** How many mandatory draft items are still empty (Push-to-Gmail completeness). */
+function countRemainingDraftRequirements(template, variables, { requireSubject = true } = {}) {
+  const fields = template?.fields || [];
+  if (!fields.length) return 0;
+
+  let remaining = 0;
+  const byKey = Object.fromEntries(fields.map((field) => [field.key, field]));
+
+  if (requireSubject && byKey.subject && !subjectHasContent(variables.subject)) remaining += 1;
+  if (byKey.recipientName && !String(variables.recipientName || '').trim()) remaining += 1;
+
+  if (byKey.claimantTitle || byKey.claimantName) {
+    const title = String(variables.claimantTitle || '').trim();
+    const name = String(variables.claimantName || '').trim();
+    if (!name || !title || title === 'Mr/Ms') remaining += 1;
+  }
+
+  fields
+    .filter((field) => field.type === 'toggle' && variables?.[field.key] && fieldIsVisible(field, variables))
+    .forEach((toggle) => {
+      fields
+        .filter((field) => field.showWhen?.key === toggle.key && field.showWhen?.equals === true)
+        .forEach((field) => {
+          if (!fieldIsVisible(field, variables)) return;
+          if (field.type === 'toggle') return;
+          if (field.key === 'idPronoun') return;
+          if (!fieldHasValue(field, variables)) remaining += 1;
+        });
+    });
+
+  return remaining;
 }
 
 function htmlListWithIdFollowup(items, emptyPlaceholder, gender) {
@@ -1278,6 +1312,10 @@ export default function EmailEngine() {
     setStatus({ msg: '', type: '' });
   }, [selectedTemplateId]);
 
+  const clearExportShading = () => {
+    setBlockingKeys([]);
+  };
+
   const handleVarChange = (key, val) => {
     setVariables((prev) => {
       const next = { ...prev, [key]: val };
@@ -1285,7 +1323,7 @@ export default function EmailEngine() {
       if (key === 'secInformal' && !val) next.secInformalDocs = false;
       return next;
     });
-    setBlockingKeys((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : prev));
+    clearExportShading();
     if (key === 'recipientName') setRecipientConfirm('');
     if (key === 'audience' && val !== 'attorneys') setOpeningOpen(true);
   };
@@ -1306,10 +1344,12 @@ export default function EmailEngine() {
       next[index] = value;
       return { ...prev, [key]: next };
     });
+    clearExportShading();
   };
 
   const addLine = (key) => {
     setVariables((prev) => ({ ...prev, [key]: [...(prev[key] || ['']), ''] }));
+    clearExportShading();
   };
 
   const addPresetLines = (key, values) => {
@@ -1318,6 +1358,7 @@ export default function EmailEngine() {
       const retained = current.filter((line) => String(line || '').trim());
       return { ...prev, [key]: [...retained, ...values] };
     });
+    clearExportShading();
   };
 
   const removeLine = (key, index) => {
@@ -1326,6 +1367,7 @@ export default function EmailEngine() {
       if (curr.length <= 1) return { ...prev, [key]: [''] };
       return { ...prev, [key]: curr.filter((_, i) => i !== index) };
     });
+    clearExportShading();
   };
 
   const compiledContent = useMemo(() => {
@@ -1449,6 +1491,8 @@ export default function EmailEngine() {
     const template = TEMPLATES.find((t) => t.id === selectedTemplateId) || TEMPLATES[0];
     setVariables(initialVariables(template));
     setSourceMode({});
+    clearExportShading();
+    setRecipientConfirm('');
     setStatus({ msg: 'Draft fields cleared.', type: 'info' });
   };
 
@@ -1575,7 +1619,7 @@ export default function EmailEngine() {
         return rows;
       }, [])
     : null;
-  const fieldCount = visibleFields ? visibleFields.length : allUniqueKeys.length;
+  const remainingCount = countRemainingDraftRequirements(selectedTemplate, variables);
 
   const inputClassFor = (fieldKey) => (blockingKeys.includes(fieldKey) ? INPUT_BLOCKING_CLASS : INPUT_CLASS);
   const chromeClassFor = (...keys) => (
@@ -1602,33 +1646,26 @@ export default function EmailEngine() {
   const renderClaimantChrome = (titleField, nameField) => {
     const nameValue = variables[nameField.key] || '';
     return (
-      <div className="space-y-2">
-        <div className={chromeClassFor(titleField.key, nameField.key)}>
-          <select
-            value={variables[titleField.key] || ''}
-            onChange={(e) => handleVarChange(titleField.key, e.target.value)}
-            aria-label={titleField.label}
-            className={`${CHROME_INNER} shrink-0 w-[5.5rem] px-3 py-3 appearance-none cursor-pointer font-medium`}
-          >
-            {(titleField.options || []).map((opt) => (
-              <option key={`${titleField.key}-${opt.value || 'empty'}`} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-          <div className="w-px self-stretch bg-slate-200 dark:bg-slate-600 shrink-0" aria-hidden="true" />
-          <input
-            type="text"
-            value={nameValue}
-            onChange={(e) => handleVarChange(nameField.key, e.target.value)}
-            placeholder={nameField.placeholder || 'Enter claimant name...'}
-            aria-label={nameField.label}
-            className={`${CHROME_INNER} min-w-0 flex-1 px-3 py-3`}
-          />
-        </div>
-        {String(nameValue).trim() ? (
-          <p className="text-[11px] text-slate-500 dark:text-slate-400">
-            In the email: <span className="font-semibold text-slate-700 dark:text-slate-200">{formatClaimantDisplayName(nameValue)}</span>
-          </p>
-        ) : null}
+      <div className={chromeClassFor(titleField.key, nameField.key)}>
+        <select
+          value={variables[titleField.key] || ''}
+          onChange={(e) => handleVarChange(titleField.key, e.target.value)}
+          aria-label={titleField.label}
+          className={`${CHROME_INNER} shrink-0 w-[5.5rem] px-3 py-3 appearance-none cursor-pointer font-medium`}
+        >
+          {(titleField.options || []).map((opt) => (
+            <option key={`${titleField.key}-${opt.value || 'empty'}`} value={opt.value} className={NATIVE_OPTION_CLASS}>{opt.label}</option>
+          ))}
+        </select>
+        <div className="w-px self-stretch bg-slate-200 dark:bg-slate-600 shrink-0" aria-hidden="true" />
+        <input
+          type="text"
+          value={nameValue}
+          onChange={(e) => handleVarChange(nameField.key, e.target.value)}
+          placeholder={nameField.placeholder || 'Enter claimant name...'}
+          aria-label={nameField.label}
+          className={`${CHROME_INNER} min-w-0 flex-1 px-3 py-3`}
+        />
       </div>
     );
   };
@@ -1664,9 +1701,9 @@ export default function EmailEngine() {
           onChange={(e) => handleVarChange(field.key, e.target.value)}
           className={`${inputClassFor(field.key)} appearance-none cursor-pointer`}
         >
-          {!hasEmptyOption && field.default == null ? <option value="">Select {field.label.toLowerCase()}</option> : null}
+          {!hasEmptyOption && field.default == null ? <option value="" className={NATIVE_OPTION_CLASS}>Select {field.label.toLowerCase()}</option> : null}
           {options.map((opt) => (
-            <option key={`${field.key}-${opt.value || 'empty'}`} value={opt.value}>{opt.label}</option>
+            <option key={`${field.key}-${opt.value || 'empty'}`} value={opt.value} className={NATIVE_OPTION_CLASS}>{opt.label}</option>
           ))}
         </select>
       );
@@ -1751,11 +1788,11 @@ export default function EmailEngine() {
             }}
             className={`${CHROME_INNER} min-w-0 flex-1 px-3 py-3 appearance-none cursor-pointer`}
           >
-            {!value ? <option value="">Select a document</option> : null}
+            {!value ? <option value="" className={NATIVE_OPTION_CLASS}>Select a document</option> : null}
             {options.map((opt) => (
-              <option key={`${field.key}-${opt}`} value={opt}>{opt}</option>
+              <option key={`${field.key}-${opt}`} value={opt} className={NATIVE_OPTION_CLASS}>{opt}</option>
             ))}
-            <option value="__other__">Other…</option>
+            <option value="__other__" className={NATIVE_OPTION_CLASS}>Other…</option>
           </select>
           {pageVisible ? renderPageSlot(pageField) : null}
         </div>
@@ -1915,11 +1952,11 @@ export default function EmailEngine() {
                 className="w-full pl-9 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm font-medium outline-none focus:ring-2 focus:ring-amber-500/20 text-slate-900 dark:text-white transition-all appearance-none cursor-pointer"
               >
                 {TEMPLATES.filter((t) => !t.legacy).map((t) => (
-                  <option key={t.id} value={t.id}>{t.menuLabel || t.name}</option>
+                  <option key={t.id} value={t.id} className={NATIVE_OPTION_CLASS}>{t.menuLabel || t.name}</option>
                 ))}
-                <optgroup label="Legacy Drafts">
+                <optgroup label="Legacy Drafts" className={NATIVE_OPTION_CLASS}>
                   {TEMPLATES.filter((t) => t.legacy).map((t) => (
-                    <option key={t.id} value={t.id}>{t.menuLabel || t.name}</option>
+                    <option key={t.id} value={t.id} className={NATIVE_OPTION_CLASS}>{t.menuLabel || t.name}</option>
                   ))}
                 </optgroup>
               </select>
@@ -1944,7 +1981,7 @@ export default function EmailEngine() {
                   <RotateCcw className="w-3 h-3" /> Reset
                 </button>
                 <span className="bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-bold px-2 py-1 rounded-full border border-amber-500/20">
-                  {fieldCount} DETECTED
+                  {remainingCount} REMAINING
                 </span>
               </div>
             </div>

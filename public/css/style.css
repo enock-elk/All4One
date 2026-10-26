@@ -1361,6 +1361,19 @@
   background: #b45309;
 }
 
+/* Native <select> popups ignore most option classes; color-scheme fixes white-on-white. */
+html.dark #email-root,
+html.dark #email-root select {
+  color-scheme: dark;
+}
+
+html.dark #email-root select,
+html.dark #email-root option,
+html.dark #email-root optgroup {
+  background-color: #1e293b;
+  color: #f1f5f9;
+}
+
 .salary-shell {
   max-width: 46rem;
   margin: 0 auto;
