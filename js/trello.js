@@ -165,7 +165,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return `${header.join('\n')}\n${run.lines.join('\n')}\n`;
     }
 
+    // Temporarily off — keep downloadWatchRun / buildWatchRunText intact to re-enable later.
+    const SAVE_WATCH_RUN_TXT = false;
+
     function downloadWatchRun(run) {
+        if (!SAVE_WATCH_RUN_TXT) return;
         if (!run) return;
         const text = buildWatchRunText(run);
         const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });

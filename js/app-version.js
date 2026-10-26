@@ -1,8 +1,15 @@
-export const APP_VERSION = '1.3.22';
-export const APP_RELEASE_DATE = '26 October 2026';
+export const APP_VERSION = '1.3.23';
+export const APP_RELEASE_DATE = '27 October 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.23',
+    date: '27 Oct 2026',
+    items: [
+      'Trello Watcher auto-download of run log .txt files is paused (logic kept; flip SAVE_WATCH_RUN_TXT to re-enable).',
+    ],
+  },
   {
     version: '1.3.22',
     date: '26 Oct 2026',
