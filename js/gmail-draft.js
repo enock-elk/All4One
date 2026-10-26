@@ -12,6 +12,8 @@ const TOKEN_EXP_KEY = 'all4one_gmail_token_exp';
 const LINKED_KEY = 'all4one_gmail_linked';
 const HINT_KEY = 'all4one_gmail_login_hint';
 const CLIENT_ID_CACHE_KEY = 'all4one_google_web_client_id';
+const EMAIL_SESSION_KEY = 'all4one_email_tab_visited';
+const SILENT_FAIL_KEY = 'all4one_gmail_silent_fails';
 
 /** Optional override in index.html: window.ALL4ONE_GMAIL_CLIENT_ID = '....apps.googleusercontent.com' */
 export function getGmailClientId() {
@@ -66,6 +68,7 @@ function cacheToken(token, expiresInSeconds = 3500) {
   writeStore(localStorage, LINKED_KEY, '1');
   removeStore(sessionStorage, TOKEN_KEY);
   removeStore(sessionStorage, TOKEN_EXP_KEY);
+  clearSilentFails();
 }
 
 export function hasPriorGmailGrant() {
@@ -106,6 +109,30 @@ export function clearGmailToken() {
 
 export function isGmailConnected() {
   return Boolean(getCachedToken());
+}
+
+export function markEmailSessionVisited() {
+  writeStore(sessionStorage, EMAIL_SESSION_KEY, '1');
+}
+
+export function hasEmailSessionVisit() {
+  return readStore(sessionStorage, EMAIL_SESSION_KEY) === '1';
+}
+
+function silentFailCount() {
+  return Number(readStore(sessionStorage, SILENT_FAIL_KEY) || 0);
+}
+
+function bumpSilentFail() {
+  writeStore(sessionStorage, SILENT_FAIL_KEY, String(silentFailCount() + 1));
+}
+
+function clearSilentFails() {
+  removeStore(sessionStorage, SILENT_FAIL_KEY);
+}
+
+export function shouldOfferGmailConnect() {
+  return hasEmailSessionVisit() && silentFailCount() >= 3 && !isGmailConnected();
 }
 
 function firebaseApiKey() {
@@ -239,11 +266,20 @@ async function refreshGmailAccessTokenSilently() {
 
 export async function restoreGmailSession() {
   if (getCachedToken()) return true;
+  // Only email-generator visitors in this browser session get silent renewals.
+  // Never open a Google popup from this path.
+  if (!hasEmailSessionVisit()) return false;
   if (!hasPriorGmailGrant()) return false;
   try {
     await refreshGmailAccessTokenSilently();
-    return Boolean(getCachedToken());
+    if (getCachedToken()) {
+      clearSilentFails();
+      return true;
+    }
+    bumpSilentFail();
+    return false;
   } catch (err) {
+    bumpSilentFail();
     console.warn('Silent Gmail refresh was not available.', err);
     return false;
   }

@@ -1,8 +1,19 @@
-export const APP_VERSION = '1.3.19';
+export const APP_VERSION = '1.3.20';
 export const APP_RELEASE_DATE = '26 October 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.20',
+    date: '26 Oct 2026',
+    items: [
+      'Date-of-birth Source A/B page boxes appear when both sources match, like accident dates.',
+      'Recipient first-name check, collapsed Opening accordion, combined title+claimant, and initials-aware claimant names (van/von kept).',
+      'Push to Gmail highlights incomplete fields instead of a long error list.',
+      'Google auth stays silent unless you visit Email Generator and click Connect (or silent renew fails repeatedly).',
+      'Trello Watcher downloads a run log .txt when a watch stops. Clear Bay clears immediately.',
+    ],
+  },
   {
     version: '1.3.19',
     date: '26 Oct 2026',

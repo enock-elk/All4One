@@ -110,12 +110,88 @@ document.addEventListener('DOMContentLoaded', () => {
     let alarmTimeout1 = null;
     let alarmTimeout2 = null;
     let alarmTimeout3 = null;
+    let watchRun = null;
 
     function assetUrl(rel) {
         return new URL(rel, document.baseURI).href;
     }
 
+    function stampIso(date = new Date()) {
+        return date.toISOString();
+    }
+
+    function stampFile(date = new Date()) {
+        return date.toISOString().replace(/[:.]/g, '-');
+    }
+
+    function beginWatchRun(targets) {
+        const startedAt = new Date();
+        watchRun = {
+            id: stampFile(startedAt),
+            startedAt: stampIso(startedAt),
+            stoppedAt: '',
+            boardId: localStorage.getItem(PREF_BOARD) || '',
+            boardName: boardSelect?.selectedOptions?.[0]?.textContent || '',
+            lists: targets.map((t) => ({ id: t.id, name: t.name })),
+            alertMode,
+            lines: [],
+            alarms: 0,
+            errors: 0,
+        };
+        appendWatchRun('info', `Watch run started (${targets.length} list(s)).`);
+    }
+
+    function appendWatchRun(type, msg) {
+        if (!watchRun) return;
+        const line = `[${stampIso()}] [${String(type || 'info').toUpperCase()}] ${msg}`;
+        watchRun.lines.push(line);
+        if (type === 'alarm') watchRun.alarms += 1;
+        if (type === 'error') watchRun.errors += 1;
+    }
+
+    function buildWatchRunText(run) {
+        const header = [
+            'All4One Trello Watcher — run log',
+            `Run id: ${run.id}`,
+            `Started: ${run.startedAt}`,
+            `Stopped: ${run.stoppedAt || '(still running)'}`,
+            `Board: ${run.boardName || '(unknown)'} (${run.boardId || 'n/a'})`,
+            `Lists: ${run.lists.map((list) => list.name).join(', ') || '(none)'}`,
+            `Alert mode: ${run.alertMode || 'n/a'}`,
+            `Alarms: ${run.alarms}`,
+            `Errors: ${run.errors}`,
+            '---',
+        ];
+        return `${header.join('\n')}\n${run.lines.join('\n')}\n`;
+    }
+
+    function downloadWatchRun(run) {
+        if (!run) return;
+        const text = buildWatchRunText(run);
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `trello-watch-${run.id}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        try {
+            localStorage.setItem('all4one_trello_last_run_log', text);
+        } catch (_) { /* ignore quota */ }
+    }
+
+    function finishWatchRun(reason) {
+        if (!watchRun) return;
+        watchRun.stoppedAt = stampIso();
+        appendWatchRun('info', `Watch run stopped (${reason}).`);
+        downloadWatchRun(watchRun);
+        watchRun = null;
+    }
+
     function addLog(msg, type = 'info') {
+        appendWatchRun(type, msg);
         if (!logContainer) return;
         const div = document.createElement('div');
         const time = new Date().toLocaleTimeString();
@@ -660,6 +736,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderBucketGrid([]);
         hideBoardPip();
         addLog('Disconnected from Trello.', 'error');
+        if (watchRun) finishWatchRun('disconnect');
     }
 
     function onWatcherEvent(data) {
@@ -1052,6 +1129,7 @@ document.addEventListener('DOMContentLoaded', () => {
         requestWakeLock();
         startSilentNoise();
 
+        beginWatchRun(targets);
         startPoller({ apiKey: API_KEY, token: userToken, targets });
 
         setupCard?.classList.add('hidden');
@@ -1083,6 +1161,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (btnStart) btnStart.disabled = selectedTargets().length === 0;
         if (btnStop) btnStop.disabled = true;
         addLog('Watcher stopped by user.', 'error');
+        finishWatchRun('user stop');
     });
 
     document.addEventListener('visibilitychange', async () => {

@@ -1008,7 +1008,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     btnClearBay.addEventListener('click', () => {
-        if (!confirm('Clear the holding bay?')) return;
         clearCompressUndo();
         closePagePreview();
         previewBitmap = null;

@@ -10,6 +10,7 @@ import {
   Plus,
   Minus,
   RotateCcw,
+  ChevronDown,
 } from 'lucide-react';
 import { AC_LOGO_DATA_URI } from './ac-logo-b64.js';
 import { getWorkspaceName } from '../workspace-identity.js';
@@ -21,11 +22,15 @@ import {
   clearGmailToken,
   hasPriorGmailGrant,
   describeGmailConnectError,
+  markEmailSessionVisited,
+  shouldOfferGmailConnect,
 } from '../gmail-draft.js';
 import { showAppToast } from '../ui-prefs.js';
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbw-M9kVkSSXKuJ49tohaconx99-l5VcbU1xSNeUTccX2gs0prok3LltyTyO7mdNKtm8/exec";
 
 const INPUT_CLASS = "w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm outline-none focus:border-amber-500 dark:text-white transition-all";
+const INPUT_BLOCKING_CLASS = "w-full p-3 rounded-xl border border-rose-300 dark:border-rose-500/60 bg-rose-50 dark:bg-rose-950/30 text-sm outline-none focus:border-rose-400 dark:text-white transition-all";
+const FIELD_BLOCKING_WRAP = "rounded-xl bg-rose-50/90 dark:bg-rose-950/25 ring-1 ring-rose-300/80 dark:ring-rose-500/40 p-2 -m-2";
 
 // Brand colours from official Actuary Consulting signature
 const SIG = {
@@ -188,14 +193,53 @@ function boldReportLine(value, source, valuePlaceholder, sourcePlaceholder, page
   return `<strong>${escapeHtml(filled(value, valuePlaceholder))}</strong> in the ${escapeHtml(filled(source, sourcePlaceholder))}${pageHtml}.`;
 }
 
+const SURNAME_PARTICLES = new Set([
+  'van', 'von', 'de', 'del', 'der', 'den', 'da', 'di', 'la', 'le', 'du', 'dos', 'das',
+  'ter', 'ten', 'op', 'af', 'zu', 'zur', 'bin', 'al', 'el', 'st', 'sint',
+]);
+
+function tokenLooksLikeInitials(token) {
+  const clean = String(token || '').replace(/\./g, '').trim();
+  return /^[A-Za-z]{1,4}$/.test(clean) && clean === clean.toUpperCase();
+}
+
+/** "Enock Leo Kazembe" → "EL Kazembe"; "Enock van Niekerk" → "E van Niekerk"; "EL Kazembe" stays. */
+function formatClaimantDisplayName(rawName) {
+  const parts = String(rawName || '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) return parts.join(' ');
+  if (tokenLooksLikeInitials(parts[0])) return parts.join(' ');
+
+  const given = [];
+  let index = 0;
+  while (index < parts.length - 1) {
+    const next = parts[index + 1].toLowerCase().replace(/\./g, '');
+    if (SURNAME_PARTICLES.has(next)) {
+      given.push(parts[index]);
+      index += 1;
+      break;
+    }
+    if (index === parts.length - 2) {
+      given.push(parts[index]);
+      index += 1;
+      break;
+    }
+    given.push(parts[index]);
+    index += 1;
+  }
+  const surname = parts.slice(index).join(' ');
+  if (!given.length || !surname) return parts.join(' ');
+  const initials = given.map((part) => part.charAt(0).toUpperCase()).join('');
+  return `${initials} ${surname}`;
+}
+
 function masterClaimantHtml(vars) {
   const title = filled(vars.claimantTitle, 'Mr/Ms');
-  const name = filled(vars.claimantName, '[Claimant]');
+  const name = formatClaimantDisplayName(filled(vars.claimantName, '[Claimant]'));
   return `<strong>${escapeHtml(title)} ${escapeHtml(name)}</strong>`;
 }
 
 function masterClaimantLabel(vars) {
-  return `${filled(vars.claimantTitle, 'Mr/Ms')} ${filled(vars.claimantName, '[Claimant]')}`;
+  return `${filled(vars.claimantTitle, 'Mr/Ms')} ${formatClaimantDisplayName(filled(vars.claimantName, '[Claimant]'))}`;
 }
 
 function masterPronoun(vars) {
@@ -293,30 +337,38 @@ function fieldHasValue(field, variables) {
 /** Required before Push to Gmail. Copy HTML does not use this. */
 function collectGmailPushErrors(template, variables) {
   const fields = template?.fields || [];
-  if (!fields.length) return [];
+  if (!fields.length) return { keys: [], labels: [] };
 
-  const errors = [];
+  const keys = new Set();
+  const labels = [];
+  const mark = (key, label) => {
+    if (key) keys.add(key);
+    if (label && !labels.includes(label)) labels.push(label);
+  };
   const byKey = Object.fromEntries(fields.map((field) => [field.key, field]));
 
   if (byKey.subject && !subjectHasContent(variables.subject)) {
-    errors.push('Subject (keep (DRAFT) and paste the rest)');
+    mark('subject', 'Subject');
   }
   if (byKey.recipientName && !String(variables.recipientName || '').trim()) {
-    errors.push('Recipient name');
+    mark('recipientName', 'Recipient name');
   }
   if (byKey.claimantTitle) {
     const title = String(variables.claimantTitle || '').trim();
     if (!title || title === 'Mr/Ms') {
-      errors.push('Claimant title (choose Mr, Ms, or Mrs — not Mr/Ms)');
+      mark('claimantTitle', 'Claimant title');
+      mark('claimantName', 'Claimant');
     }
   }
   if (byKey.claimantName && !String(variables.claimantName || '').trim()) {
-    errors.push('Claimant name');
+    mark('claimantName', 'Claimant name');
+    mark('claimantTitle', 'Claimant');
   }
 
   fields
     .filter((field) => field.type === 'toggle' && variables?.[field.key] && fieldIsVisible(field, variables))
     .forEach((toggle) => {
+      let toggleHasGap = false;
       fields
         .filter((field) => field.showWhen?.key === toggle.key && field.showWhen?.equals === true)
         .forEach((field) => {
@@ -324,12 +376,14 @@ function collectGmailPushErrors(template, variables) {
           if (field.type === 'toggle') return;
           if (field.key === 'idPronoun') return;
           if (!fieldHasValue(field, variables)) {
-            errors.push(`${toggle.label}: ${field.label}`);
+            mark(field.key, `${toggle.label}: ${field.label}`);
+            toggleHasGap = true;
           }
         });
+      if (toggleHasGap) mark(toggle.key, toggle.label);
     });
 
-  return errors;
+  return { keys: [...keys], labels };
 }
 
 function htmlListWithIdFollowup(items, emptyPlaceholder, gender) {
@@ -415,6 +469,7 @@ const TEMPLATES = [
         label: 'Opening',
         type: 'select',
         default: 'attorneys',
+        accordion: true,
         guidance: 'Loss of Earnings and Wrongful Arrest are separate openings. Only one is used in the draft.',
         options: [
           { value: 'attorneys', label: 'Loss of Earnings — instructing attorneys' },
@@ -424,10 +479,11 @@ const TEMPLATES = [
       },
       {
         key: 'claimantTitle',
-        label: 'Claimant title',
+        label: 'Title',
         type: 'select',
         default: 'Mr/Ms',
         row: 'claimant',
+        edge: true,
         options: [
           { value: 'Mr/Ms', label: 'Mr/Ms' },
           { value: 'Mr', label: 'Mr' },
@@ -435,7 +491,14 @@ const TEMPLATES = [
           { value: 'Mrs', label: 'Mrs' },
         ],
       },
-      { key: 'claimantName', label: 'Claimant name', type: 'text', placeholder: 'e.g. L Nkosi', row: 'claimant' },
+      {
+        key: 'claimantName',
+        label: 'Claimant',
+        type: 'text',
+        placeholder: 'e.g. Enock Leo Kazembe',
+        row: 'claimant',
+        guidance: 'Full names become initials + surname in the email (van/von kept with the surname).',
+      },
       {
         key: 'attorneyFirm',
         label: 'On behalf of',
@@ -553,6 +616,30 @@ const TEMPLATES = [
         nested: true,
         loeOnly: true,
       }),
+      {
+        key: 'dobOtPage',
+        label: 'Page A',
+        type: 'text',
+        placeholder: 'e.g. 6',
+        row: 'dob-a',
+        showWhen: { key: 'secDob', equals: true },
+        sameSource: ['dobOtSource', 'dobIpSource'],
+        nested: true,
+        compact: true,
+        loeOnly: true,
+      },
+      {
+        key: 'dobIpPage',
+        label: 'Page B',
+        type: 'text',
+        placeholder: 'e.g. 8',
+        row: 'dob-a',
+        showWhen: { key: 'secDob', equals: true },
+        sameSource: ['dobOtSource', 'dobIpSource'],
+        nested: true,
+        compact: true,
+        loeOnly: true,
+      },
       {
         key: 'secName',
         label: 'Confirm name or surname spelling',
@@ -748,9 +835,10 @@ const TEMPLATES = [
       }
 
       if (!wrongfulArrest && vars.secDob) {
+        const sameDobSource = sameDocument(vars.dobOtSource, vars.dobIpSource);
         pushRequest(`${requestLead(hasPriorRequest)} assist us by confirming the claimant\u2019s date of birth.${htmlRichList([
-          boldReportLine(vars.dobOt, vars.dobOtSource, '[date of birth]', 'OT report'),
-          boldReportLine(vars.dobIp, vars.dobIpSource, '[date of birth]', 'IP report'),
+          boldReportLine(vars.dobOt, vars.dobOtSource, '[date of birth]', 'OT report', sameDobSource ? vars.dobOtPage : ''),
+          boldReportLine(vars.dobIp, vars.dobIpSource, '[date of birth]', 'IP report', sameDobSource ? vars.dobIpPage : ''),
         ])}`);
       }
 
@@ -832,6 +920,7 @@ const TEMPLATES = [
         label: 'Opening',
         type: 'select',
         default: 'attorneys',
+        accordion: true,
         guidance: 'The thank-you goes to the instructing attorneys. The other opening is for an IP or someone else.',
         options: [
           { value: 'attorneys', label: 'Loss of Support — instructing attorneys' },
@@ -840,10 +929,11 @@ const TEMPLATES = [
       },
       {
         key: 'claimantTitle',
-        label: 'Claimant title',
+        label: 'Title',
         type: 'select',
         default: 'Ms',
         row: 'claimant',
+        edge: true,
         options: [
           { value: 'Mr/Ms', label: 'Mr/Ms' },
           { value: 'Mr', label: 'Mr' },
@@ -853,10 +943,11 @@ const TEMPLATES = [
       },
       {
         key: 'claimantName',
-        label: 'Claimant name',
+        label: 'Claimant',
         type: 'text',
-        placeholder: 'e.g. L Nkosi',
+        placeholder: 'e.g. Enock Leo Kazembe',
         row: 'claimant',
+        guidance: 'Full names become initials + surname in the email (van/von kept with the surname).',
       },
       {
         key: 'attorneyFirm',
@@ -1109,13 +1200,16 @@ export default function EmailEngine() {
   const [isPushing, setIsPushing] = useState(false);
   const [gmailLinked, setGmailLinked] = useState(() => isGmailConnected());
   const [sourceMode, setSourceMode] = useState({});
+  const [blockingKeys, setBlockingKeys] = useState([]);
+  const [openingOpen, setOpeningOpen] = useState(false);
+  const [recipientConfirm, setRecipientConfirm] = useState('');
   const [inputsWidth, setInputsWidth] = useState(readEmailInputsWidth);
   const inputsWidthRef = useRef(inputsWidth);
   const previewRef = useRef(null);
 
   useEffect(() => {
-    // Only use a cached token on load. Never open Google auth or a connect
-    // prompt until the user clicks Connect Gmail / Push to Gmail.
+    // Email-tab visitors only. Cached token on load; never open Google UI here.
+    markEmailSessionVisited();
     setGmailLinked(isGmailConnected());
   }, []);
 
@@ -1133,7 +1227,14 @@ export default function EmailEngine() {
       }
       // Silent renew only — no consent UI (prompt: 'none').
       const ok = await restoreGmailSession();
-      if (!cancel) setGmailLinked(ok);
+      if (cancel) return;
+      setGmailLinked(ok);
+      if (!ok && shouldOfferGmailConnect()) {
+        setStatus({
+          msg: 'Gmail is not connected quietly. Click Connect Gmail when you need drafts.',
+          type: 'info',
+        });
+      }
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
@@ -1158,6 +1259,9 @@ export default function EmailEngine() {
       setParsedKeys({ subject: [], body: [] });
       setVariables(initialVariables(template));
       setSourceMode({});
+      setBlockingKeys([]);
+      setOpeningOpen(false);
+      setRecipientConfirm('');
       setStatus({ msg: '', type: '' });
       return;
     }
@@ -1168,6 +1272,9 @@ export default function EmailEngine() {
     });
     setVariables(initialVariables(template));
     setSourceMode({});
+    setBlockingKeys([]);
+    setOpeningOpen(false);
+    setRecipientConfirm('');
     setStatus({ msg: '', type: '' });
   }, [selectedTemplateId]);
 
@@ -1178,6 +1285,19 @@ export default function EmailEngine() {
       if (key === 'secInformal' && !val) next.secInformalDocs = false;
       return next;
     });
+    setBlockingKeys((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : prev));
+    if (key === 'recipientName') setRecipientConfirm('');
+    if (key === 'audience' && val !== 'attorneys') setOpeningOpen(true);
+  };
+
+  const checkRecipientFirstName = () => {
+    const value = String(variables.recipientName || '').trim();
+    const parts = value.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      setRecipientConfirm(parts[0]);
+    } else {
+      setRecipientConfirm('');
+    }
   };
 
   const handleLineChange = (key, index, value) => {
@@ -1340,13 +1460,15 @@ export default function EmailEngine() {
     }
 
     const missing = collectGmailPushErrors(selectedTemplate, variables);
-    if (missing.length) {
+    if (missing.keys.length) {
+      setBlockingKeys(missing.keys);
       setStatus({
-        msg: `Fill these before Push to Gmail: ${missing.join('; ')}.`,
+        msg: 'Complete the highlighted fields before Push to Gmail.',
         type: 'error',
       });
       return;
     }
+    setBlockingKeys([]);
 
     setIsPushing(true);
     setStatus({ msg: 'Pushing draft to Gmail...', type: 'info' });
@@ -1444,11 +1566,14 @@ export default function EmailEngine() {
     : null;
   const fieldCount = visibleFields ? visibleFields.length : allUniqueKeys.length;
 
+  const inputClassFor = (fieldKey) => (blockingKeys.includes(fieldKey) ? INPUT_BLOCKING_CLASS : INPUT_CLASS);
+
   const renderStructuredField = (field) => {
     if (field.type === 'toggle') {
       const on = Boolean(variables[field.key]);
+      const blocked = blockingKeys.includes(field.key);
       return (
-        <label className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 cursor-pointer transition-colors ${on ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/30' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40'}`}>
+        <label className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 cursor-pointer transition-colors ${blocked ? 'border-rose-300 bg-rose-50 dark:bg-rose-950/30' : on ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/30' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40'}`}>
           <input
             type="checkbox"
             checked={on}
@@ -1468,17 +1593,42 @@ export default function EmailEngine() {
     if (field.type === 'select') {
       const options = field.options || [];
       const hasEmptyOption = options.some((opt) => opt.value === '');
-      return (
+      const selectEl = (
         <select
           value={variables[field.key] || ''}
           onChange={(e) => handleVarChange(field.key, e.target.value)}
-          className={`${INPUT_CLASS} appearance-none cursor-pointer`}
+          className={`${inputClassFor(field.key)} appearance-none cursor-pointer`}
         >
           {!hasEmptyOption && field.default == null ? <option value="">Select {field.label.toLowerCase()}</option> : null}
           {options.map((opt) => (
             <option key={`${field.key}-${opt.value || 'empty'}`} value={opt.value}>{opt.label}</option>
           ))}
         </select>
+      );
+      if (!field.accordion) return selectEl;
+      const current = options.find((opt) => opt.value === (variables[field.key] || field.default))?.label || field.label;
+      return (
+        <div className={`rounded-xl border ${blockingKeys.includes(field.key) ? 'border-rose-300 bg-rose-50/80 dark:bg-rose-950/20' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40'}`}>
+          <button
+            type="button"
+            onClick={() => setOpeningOpen((open) => !open)}
+            className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left"
+          >
+            <span className="min-w-0">
+              <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">{field.label}</span>
+              <span className="block text-sm font-medium text-slate-800 dark:text-slate-100 truncate">{current}</span>
+            </span>
+            <ChevronDown className={`w-4 h-4 shrink-0 text-slate-400 transition-transform ${openingOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {openingOpen ? (
+            <div className="px-3 pb-3 space-y-2 border-t border-slate-100 dark:border-slate-700 pt-2">
+              {field.guidance ? (
+                <p className="text-[11px] leading-snug text-slate-500 dark:text-slate-400">{field.guidance}</p>
+              ) : null}
+              {selectEl}
+            </div>
+          ) : null}
+        </div>
       );
     }
 
@@ -1501,7 +1651,7 @@ export default function EmailEngine() {
                 handleVarChange(field.key, next);
               }
             }}
-            className={`${INPUT_CLASS} appearance-none cursor-pointer`}
+            className={`${inputClassFor(field.key)} appearance-none cursor-pointer`}
           >
             {!value ? <option value="">Select a document</option> : null}
             {options.map((opt) => (
@@ -1515,7 +1665,7 @@ export default function EmailEngine() {
               value={known ? '' : value}
               onChange={(e) => handleVarChange(field.key, e.target.value)}
               placeholder="Type the document name"
-              className={INPUT_CLASS}
+              className={inputClassFor(field.key)}
             />
           ) : null}
         </div>
@@ -1559,7 +1709,7 @@ export default function EmailEngine() {
                 value={line}
                 onChange={(e) => handleLineChange(field.key, idx, e.target.value)}
                 placeholder={field.placeholder || `Enter ${field.label}...`}
-                className={INPUT_CLASS}
+                className={inputClassFor(field.key)}
               />
               <button
                 type="button"
@@ -1589,35 +1739,70 @@ export default function EmailEngine() {
           onChange={(e) => handleVarChange(field.key, e.target.value)}
           placeholder={field.placeholder || `Enter ${field.label}...`}
           rows={3}
-          className={`${INPUT_CLASS} resize-y`}
+          className={`${inputClassFor(field.key)} resize-y`}
         />
       );
     }
 
     return (
-      <input
-        type="text"
-        value={variables[field.key] || ''}
-        onChange={(e) => handleVarChange(field.key, e.target.value)}
-        placeholder={field.key === 'subject'
-          ? draftSubject(selectedTemplate.name, masterClaimantLabel(variables))
-          : (field.placeholder || `Enter ${field.label}...`)}
-        className={INPUT_CLASS}
-      />
+      <div className="space-y-2">
+        <input
+          type="text"
+          value={variables[field.key] || ''}
+          onChange={(e) => handleVarChange(field.key, e.target.value)}
+          onBlur={field.key === 'recipientName' ? checkRecipientFirstName : undefined}
+          placeholder={field.key === 'subject'
+            ? draftSubject(selectedTemplate.name, masterClaimantLabel(variables))
+            : (field.placeholder || `Enter ${field.label}...`)}
+          className={inputClassFor(field.key)}
+        />
+        {field.key === 'recipientName' && recipientConfirm ? (
+          <div className="rounded-xl border border-amber-300/80 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-[11px] text-slate-700 dark:text-slate-200 space-y-2">
+            <p>Recipient should be a first name only. Use <strong>{recipientConfirm}</strong>?</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  handleVarChange('recipientName', recipientConfirm);
+                  setRecipientConfirm('');
+                }}
+                className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500 text-slate-900"
+              >
+                Use {recipientConfirm}
+              </button>
+              <button
+                type="button"
+                onClick={() => setRecipientConfirm('')}
+                className="px-2.5 py-1 rounded-lg text-[11px] font-bold border border-slate-300 dark:border-slate-600"
+              >
+                Keep as typed
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {field.key === 'claimantName' && String(variables.claimantName || '').trim() ? (
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            In the email: <span className="font-semibold text-slate-700 dark:text-slate-200">{formatClaimantDisplayName(variables.claimantName)}</span>
+          </p>
+        ) : null}
+      </div>
     );
   };
 
   const rowLayoutClass = (row) => {
     if (row.length <= 1) return '';
+    if (row.some((field) => field.edge)) return 'flex items-end gap-2';
     if (row.some((field) => field.compact)) return 'flex flex-wrap items-end gap-2';
     return 'grid grid-cols-2 gap-2';
   };
 
   const fieldCellClass = (field, row) => {
     const nested = row.length === 1 && field.nested ? 'pl-3 border-l-2 border-amber-200 dark:border-amber-800' : '';
-    if (field.compact) return `min-w-0 w-[4.75rem] shrink-0 ${nested}`;
-    if (row.some((item) => item.compact)) return `min-w-0 flex-1 basis-[8rem] ${nested}`;
-    return `min-w-0 ${nested}`;
+    const blocked = blockingKeys.includes(field.key) && field.type !== 'toggle' ? FIELD_BLOCKING_WRAP : '';
+    if (field.edge) return `min-w-0 w-[6.5rem] shrink-0 ${nested} ${blocked}`;
+    if (field.compact) return `min-w-0 w-[4.75rem] shrink-0 ${nested} ${blocked}`;
+    if (row.some((item) => item.edge || item.compact)) return `min-w-0 flex-1 basis-[8rem] ${nested} ${blocked}`;
+    return `min-w-0 ${nested} ${blocked}`;
   };
 
   return (
@@ -1692,10 +1877,10 @@ export default function EmailEngine() {
                         key={field.key}
                         className={fieldCellClass(field, row)}
                       >
-                        {field.type === 'toggle' ? null : (
+                        {field.type === 'toggle' || field.accordion ? null : (
                           <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">{field.label}</label>
                         )}
-                        {field.type !== 'toggle' && field.guidance ? (
+                        {field.type !== 'toggle' && !field.accordion && field.guidance ? (
                           <p className="text-[11px] leading-snug text-slate-500 dark:text-slate-400 mb-1">{field.guidance}</p>
                         ) : null}
                         {renderStructuredField(field)}
