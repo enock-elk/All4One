@@ -29,8 +29,10 @@ import { showAppToast } from '../ui-prefs.js';
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbw-M9kVkSSXKuJ49tohaconx99-l5VcbU1xSNeUTccX2gs0prok3LltyTyO7mdNKtm8/exec";
 
 const INPUT_CLASS = "w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm outline-none focus:border-amber-500 dark:text-white transition-all";
-const INPUT_BLOCKING_CLASS = "w-full p-3 rounded-xl border border-rose-300 dark:border-rose-500/60 bg-rose-50 dark:bg-rose-950/30 text-sm outline-none focus:border-rose-400 dark:text-white transition-all";
-const FIELD_BLOCKING_WRAP = "rounded-xl bg-rose-50/90 dark:bg-rose-950/25 ring-1 ring-rose-300/80 dark:ring-rose-500/40 p-2 -m-2";
+const INPUT_BLOCKING_CLASS = "w-full p-3 rounded-xl border border-rose-300/80 dark:border-rose-400/50 bg-rose-50/50 dark:bg-rose-950/20 text-sm outline-none focus:border-rose-400 dark:text-white transition-all";
+const CHROME_CLASS = "flex items-stretch rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-hidden focus-within:border-amber-500 transition-all";
+const CHROME_BLOCKING_CLASS = "flex items-stretch rounded-xl border border-rose-300/80 dark:border-rose-400/50 bg-rose-50/50 dark:bg-rose-950/20 overflow-hidden focus-within:border-rose-400 transition-all";
+const CHROME_INNER = "border-0 bg-transparent text-sm outline-none dark:text-white";
 
 // Brand colours from official Actuary Consulting signature
 const SIG = {
@@ -203,7 +205,7 @@ function tokenLooksLikeInitials(token) {
   return /^[A-Za-z]{1,4}$/.test(clean) && clean === clean.toUpperCase();
 }
 
-/** "Enock Leo Kazembe" → "EL Kazembe"; "Enock van Niekerk" → "E van Niekerk"; "EL Kazembe" stays. */
+/** "Tanaka Christopher Mokgoro" → "TC Mokgoro"; "Tanaka van Niekerk" → "T van Niekerk"; "TC Mokgoro" stays. */
 function formatClaimantDisplayName(rawName) {
   const parts = String(rawName || '').trim().split(/\s+/).filter(Boolean);
   if (parts.length <= 1) return parts.join(' ');
@@ -334,8 +336,8 @@ function fieldHasValue(field, variables) {
   return Boolean(String(value ?? '').trim());
 }
 
-/** Required before Push to Gmail. Copy HTML does not use this. */
-function collectGmailPushErrors(template, variables) {
+/** Required before Push to Gmail. Copy HTML can skip Subject. */
+function collectGmailPushErrors(template, variables, { requireSubject = true } = {}) {
   const fields = template?.fields || [];
   if (!fields.length) return { keys: [], labels: [] };
 
@@ -347,7 +349,7 @@ function collectGmailPushErrors(template, variables) {
   };
   const byKey = Object.fromEntries(fields.map((field) => [field.key, field]));
 
-  if (byKey.subject && !subjectHasContent(variables.subject)) {
+  if (requireSubject && byKey.subject && !subjectHasContent(variables.subject)) {
     mark('subject', 'Subject');
   }
   if (byKey.recipientName && !String(variables.recipientName || '').trim()) {
@@ -495,9 +497,8 @@ const TEMPLATES = [
         key: 'claimantName',
         label: 'Claimant',
         type: 'text',
-        placeholder: 'e.g. Enock Leo Kazembe',
+        placeholder: 'e.g. Tanaka Christopher Mokgoro',
         row: 'claimant',
-        guidance: 'Full names become initials + surname in the email (van/von kept with the surname).',
       },
       {
         key: 'attorneyFirm',
@@ -536,6 +537,7 @@ const TEMPLATES = [
         showWhen: { key: 'secAccident', equals: true },
         nested: true,
         loeOnly: true,
+        pageKey: 'accidentOtPage',
       }),
       {
         key: 'accidentIp',
@@ -552,17 +554,17 @@ const TEMPLATES = [
         showWhen: { key: 'secAccident', equals: true },
         nested: true,
         loeOnly: true,
+        pageKey: 'accidentIpPage',
       }),
       {
         key: 'accidentOtPage',
         label: 'Page A',
         type: 'text',
         placeholder: 'e.g. 6',
-        row: 'accident-a',
         showWhen: { key: 'secAccident', equals: true },
         sameSource: ['accidentOtSource', 'accidentIpSource'],
         nested: true,
-        compact: true,
+        embedded: true,
         loeOnly: true,
       },
       {
@@ -570,11 +572,10 @@ const TEMPLATES = [
         label: 'Page B',
         type: 'text',
         placeholder: 'e.g. 8',
-        row: 'accident-a',
         showWhen: { key: 'secAccident', equals: true },
         sameSource: ['accidentOtSource', 'accidentIpSource'],
         nested: true,
-        compact: true,
+        embedded: true,
         loeOnly: true,
       },
       {
@@ -599,6 +600,7 @@ const TEMPLATES = [
         showWhen: { key: 'secDob', equals: true },
         nested: true,
         loeOnly: true,
+        pageKey: 'dobOtPage',
       }),
       {
         key: 'dobIp',
@@ -615,17 +617,17 @@ const TEMPLATES = [
         showWhen: { key: 'secDob', equals: true },
         nested: true,
         loeOnly: true,
+        pageKey: 'dobIpPage',
       }),
       {
         key: 'dobOtPage',
         label: 'Page A',
         type: 'text',
         placeholder: 'e.g. 6',
-        row: 'dob-a',
         showWhen: { key: 'secDob', equals: true },
         sameSource: ['dobOtSource', 'dobIpSource'],
         nested: true,
-        compact: true,
+        embedded: true,
         loeOnly: true,
       },
       {
@@ -633,11 +635,10 @@ const TEMPLATES = [
         label: 'Page B',
         type: 'text',
         placeholder: 'e.g. 8',
-        row: 'dob-a',
         showWhen: { key: 'secDob', equals: true },
         sameSource: ['dobOtSource', 'dobIpSource'],
         nested: true,
-        compact: true,
+        embedded: true,
         loeOnly: true,
       },
       {
@@ -945,9 +946,8 @@ const TEMPLATES = [
         key: 'claimantName',
         label: 'Claimant',
         type: 'text',
-        placeholder: 'e.g. Enock Leo Kazembe',
+        placeholder: 'e.g. Tanaka Christopher Mokgoro',
         row: 'claimant',
-        guidance: 'Full names become initials + surname in the email (van/von kept with the surname).',
       },
       {
         key: 'attorneyFirm',
@@ -977,6 +977,7 @@ const TEMPLATES = [
         showWhen: { key: 'secAccident', equals: true },
         nested: true,
         options: LOS_SOURCES,
+        pageKey: 'accidentOtPage',
       }),
       {
         key: 'accidentIp',
@@ -992,28 +993,27 @@ const TEMPLATES = [
         showWhen: { key: 'secAccident', equals: true },
         nested: true,
         options: LOS_SOURCES,
+        pageKey: 'accidentIpPage',
       }),
       {
         key: 'accidentOtPage',
         label: 'Page A',
         type: 'text',
         placeholder: 'e.g. 6',
-        row: 'accident-a',
         showWhen: { key: 'secAccident', equals: true },
         sameSource: ['accidentOtSource', 'accidentIpSource'],
         nested: true,
-        compact: true,
+        embedded: true,
       },
       {
         key: 'accidentIpPage',
         label: 'Page B',
         type: 'text',
         placeholder: 'e.g. 8',
-        row: 'accident-a',
         showWhen: { key: 'secAccident', equals: true },
         sameSource: ['accidentOtSource', 'accidentIpSource'],
         nested: true,
-        compact: true,
+        embedded: true,
       },
       {
         key: 'secIpDocs',
@@ -1398,6 +1398,17 @@ export default function EmailEngine() {
   };
 
   const copyToClipboard = () => {
+    const missing = collectGmailPushErrors(selectedTemplate, variables, { requireSubject: false });
+    if (missing.keys.length) {
+      setBlockingKeys(missing.keys);
+      setStatus({
+        msg: 'Complete the highlighted fields before copying.',
+        type: 'error',
+      });
+      return;
+    }
+    setBlockingKeys([]);
+
     const htmlBody = currentHtmlBody();
     try {
       const blobHtml = new Blob([htmlBody], { type: "text/html" });
@@ -1551,7 +1562,7 @@ export default function EmailEngine() {
   const allUniqueKeys = [...new Set([...parsedKeys.subject, ...parsedKeys.body])];
   const structuredFields = selectedTemplate.fields || null;
   const visibleFields = structuredFields
-    ? structuredFields.filter((field) => fieldIsVisible(field, variables))
+    ? structuredFields.filter((field) => fieldIsVisible(field, variables) && !field.embedded)
     : null;
   const structuredRows = visibleFields
     ? visibleFields.reduce((rows, field) => {
@@ -1567,13 +1578,67 @@ export default function EmailEngine() {
   const fieldCount = visibleFields ? visibleFields.length : allUniqueKeys.length;
 
   const inputClassFor = (fieldKey) => (blockingKeys.includes(fieldKey) ? INPUT_BLOCKING_CLASS : INPUT_CLASS);
+  const chromeClassFor = (...keys) => (
+    keys.some((key) => blockingKeys.includes(key)) ? CHROME_BLOCKING_CLASS : CHROME_CLASS
+  );
+
+  const renderPageSlot = (pageField) => {
+    if (!pageField) return null;
+    return (
+      <>
+        <div className="w-px self-stretch bg-slate-200 dark:bg-slate-600 shrink-0" aria-hidden="true" />
+        <input
+          type="text"
+          value={variables[pageField.key] || ''}
+          onChange={(e) => handleVarChange(pageField.key, e.target.value)}
+          placeholder={pageField.placeholder || 'Pg'}
+          aria-label={pageField.label}
+          className={`${CHROME_INNER} w-[3.25rem] shrink-0 px-2 py-3 text-center`}
+        />
+      </>
+    );
+  };
+
+  const renderClaimantChrome = (titleField, nameField) => {
+    const nameValue = variables[nameField.key] || '';
+    return (
+      <div className="space-y-2">
+        <div className={chromeClassFor(titleField.key, nameField.key)}>
+          <select
+            value={variables[titleField.key] || ''}
+            onChange={(e) => handleVarChange(titleField.key, e.target.value)}
+            aria-label={titleField.label}
+            className={`${CHROME_INNER} shrink-0 w-[5.5rem] px-3 py-3 appearance-none cursor-pointer font-medium`}
+          >
+            {(titleField.options || []).map((opt) => (
+              <option key={`${titleField.key}-${opt.value || 'empty'}`} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+          <div className="w-px self-stretch bg-slate-200 dark:bg-slate-600 shrink-0" aria-hidden="true" />
+          <input
+            type="text"
+            value={nameValue}
+            onChange={(e) => handleVarChange(nameField.key, e.target.value)}
+            placeholder={nameField.placeholder || 'Enter claimant name...'}
+            aria-label={nameField.label}
+            className={`${CHROME_INNER} min-w-0 flex-1 px-3 py-3`}
+          />
+        </div>
+        {String(nameValue).trim() ? (
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            In the email: <span className="font-semibold text-slate-700 dark:text-slate-200">{formatClaimantDisplayName(nameValue)}</span>
+          </p>
+        ) : null}
+      </div>
+    );
+  };
 
   const renderStructuredField = (field) => {
     if (field.type === 'toggle') {
       const on = Boolean(variables[field.key]);
       const blocked = blockingKeys.includes(field.key);
       return (
-        <label className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 cursor-pointer transition-colors ${blocked ? 'border-rose-300 bg-rose-50 dark:bg-rose-950/30' : on ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/30' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40'}`}>
+        <label className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 cursor-pointer transition-colors ${blocked ? 'border-rose-300/80 dark:border-rose-400/50' : on ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/30' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40'}`}>
           <input
             type="checkbox"
             checked={on}
@@ -1608,7 +1673,7 @@ export default function EmailEngine() {
       if (!field.accordion) return selectEl;
       const current = options.find((opt) => opt.value === (variables[field.key] || field.default))?.label || field.label;
       return (
-        <div className={`rounded-xl border ${blockingKeys.includes(field.key) ? 'border-rose-300 bg-rose-50/80 dark:bg-rose-950/20' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40'}`}>
+        <div className={`rounded-xl border ${blockingKeys.includes(field.key) ? 'border-rose-300/80 dark:border-rose-400/50' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40'}`}>
           <button
             type="button"
             onClick={() => setOpeningOpen((open) => !open)}
@@ -1636,22 +1701,55 @@ export default function EmailEngine() {
       const value = variables[field.key] || '';
       const options = field.options || [];
       const known = options.includes(value);
-      const selectValue = sourceMode[field.key] === 'other' || (value && !known) ? '__other__' : value;
+      const isOther = sourceMode[field.key] === 'other' || (value && !known);
+      const pageField = field.pageKey
+        ? structuredFields?.find((item) => item.key === field.pageKey)
+        : null;
+      const pageVisible = Boolean(pageField && fieldIsVisible(pageField, variables));
+      const pageKeys = pageVisible ? [pageField.key] : [];
+
+      if (isOther) {
+        return (
+          <div className={chromeClassFor(field.key, ...pageKeys)}>
+            <button
+              type="button"
+              title="Choose a built-in document type"
+              onClick={() => {
+                setSourceMode((prev) => ({ ...prev, [field.key]: 'list' }));
+                handleVarChange(field.key, '');
+              }}
+              className={`${CHROME_INNER} shrink-0 px-3 py-3 font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer`}
+            >
+              Other
+            </button>
+            <div className="w-px self-stretch bg-slate-200 dark:bg-slate-600 shrink-0" aria-hidden="true" />
+            <input
+              type="text"
+              value={known ? '' : value}
+              onChange={(e) => handleVarChange(field.key, e.target.value)}
+              placeholder="Type the document name"
+              className={`${CHROME_INNER} min-w-0 flex-1 px-3 py-3`}
+            />
+            {pageVisible ? renderPageSlot(pageField) : null}
+          </div>
+        );
+      }
+
       return (
-        <div className="space-y-2">
+        <div className={chromeClassFor(field.key, ...pageKeys)}>
           <select
-            value={selectValue}
+            value={value}
             onChange={(e) => {
               const next = e.target.value;
               if (next === '__other__') {
                 setSourceMode((prev) => ({ ...prev, [field.key]: 'other' }));
-                if (known) handleVarChange(field.key, '');
+                handleVarChange(field.key, '');
               } else {
                 setSourceMode((prev) => ({ ...prev, [field.key]: 'list' }));
                 handleVarChange(field.key, next);
               }
             }}
-            className={`${inputClassFor(field.key)} appearance-none cursor-pointer`}
+            className={`${CHROME_INNER} min-w-0 flex-1 px-3 py-3 appearance-none cursor-pointer`}
           >
             {!value ? <option value="">Select a document</option> : null}
             {options.map((opt) => (
@@ -1659,15 +1757,7 @@ export default function EmailEngine() {
             ))}
             <option value="__other__">Other…</option>
           </select>
-          {selectValue === '__other__' ? (
-            <input
-              type="text"
-              value={known ? '' : value}
-              onChange={(e) => handleVarChange(field.key, e.target.value)}
-              placeholder="Type the document name"
-              className={inputClassFor(field.key)}
-            />
-          ) : null}
+          {pageVisible ? renderPageSlot(pageField) : null}
         </div>
       );
     }
@@ -1780,11 +1870,6 @@ export default function EmailEngine() {
             </div>
           </div>
         ) : null}
-        {field.key === 'claimantName' && String(variables.claimantName || '').trim() ? (
-          <p className="text-[11px] text-slate-500 dark:text-slate-400">
-            In the email: <span className="font-semibold text-slate-700 dark:text-slate-200">{formatClaimantDisplayName(variables.claimantName)}</span>
-          </p>
-        ) : null}
       </div>
     );
   };
@@ -1798,11 +1883,10 @@ export default function EmailEngine() {
 
   const fieldCellClass = (field, row) => {
     const nested = row.length === 1 && field.nested ? 'pl-3 border-l-2 border-amber-200 dark:border-amber-800' : '';
-    const blocked = blockingKeys.includes(field.key) && field.type !== 'toggle' ? FIELD_BLOCKING_WRAP : '';
-    if (field.edge) return `min-w-0 w-[6.5rem] shrink-0 ${nested} ${blocked}`;
-    if (field.compact) return `min-w-0 w-[4.75rem] shrink-0 ${nested} ${blocked}`;
-    if (row.some((item) => item.edge || item.compact)) return `min-w-0 flex-1 basis-[8rem] ${nested} ${blocked}`;
-    return `min-w-0 ${nested} ${blocked}`;
+    if (field.edge) return `min-w-0 w-[6.5rem] shrink-0 ${nested}`;
+    if (field.compact) return `min-w-0 w-[4.75rem] shrink-0 ${nested}`;
+    if (row.some((item) => item.edge || item.compact)) return `min-w-0 flex-1 basis-[8rem] ${nested}`;
+    return `min-w-0 ${nested}`;
   };
 
   return (
@@ -1867,27 +1951,39 @@ export default function EmailEngine() {
 
             {structuredFields ? (
               <div className="space-y-4">
-                {structuredRows.map((row) => (
-                  <div
-                    key={row.map((field) => field.key).join('-')}
-                    className={rowLayoutClass(row)}
-                  >
-                    {row.map((field) => (
-                      <div
-                        key={field.key}
-                        className={fieldCellClass(field, row)}
-                      >
-                        {field.type === 'toggle' || field.accordion ? null : (
-                          <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">{field.label}</label>
-                        )}
-                        {field.type !== 'toggle' && !field.accordion && field.guidance ? (
-                          <p className="text-[11px] leading-snug text-slate-500 dark:text-slate-400 mb-1">{field.guidance}</p>
-                        ) : null}
-                        {renderStructuredField(field)}
+                {structuredRows.map((row) => {
+                  const titleField = row.find((field) => field.key === 'claimantTitle');
+                  const nameField = row.find((field) => field.key === 'claimantName');
+                  if (titleField && nameField) {
+                    return (
+                      <div key="claimant-chrome" className="min-w-0">
+                        <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">Claimant</label>
+                        {renderClaimantChrome(titleField, nameField)}
                       </div>
-                    ))}
-                  </div>
-                ))}
+                    );
+                  }
+                  return (
+                    <div
+                      key={row.map((field) => field.key).join('-')}
+                      className={rowLayoutClass(row)}
+                    >
+                      {row.map((field) => (
+                        <div
+                          key={field.key}
+                          className={fieldCellClass(field, row)}
+                        >
+                          {field.type === 'toggle' || field.accordion ? null : (
+                            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">{field.label}</label>
+                          )}
+                          {field.type !== 'toggle' && !field.accordion && field.guidance ? (
+                            <p className="text-[11px] leading-snug text-slate-500 dark:text-slate-400 mb-1">{field.guidance}</p>
+                          ) : null}
+                          {renderStructuredField(field)}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
               </div>
             ) : allUniqueKeys.length === 0 ? (
               <p className="text-sm text-slate-400 text-center py-4">No dynamic variables detected.</p>
