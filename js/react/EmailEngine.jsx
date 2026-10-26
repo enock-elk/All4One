@@ -57,7 +57,7 @@ const getSignatureHtml = () => `
     <strong style="color: ${SIG.label};">M</strong>&nbsp;082 374 5552
   </p>
   <p style="margin: 0; color: ${SIG.text};">
-    <strong style="color: ${SIG.label};">E</strong>&nbsp;<a href="mailto:namir@actuaryconsulting.co.za" style="color: ${SIG.link}; text-decoration: underline;">namir@actuaryconsulting.co.za</a>&nbsp;&nbsp;&nbsp;
+    <strong style="color: ${SIG.label};">E</strong>&nbsp;<a href="mailto:namir@actuaryconsulting.co.za" style="color: ${SIG.link}; text-decoration: underline;">namir@actuaryconsulting.co.za</a>&nbsp;
     <strong style="color: ${SIG.label};">W</strong>&nbsp;<a href="https://actuaryconsulting.co.za" target="_blank" rel="noopener noreferrer" style="color: ${SIG.link}; text-decoration: underline;">actuaryconsulting.co.za</a>
   </p>
 </div>
@@ -277,6 +277,61 @@ function fieldIsVisible(field, variables) {
   return true;
 }
 
+function subjectHasContent(value) {
+  return Boolean(String(value || '').replace(/^\(DRAFT\)\s*/i, '').trim());
+}
+
+function fieldHasValue(field, variables) {
+  const value = variables?.[field.key];
+  if (field.type === 'lines') {
+    return (Array.isArray(value) ? value : []).some((line) => String(line || '').trim());
+  }
+  if (field.type === 'toggle') return true;
+  return Boolean(String(value ?? '').trim());
+}
+
+/** Required before Push to Gmail. Copy HTML does not use this. */
+function collectGmailPushErrors(template, variables) {
+  const fields = template?.fields || [];
+  if (!fields.length) return [];
+
+  const errors = [];
+  const byKey = Object.fromEntries(fields.map((field) => [field.key, field]));
+
+  if (byKey.subject && !subjectHasContent(variables.subject)) {
+    errors.push('Subject (keep (DRAFT) and paste the rest)');
+  }
+  if (byKey.recipientName && !String(variables.recipientName || '').trim()) {
+    errors.push('Recipient name');
+  }
+  if (byKey.claimantTitle) {
+    const title = String(variables.claimantTitle || '').trim();
+    if (!title || title === 'Mr/Ms') {
+      errors.push('Claimant title (choose Mr, Ms, or Mrs — not Mr/Ms)');
+    }
+  }
+  if (byKey.claimantName && !String(variables.claimantName || '').trim()) {
+    errors.push('Claimant name');
+  }
+
+  fields
+    .filter((field) => field.type === 'toggle' && variables?.[field.key] && fieldIsVisible(field, variables))
+    .forEach((toggle) => {
+      fields
+        .filter((field) => field.showWhen?.key === toggle.key && field.showWhen?.equals === true)
+        .forEach((field) => {
+          if (!fieldIsVisible(field, variables)) return;
+          if (field.type === 'toggle') return;
+          if (field.key === 'idPronoun') return;
+          if (!fieldHasValue(field, variables)) {
+            errors.push(`${toggle.label}: ${field.label}`);
+          }
+        });
+    });
+
+  return errors;
+}
+
 function htmlListWithIdFollowup(items, emptyPlaceholder, gender) {
   return `${htmlList(items, emptyPlaceholder)}${orIdDocumentLine(gender)}`;
 }
@@ -350,7 +405,9 @@ const TEMPLATES = [
         key: 'subject',
         label: 'Subject',
         type: 'text',
-        guidance: 'Leave this blank to keep the automatic subject.',
+        default: '(DRAFT) ',
+        placeholder: '(DRAFT) paste the rest of the subject…',
+        guidance: '(DRAFT) is filled for you. Paste the rest of the subject after it. Required for Push to Gmail; Copy HTML does not need it.',
       },
       { key: 'recipientName', label: 'Recipient name', type: 'text', placeholder: 'e.g. Ntembeko' },
       {
@@ -748,8 +805,9 @@ const TEMPLATES = [
       parts.push(SIGN_OFF);
 
       const generatedSubject = draftSubject(this.name, masterClaimantLabel(vars));
+      const typedSubject = String(vars.subject || '').trim();
       return {
-        subject: String(vars.subject || '').trim() || generatedSubject,
+        subject: subjectHasContent(typedSubject) ? typedSubject : generatedSubject,
         bodyHtml: parts.join('<br/><br/>'),
       };
     },
@@ -764,7 +822,9 @@ const TEMPLATES = [
         key: 'subject',
         label: 'Subject',
         type: 'text',
-        guidance: 'Leave this blank to keep the automatic subject.',
+        default: '(DRAFT) ',
+        placeholder: '(DRAFT) paste the rest of the subject…',
+        guidance: '(DRAFT) is filled for you. Paste the rest of the subject after it. Required for Push to Gmail; Copy HTML does not need it.',
       },
       { key: 'recipientName', label: 'Recipient name', type: 'text', placeholder: 'e.g. Ntembeko' },
       {
@@ -911,8 +971,9 @@ const TEMPLATES = [
       parts.push(TURNAROUND);
       parts.push(SIGN_OFF);
       const generatedSubject = draftSubject(this.name, masterClaimantLabel(vars));
+      const typedSubject = String(vars.subject || '').trim();
       return {
-        subject: String(vars.subject || '').trim() || generatedSubject,
+        subject: subjectHasContent(typedSubject) ? typedSubject : generatedSubject,
         bodyHtml: parts.join('<br/><br/>'),
       };
     },
@@ -1277,6 +1338,16 @@ export default function EmailEngine() {
       setStatus({ msg: 'Connect Gmail before pushing a draft.', type: 'error' });
       return;
     }
+
+    const missing = collectGmailPushErrors(selectedTemplate, variables);
+    if (missing.length) {
+      setStatus({
+        msg: `Fill these before Push to Gmail: ${missing.join('; ')}.`,
+        type: 'error',
+      });
+      return;
+    }
+
     setIsPushing(true);
     setStatus({ msg: 'Pushing draft to Gmail...', type: 'info' });
 

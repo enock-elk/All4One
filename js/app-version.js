@@ -1,8 +1,17 @@
-export const APP_VERSION = '1.3.18';
-export const APP_RELEASE_DATE = '19 October 2026';
+export const APP_VERSION = '1.3.19';
+export const APP_RELEASE_DATE = '26 October 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.19',
+    date: '26 Oct 2026',
+    items: [
+      'Push to Gmail requires Subject, Recipient name, Claimant title (not Mr/Ms), Claimant name, and every field in a selected block.',
+      'Subject starts with (DRAFT) so you can paste the rest. Copy HTML still works without a subject.',
+      'The signature E / W line no longer has extra spaces between the email and website.',
+    ],
+  },
   {
     version: '1.3.18',
     date: '19 Oct 2026',
