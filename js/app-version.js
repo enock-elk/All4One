@@ -1,8 +1,17 @@
-export const APP_VERSION = '1.3.21';
+export const APP_VERSION = '1.3.22';
 export const APP_RELEASE_DATE = '26 October 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.22',
+    date: '26 Oct 2026',
+    items: [
+      'Claimant title dropdown options stay readable in dark mode.',
+      'Export red shading clears on Reset or any edit; it only returns after Copy HTML / Push with gaps.',
+      'Draft badge shows N REMAINING mandatory items. Initials-style claimant names (e.g. S Matshakeni) export fine; the “In the email” line is gone.',
+    ],
+  },
   {
     version: '1.3.21',
     date: '26 Oct 2026',
