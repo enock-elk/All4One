@@ -337,7 +337,40 @@ function fieldHasValue(field, variables) {
   return Boolean(String(value ?? '').trim());
 }
 
-/** Required before Push to Gmail. Copy HTML can skip Subject. */
+/** Page slots are optional — soft-confirm on push instead of hard-blocking. */
+function isPageNumberField(field) {
+  return Boolean(field?.embedded) || /Page$/i.test(String(field?.key || ''));
+}
+
+function titleNeedsChoice(title) {
+  const value = String(title || '').trim();
+  return !value || value === 'Mr/Ms';
+}
+
+function collectMissingPageFields(template, variables) {
+  const fields = template?.fields || [];
+  if (!fields.length) return [];
+
+  const missing = [];
+  const seen = new Set();
+  fields
+    .filter((field) => field.type === 'toggle' && variables?.[field.key] && fieldIsVisible(field, variables))
+    .forEach((toggle) => {
+      fields
+        .filter((field) => field.showWhen?.key === toggle.key && field.showWhen?.equals === true)
+        .forEach((field) => {
+          if (!isPageNumberField(field)) return;
+          if (!fieldIsVisible(field, variables)) return;
+          if (fieldHasValue(field, variables)) return;
+          if (seen.has(field.key)) return;
+          seen.add(field.key);
+          missing.push({ key: field.key, label: `${toggle.label}: ${field.label}` });
+        });
+    });
+  return missing;
+}
+
+/** Required before Push to Gmail. Copy HTML can skip Subject. Page numbers are not hard-required. */
 function collectGmailPushErrors(template, variables, { requireSubject = true } = {}) {
   const fields = template?.fields || [];
   if (!fields.length) return { keys: [], labels: [] };
@@ -356,16 +389,11 @@ function collectGmailPushErrors(template, variables, { requireSubject = true } =
   if (byKey.recipientName && !String(variables.recipientName || '').trim()) {
     mark('recipientName', 'Recipient name');
   }
-  if (byKey.claimantTitle) {
-    const title = String(variables.claimantTitle || '').trim();
-    if (!title || title === 'Mr/Ms') {
-      mark('claimantTitle', 'Claimant title');
-      mark('claimantName', 'Claimant');
-    }
+  if (byKey.claimantTitle && titleNeedsChoice(variables.claimantTitle)) {
+    mark('claimantTitle', 'Claimant title');
   }
   if (byKey.claimantName && !String(variables.claimantName || '').trim()) {
     mark('claimantName', 'Claimant name');
-    mark('claimantTitle', 'Claimant');
   }
 
   fields
@@ -378,6 +406,7 @@ function collectGmailPushErrors(template, variables, { requireSubject = true } =
           if (!fieldIsVisible(field, variables)) return;
           if (field.type === 'toggle') return;
           if (field.key === 'idPronoun') return;
+          if (isPageNumberField(field)) return;
           if (!fieldHasValue(field, variables)) {
             mark(field.key, `${toggle.label}: ${field.label}`);
             toggleHasGap = true;
@@ -400,11 +429,8 @@ function countRemainingDraftRequirements(template, variables, { requireSubject =
   if (requireSubject && byKey.subject && !subjectHasContent(variables.subject)) remaining += 1;
   if (byKey.recipientName && !String(variables.recipientName || '').trim()) remaining += 1;
 
-  if (byKey.claimantTitle || byKey.claimantName) {
-    const title = String(variables.claimantTitle || '').trim();
-    const name = String(variables.claimantName || '').trim();
-    if (!name || !title || title === 'Mr/Ms') remaining += 1;
-  }
+  if (byKey.claimantTitle && titleNeedsChoice(variables.claimantTitle)) remaining += 1;
+  if (byKey.claimantName && !String(variables.claimantName || '').trim()) remaining += 1;
 
   fields
     .filter((field) => field.type === 'toggle' && variables?.[field.key] && fieldIsVisible(field, variables))
@@ -415,6 +441,7 @@ function countRemainingDraftRequirements(template, variables, { requireSubject =
           if (!fieldIsVisible(field, variables)) return;
           if (field.type === 'toggle') return;
           if (field.key === 'idPronoun') return;
+          if (isPageNumberField(field)) return;
           if (!fieldHasValue(field, variables)) remaining += 1;
         });
     });
@@ -1237,6 +1264,8 @@ export default function EmailEngine() {
   const [blockingKeys, setBlockingKeys] = useState([]);
   const [openingOpen, setOpeningOpen] = useState(false);
   const [recipientConfirm, setRecipientConfirm] = useState('');
+  const [pageConfirm, setPageConfirm] = useState(null);
+  const [allowEmptyPages, setAllowEmptyPages] = useState(false);
   const [inputsWidth, setInputsWidth] = useState(readEmailInputsWidth);
   const inputsWidthRef = useRef(inputsWidth);
   const previewRef = useRef(null);
@@ -1309,6 +1338,8 @@ export default function EmailEngine() {
     setBlockingKeys([]);
     setOpeningOpen(false);
     setRecipientConfirm('');
+    setPageConfirm(null);
+    setAllowEmptyPages(false);
     setStatus({ msg: '', type: '' });
   }, [selectedTemplateId]);
 
@@ -1325,6 +1356,10 @@ export default function EmailEngine() {
     });
     clearExportShading();
     if (key === 'recipientName') setRecipientConfirm('');
+    if (/Page$/i.test(String(key || ''))) {
+      setPageConfirm(null);
+      setAllowEmptyPages(false);
+    }
     if (key === 'audience' && val !== 'attorneys') setOpeningOpen(true);
   };
 
@@ -1493,6 +1528,8 @@ export default function EmailEngine() {
     setSourceMode({});
     clearExportShading();
     setRecipientConfirm('');
+    setPageConfirm(null);
+    setAllowEmptyPages(false);
     setStatus({ msg: 'Draft fields cleared.', type: 'info' });
   };
 
@@ -1508,7 +1545,7 @@ export default function EmailEngine() {
     });
   };
 
-  const pushToGmail = async () => {
+  const pushToGmail = async ({ skipPageConfirm = false } = {}) => {
     if (!gmailLinked) {
       setStatus({ msg: 'Connect Gmail before pushing a draft.', type: 'error' });
       return;
@@ -1517,6 +1554,7 @@ export default function EmailEngine() {
     const missing = collectGmailPushErrors(selectedTemplate, variables);
     if (missing.keys.length) {
       setBlockingKeys(missing.keys);
+      setPageConfirm(null);
       setStatus({
         msg: 'Complete the highlighted fields before Push to Gmail.',
         type: 'error',
@@ -1524,6 +1562,14 @@ export default function EmailEngine() {
       return;
     }
     setBlockingKeys([]);
+
+    const missingPages = collectMissingPageFields(selectedTemplate, variables);
+    if (missingPages.length && !skipPageConfirm && !allowEmptyPages) {
+      setPageConfirm(missingPages);
+      setStatus({ msg: '', type: '' });
+      return;
+    }
+    setPageConfirm(null);
 
     setIsPushing(true);
     setStatus({ msg: 'Pushing draft to Gmail...', type: 'info' });
@@ -1620,6 +1666,7 @@ export default function EmailEngine() {
       }, [])
     : null;
   const remainingCount = countRemainingDraftRequirements(selectedTemplate, variables);
+  const pageConfirmKeys = new Set((pageConfirm || []).map((item) => item.key));
 
   const inputClassFor = (fieldKey) => (blockingKeys.includes(fieldKey) ? INPUT_BLOCKING_CLASS : INPUT_CLASS);
   const chromeClassFor = (...keys) => (
@@ -1628,16 +1675,17 @@ export default function EmailEngine() {
 
   const renderPageSlot = (pageField) => {
     if (!pageField) return null;
+    const soft = pageConfirmKeys.has(pageField.key);
     return (
       <>
-        <div className="w-px self-stretch bg-slate-200 dark:bg-slate-600 shrink-0" aria-hidden="true" />
+        <div className={`w-px self-stretch shrink-0 ${soft ? 'bg-amber-300 dark:bg-amber-600' : 'bg-slate-200 dark:bg-slate-600'}`} aria-hidden="true" />
         <input
           type="text"
           value={variables[pageField.key] || ''}
           onChange={(e) => handleVarChange(pageField.key, e.target.value)}
           placeholder={pageField.placeholder || 'Pg'}
           aria-label={pageField.label}
-          className={`${CHROME_INNER} w-[3.25rem] shrink-0 px-2 py-3 text-center`}
+          className={`${CHROME_INNER} w-[3.25rem] shrink-0 px-2 py-3 text-center ${soft ? 'bg-amber-50/80 dark:bg-amber-950/40' : ''}`}
         />
       </>
     );
@@ -1646,25 +1694,24 @@ export default function EmailEngine() {
   const renderClaimantChrome = (titleField, nameField) => {
     const nameValue = variables[nameField.key] || '';
     return (
-      <div className={chromeClassFor(titleField.key, nameField.key)}>
+      <div className="flex items-stretch gap-2 min-w-0">
         <select
           value={variables[titleField.key] || ''}
           onChange={(e) => handleVarChange(titleField.key, e.target.value)}
           aria-label={titleField.label}
-          className={`${CHROME_INNER} shrink-0 w-[5.5rem] px-3 py-3 appearance-none cursor-pointer font-medium`}
+          className={`${inputClassFor(titleField.key)} shrink-0 w-[5.5rem] appearance-none cursor-pointer font-medium`}
         >
           {(titleField.options || []).map((opt) => (
             <option key={`${titleField.key}-${opt.value || 'empty'}`} value={opt.value} className={NATIVE_OPTION_CLASS}>{opt.label}</option>
           ))}
         </select>
-        <div className="w-px self-stretch bg-slate-200 dark:bg-slate-600 shrink-0" aria-hidden="true" />
         <input
           type="text"
           value={nameValue}
           onChange={(e) => handleVarChange(nameField.key, e.target.value)}
           placeholder={nameField.placeholder || 'Enter claimant name...'}
           aria-label={nameField.label}
-          className={`${CHROME_INNER} min-w-0 flex-1 px-3 py-3`}
+          className={`${inputClassFor(nameField.key)} min-w-0 flex-1`}
         />
       </div>
     );
@@ -1743,11 +1790,16 @@ export default function EmailEngine() {
         ? structuredFields?.find((item) => item.key === field.pageKey)
         : null;
       const pageVisible = Boolean(pageField && fieldIsVisible(pageField, variables));
-      const pageKeys = pageVisible ? [pageField.key] : [];
+      const pageSoft = pageVisible && pageConfirmKeys.has(pageField.key);
+      const sourceChrome = blockingKeys.includes(field.key)
+        ? CHROME_BLOCKING_CLASS
+        : pageSoft
+          ? 'flex items-stretch rounded-xl border border-amber-300/80 dark:border-amber-500/50 bg-white dark:bg-slate-800 overflow-hidden focus-within:border-amber-500 dark:[color-scheme:dark] transition-all'
+          : CHROME_CLASS;
 
       if (isOther) {
         return (
-          <div className={chromeClassFor(field.key, ...pageKeys)}>
+          <div className={sourceChrome}>
             <button
               type="button"
               title="Choose a built-in document type"
@@ -1773,7 +1825,7 @@ export default function EmailEngine() {
       }
 
       return (
-        <div className={chromeClassFor(field.key, ...pageKeys)}>
+        <div className={sourceChrome}>
           <select
             value={value}
             onChange={(e) => {
@@ -1993,8 +2045,15 @@ export default function EmailEngine() {
                   const nameField = row.find((field) => field.key === 'claimantName');
                   if (titleField && nameField) {
                     return (
-                      <div key="claimant-chrome" className="min-w-0">
-                        <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">Claimant</label>
+                      <div key="claimant-chrome" className="min-w-0 space-y-1">
+                        <div className="flex items-end gap-2">
+                          <div className="w-[5.5rem] shrink-0">
+                            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">Title</label>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">Claimant name</label>
+                          </div>
+                        </div>
                         {renderClaimantChrome(titleField, nameField)}
                       </div>
                     );
@@ -2021,6 +2080,40 @@ export default function EmailEngine() {
                     </div>
                   );
                 })}
+                {pageConfirm?.length ? (
+                  <div className="rounded-xl border border-amber-300/80 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-[11px] text-slate-700 dark:text-slate-200 space-y-2">
+                    <p>
+                      Page numbers are empty
+                      {pageConfirm.length === 1
+                        ? ` (${pageConfirm[0].label})`
+                        : ` (${pageConfirm.map((item) => item.label).join('; ')})`}
+                      . Push without them?
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAllowEmptyPages(true);
+                          setPageConfirm(null);
+                          pushToGmail({ skipPageConfirm: true });
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500 text-slate-900"
+                      >
+                        Push without page numbers
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPageConfirm(null);
+                          setStatus({ msg: '', type: '' });
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold border border-slate-300 dark:border-slate-600"
+                      >
+                        I&apos;ll add them
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : allUniqueKeys.length === 0 ? (
               <p className="text-sm text-slate-400 text-center py-4">No dynamic variables detected.</p>
@@ -2100,7 +2193,7 @@ export default function EmailEngine() {
               <Copy className="w-4 h-4" /> Copy HTML
             </button>
             <button 
-              onClick={pushToGmail} 
+              onClick={() => pushToGmail()} 
               disabled={!gmailLinked || isPushing}
               title={gmailLinked ? 'Create a Gmail draft' : 'Connect Gmail to push this draft'}
               className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all active:scale-95 disabled:cursor-not-allowed disabled:active:scale-100 ${gmailLinked ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/20 disabled:opacity-50' : 'bg-slate-300 text-slate-500 shadow-none dark:bg-slate-700 dark:text-slate-400'}`}
