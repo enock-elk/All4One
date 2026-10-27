@@ -257,32 +257,38 @@ function requestGmailAccessTokenViaGis(clientId, { prompt = 'consent' } = {}) {
   }));
 }
 
-async function refreshGmailAccessTokenSilently() {
-  if (!hasPriorGmailGrant()) return null;
-  const clientId = await discoverGoogleWebClientId();
-  if (!clientId) return null;
-  return requestGmailAccessTokenViaGis(clientId, { prompt: 'none' });
-}
-
-export async function restoreGmailSession() {
-  if (getCachedToken()) return true;
-  // Only email-generator visitors in this browser session get silent renewals.
-  // Never open a Google popup from this path.
-  if (!hasEmailSessionVisit()) return false;
-  if (!hasPriorGmailGrant()) return false;
+/**
+ * Background session checks must never call GIS requestAccessToken.
+ * Even prompt:'none' briefly opens a Google window and looks like spam.
+ * Validate the cached token with a quiet API call instead.
+ */
+async function validateCachedGmailToken(token) {
+  if (!token) return false;
   try {
-    await refreshGmailAccessTokenSilently();
-    if (getCachedToken()) {
+    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
       clearSilentFails();
       return true;
     }
-    bumpSilentFail();
+    if (res.status === 401) clearLiveGmailToken();
     return false;
-  } catch (err) {
-    bumpSilentFail();
-    console.warn('Silent Gmail refresh was not available.', err);
+  } catch {
+    // Offline / blocked — keep the cached token until Connect or Push proves otherwise.
+    return true;
+  }
+}
+
+export async function restoreGmailSession() {
+  const token = getCachedToken();
+  if (!token) {
+    if (hasPriorGmailGrant()) bumpSilentFail();
     return false;
   }
+  const ok = await validateCachedGmailToken(token);
+  if (!ok) bumpSilentFail();
+  return ok;
 }
 
 async function requestGmailAccessTokenViaFirebase() {
@@ -339,15 +345,8 @@ export async function requestGmailAccessToken({ interactive = true } = {}) {
   const cached = getCachedToken();
   if (cached) return cached;
 
+  // Non-interactive: never open Google UI. Push/create must use Connect first.
   if (!interactive) {
-    if (hasPriorGmailGrant()) {
-      try {
-        const refreshed = await refreshGmailAccessTokenSilently();
-        if (refreshed) return refreshed;
-      } catch (err) {
-        console.warn('Silent Gmail refresh was not available.', err);
-      }
-    }
     const expired = new Error('Gmail session expired. Connect Gmail again.');
     expired.code = 'gmail/session-expired';
     throw expired;
@@ -357,7 +356,8 @@ export async function requestGmailAccessToken({ interactive = true } = {}) {
     const clientId = await discoverGoogleWebClientId();
     if (clientId) {
       try {
-        return await requestGmailAccessTokenViaGis(clientId);
+        // Explicit Connect only — consent / account picker is intentional here.
+        return await requestGmailAccessTokenViaGis(clientId, { prompt: 'consent' });
       } catch (gisErr) {
         console.warn('Gmail GIS token request failed, trying Firebase popup.', gisErr);
         try {

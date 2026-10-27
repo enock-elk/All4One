@@ -20,7 +20,6 @@ import {
   requestGmailAccessToken,
   restoreGmailSession,
   clearGmailToken,
-  hasPriorGmailGrant,
   describeGmailConnectError,
   markEmailSessionVisited,
   shouldOfferGmailConnect,
@@ -1278,31 +1277,24 @@ export default function EmailEngine() {
 
   useEffect(() => {
     let cancel = false;
-    const onVisible = async () => {
+    // Quiet check only (cached token + userinfo). Never opens Google UI.
+    const syncLinkState = async () => {
       if (document.visibilityState !== 'visible') return;
-      if (isGmailConnected()) {
-        setGmailLinked(true);
-        return;
-      }
-      if (!hasPriorGmailGrant()) {
-        setGmailLinked(false);
-        return;
-      }
-      // Silent renew only — no consent UI (prompt: 'none').
       const ok = await restoreGmailSession();
       if (cancel) return;
       setGmailLinked(ok);
       if (!ok && shouldOfferGmailConnect()) {
         setStatus({
-          msg: 'Gmail is not connected quietly. Click Connect Gmail when you need drafts.',
+          msg: 'Gmail session expired. Click Connect Gmail when you need drafts.',
           type: 'info',
         });
       }
     };
-    document.addEventListener('visibilitychange', onVisible);
+    syncLinkState();
+    document.addEventListener('visibilitychange', syncLinkState);
     return () => {
       cancel = true;
-      document.removeEventListener('visibilitychange', onVisible);
+      document.removeEventListener('visibilitychange', syncLinkState);
     };
   }, []);
 
@@ -1453,19 +1445,30 @@ export default function EmailEngine() {
     setSplitWidth(inputsWidthRef.current + delta, root.getBoundingClientRect().width);
   };
 
-  const logEmailUsage = (action, deliveryChannel) => {
-    // LOG_EMAIL_USAGE → Email Log tab on the Automating Master Affidavit Creation sheet.
+  const logEmailUsage = (action) => {
+    // Slim audit row → Email Log tab (same workbook as Feedback). No subject / body text.
+    const caseName = (
+      variables.claimantFullName ||
+      variables.claimantName ||
+      variables['Claimant Name'] ||
+      ''
+    ).trim() || '(no claimant)';
+    const draftLabel = selectedTemplate.menuLabel || selectedTemplate.name || 'Email draft';
+    const openingField = (selectedTemplate.fields || []).find((f) => f.key === 'opening');
+    const openingOpt = openingField?.options?.find((o) => o.value === variables.opening);
+    const blocks = (selectedTemplate.fields || [])
+      .filter((f) => f.type === 'toggle' && variables?.[f.key] && fieldIsVisible(f, variables))
+      .map((f) => f.label);
+    const typeParts = [draftLabel];
+    if (openingOpt?.label) typeParts.push(openingOpt.label);
+    if (blocks.length) typeParts.push(blocks.join('; '));
+
     const payload = {
       action: 'LOG_EMAIL_USAGE',
       userName: getWorkspaceName() || 'Unknown User',
-      templateId: selectedTemplate.id,
-      templateName: selectedTemplate.name,
-      claimant: variables.claimantFullName || variables.claimantName || variables['Claimant Name'] || '',
-      subject: compiledContent.subject,
+      caseName,
+      emailType: typeParts.join(' — '),
       usageAction: action,
-      status: 'Success',
-      deliveryChannel,
-      appVersion: window.ALL4ONE_APP_VERSION || '',
     };
 
     fetch(GAS_API_URL, {
@@ -1495,13 +1498,13 @@ export default function EmailEngine() {
 
       navigator.clipboard.write(data).then(() => {
         setStatus({ msg: 'Rich text copied! Paste directly into Gmail.', type: 'success' });
-        logEmailUsage('Copy HTML', 'Clipboard');
+        logEmailUsage('Copy HTML');
         setTimeout(() => setStatus({ msg: '', type: '' }), 3000);
       });
     } catch (err) {
       navigator.clipboard.writeText(htmlBody.replace(/<br\/>/g, '\n').replace(/<[^>]*>?/gm, ''));
       setStatus({ msg: 'Plain text copied to clipboard.', type: 'success' });
-      logEmailUsage('Copy plain text', 'Clipboard');
+      logEmailUsage('Copy plain text');
     }
   };
 
@@ -1539,7 +1542,7 @@ export default function EmailEngine() {
       subject: compiledContent.subject,
       htmlBody: currentHtmlBody(),
     });
-    logEmailUsage('Push to Gmail', 'Gmail OAuth');
+    logEmailUsage('Push to Gmail');
     setStatus({
       msg: 'Draft created in your Gmail account. Open Gmail → Drafts to review and send.',
       type: 'success',
@@ -1605,7 +1608,7 @@ export default function EmailEngine() {
 
       const ok = String(result?.status || '').toLowerCase() === 'success';
       if (ok) {
-        logEmailUsage('Push to Gmail', 'Apps Script');
+        logEmailUsage('Push to Gmail');
         setStatus({
           msg: result.message || 'Draft created in your Gmail account!',
           type: 'success',

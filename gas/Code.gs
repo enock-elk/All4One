@@ -1,15 +1,13 @@
 /**
  * ==========================================
  * Affidavit Automation + All4One Backend
- * V5.1 - Shared Automating Master Affidavit workbook
+ * V5.2 - Shared Automating Master Affidavit workbook
  * ==========================================
  *
  * - Attorney prefs: active spreadsheet "Attoneys & Preferences" tab.
- * - LOG_FEEDBACK (no source / legacy): Feedback + Copy of Feedback on
- *   LEGACY_FEEDBACK_SHEET_ID (Automating Master Affidavit Creation).
- * - LOG_EMAIL_USAGE: Email Log tab on that same workbook.
- * - source: "ALL4ONE" on LOG_FEEDBACK is ignored for routing — All4One
- *   affidavits use the same Feedback tabs as the old generator.
+ * - LOG_FEEDBACK: Feedback + Copy of Feedback on LEGACY_FEEDBACK_SHEET_ID.
+ * - LOG_EMAIL_USAGE: Email Log tab — Author, Date, Time, Case Name,
+ *   Email Type (draft + selected blocks), Action (Copy HTML / Push).
  *
  * Deploy by editing the existing web-app deployment and selecting
  * Version → New version so its /exec URL does not change.
@@ -206,27 +204,26 @@ function logEmailUsage_(data) {
       'Email Author',
       'Date',
       'Time',
-      'Template',
-      'Claimant',
-      'Subject',
+      'Case Name',
+      'Email Type',
       'Action',
-      'Status',
-      'Delivery Channel',
-      'App Version',
     ]
   );
   const stamp = usageStamp_(ss.getSpreadsheetTimeZone());
+  // Prefer slim All4One fields; fall back to older payload shapes if present.
+  const emailType =
+    data.emailType ||
+    [data.templateName || data.templateId || '', data.claimant || '']
+      .filter(Boolean)
+      .join(' — ') ||
+    'Email draft';
   const row = [
-    data.userName || 'Unknown',
+    data.userName || 'Unknown User',
     stamp.date,
     stamp.time,
-    data.templateName || data.templateId || '',
-    data.claimant || '',
-    data.subject || '',
-    data.usageAction || '',
-    data.status || '',
-    data.deliveryChannel || '',
-    data.appVersion || '',
+    data.caseName || data.claimant || '(no claimant)',
+    emailType,
+    data.usageAction || data.action || '',
   ];
 
   withDocumentLock_(function () {

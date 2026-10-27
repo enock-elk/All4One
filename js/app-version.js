@@ -1,8 +1,16 @@
-export const APP_VERSION = '1.3.25';
+export const APP_VERSION = '1.3.26';
 export const APP_RELEASE_DATE = '27 October 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.26',
+    date: '27 Oct 2026',
+    items: [
+      'Email Log records Copy HTML and Push with author, case name, draft type/blocks, and action — no subject or body text. Missing workspace names are logged as Unknown User.',
+      'Gmail connection checks stay in the background; the Google sign-in window only opens when you click Connect Gmail.',
+    ],
+  },
   {
     version: '1.3.25',
     date: '27 Oct 2026',
