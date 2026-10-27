@@ -1,0 +1,26 @@
+---
+description: Affidavit Feedback and Email Log Google Sheets / Apps Script contracts
+globs: gas/Code.gs,js/react/AffidavitAutomation.jsx,js/react/EmailEngine.jsx
+alwaysApply: false
+---
+
+# Sheets + GAS logging
+
+Full detail: [`AGENTS.md`](../../AGENTS.md) § Google Sheets + Apps Script.
+
+## Affidavit (`AffidavitAutomation.jsx`)
+
+- `action: "LOG_FEEDBACK"` only — **no** `source` field.
+- Target tabs: **Feedback** + **Copy of Feedback** on workbook `1twLeKxFlNOjD5HmCqIqdTPg5qd_34twgOetm6AD5AYc`.
+- POST `GOOGLE_API_URL` with `Content-Type: text/plain;charset=utf-8`.
+
+## Email (`EmailEngine.jsx`)
+
+- `action: "LOG_EMAIL_USAGE"` — slim fields: `userName`, `caseName`, `emailType`, `usageAction`.
+- Target tab: **Email Log** on the **same** workbook (not Feedback).
+- Same `/exec` URL as affidavits (`GAS_API_URL`).
+
+## Server (`gas/Code.gs`)
+
+- Repo file is not live until Apps Script **Deploy → existing web app → New version** (keep `/exec` URL).
+- Attorney prefs sheet name typo is intentional: `Attoneys & Preferences`.

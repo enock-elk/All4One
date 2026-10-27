@@ -1,0 +1,17 @@
+---
+description: Always load All4One agent handbook — architecture, Sheets/GAS logging, Pages/docs pitfalls
+alwaysApply: true
+---
+
+# All4One — start here
+
+Before changing this repo, **read [`AGENTS.md`](../../AGENTS.md)** at the project root. It documents:
+
+- What to edit (`js/`, `gas/Code.gs`) vs generated (`docs/`, `dist/`)
+- Affidavit → **Feedback** vs Email → **Email Log** on sheet `1twLeKxFlNOjD5HmCqIqdTPg5qd_34twgOetm6AD5AYc`
+- Shared Apps Script `/exec` URL and why **`gas/Code.gs` must be redeployed** (commit ≠ live)
+- POST as `text/plain;charset=utf-8`; never use Affidavit `source: "ALL4ONE"` for Feedback
+- Pages workflow / `docs/` rebase conflicts — rebuild instead of hand-merging hashed assets
+- Version bumps in both `package.json` and `js/app-version.js`
+
+Do not invent new sheet IDs or GAS `action` names without updating `gas/Code.gs` and redeploying the existing web-app version (same URL).
