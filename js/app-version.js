@@ -1,8 +1,16 @@
-export const APP_VERSION = '1.3.24';
+export const APP_VERSION = '1.3.25';
 export const APP_RELEASE_DATE = '27 October 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.25',
+    date: '27 Oct 2026',
+    items: [
+      'Affidavit Generator logs to the Feedback tab on Automating Master Affidavit Creation (same as the old tool).',
+      'Email Generator logs to the Email Log tab on that same workbook.',
+    ],
+  },
   {
     version: '1.3.24',
     date: '27 Oct 2026',

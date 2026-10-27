@@ -1,17 +1,15 @@
 /**
  * ==========================================
  * Affidavit Automation + All4One Backend
- * V5.0 - Guardian compatibility edition
+ * V5.1 - Shared Automating Master Affidavit workbook
  * ==========================================
  *
- * Backward compatibility:
- * - Existing affidavit projects keep using the active spreadsheet's
- *   "Attoneys & Preferences" tab.
- * - Existing LOG_FEEDBACK calls keep dual-writing to Feedback and
- *   Copy of Feedback in the legacy feedback workbook.
- * - All4One identifies itself with source: "ALL4ONE" and writes its
- *   affidavit history to the new All4One-Affidavits tab instead.
- * - All4One email usage writes to All4One-Email.
+ * - Attorney prefs: active spreadsheet "Attoneys & Preferences" tab.
+ * - LOG_FEEDBACK (no source / legacy): Feedback + Copy of Feedback on
+ *   LEGACY_FEEDBACK_SHEET_ID (Automating Master Affidavit Creation).
+ * - LOG_EMAIL_USAGE: Email Log tab on that same workbook.
+ * - source: "ALL4ONE" on LOG_FEEDBACK is ignored for routing — All4One
+ *   affidavits use the same Feedback tabs as the old generator.
  *
  * Deploy by editing the existing web-app deployment and selecting
  * Version → New version so its /exec URL does not change.
@@ -23,9 +21,7 @@ const CONFIG = {
   LEGACY_FEEDBACK_SHEET_ID: '1twLeKxFlNOjD5HmCqIqdTPg5qd_34twgOetm6AD5AYc',
   LEGACY_FEEDBACK_TAB_NAME: 'Feedback',
   LEGACY_LOCKED_FEEDBACK_TAB_NAME: 'Copy of Feedback',
-  ALL4ONE_USAGE_SHEET_ID: '14PwX3IqOdiU-_iF_dNxYRkH-adHYIkdRXiCWgfhBK00',
-  ALL4ONE_EMAIL_TAB_NAME: 'All4One-Email',
-  ALL4ONE_AFFIDAVIT_TAB_NAME: 'All4One-Affidavits',
+  EMAIL_LOG_TAB_NAME: 'Email Log',
   DRAFT_TO: 'namir@actuaryconsulting.co.za',
   DRAFT_CC: 'actuarialteam@actuaryconsulting.co.za',
 };
@@ -167,13 +163,10 @@ function isEnabled_(value, acceptedWords) {
 }
 
 /**
- * Legacy callers have no source field and retain the original dual-write.
- * All4One sends source: "ALL4ONE" and writes only to its migrated log.
+ * Affidavit export / skip feedback — always the legacy Feedback dual-write
+ * on Automating Master Affidavit Creation (All4One and old generator alike).
  */
 function logFeedback_(payload) {
-  if (String(payload.source || '').toUpperCase() === 'ALL4ONE') {
-    return logAll4OneAffidavit_(payload);
-  }
   return logLegacyFeedback_(payload);
 }
 
@@ -186,7 +179,7 @@ function logLegacyFeedback_(payload) {
     throw new Error('Feedback tabs not found. Please ensure tabs exist in the linked Sheet.');
   }
 
-  const stamp = usageStamp_(Session.getScriptTimeZone());
+  const stamp = usageStamp_(ss.getSpreadsheetTimeZone());
   const row = [
     payload.userName || 'Unknown User',
     stamp.date,
@@ -204,34 +197,11 @@ function logLegacyFeedback_(payload) {
   return { status: 'SUCCESS', message: 'Feedback safely stored in vault.' };
 }
 
-function logAll4OneAffidavit_(payload) {
-  const ss = SpreadsheetApp.openById(CONFIG.ALL4ONE_USAGE_SHEET_ID);
-  const sheet = getOrCreateSheet_(
-    ss,
-    CONFIG.ALL4ONE_AFFIDAVIT_TAB_NAME,
-    ['Affidavit Author', 'Date', 'Time', 'Case Name', 'Before Feedback']
-  );
-  const stamp = usageStamp_(ss.getSpreadsheetTimeZone());
-  const row = [
-    payload.userName || 'Unknown User',
-    stamp.date,
-    stamp.time,
-    payload.caseName || 'Unknown',
-    payload.feedback || '',
-  ];
-
-  withDocumentLock_(function () {
-    sheet.appendRow(row);
-  });
-
-  return { status: 'SUCCESS', message: 'All4One affidavit usage logged.' };
-}
-
 function logEmailUsage_(data) {
-  const ss = SpreadsheetApp.openById(CONFIG.ALL4ONE_USAGE_SHEET_ID);
+  const ss = SpreadsheetApp.openById(CONFIG.LEGACY_FEEDBACK_SHEET_ID);
   const sheet = getOrCreateSheet_(
     ss,
-    CONFIG.ALL4ONE_EMAIL_TAB_NAME,
+    CONFIG.EMAIL_LOG_TAB_NAME,
     [
       'Email Author',
       'Date',

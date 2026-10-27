@@ -1454,26 +1454,18 @@ export default function EmailEngine() {
   };
 
   const logEmailUsage = (action, deliveryChannel) => {
-    // Same LOG_FEEDBACK path as legacy Affidavit Automation → Feedback sheet
-    // (no source: ALL4ONE, or Apps Script routes to All4One-Affidavits instead).
-    const claimant =
-      variables.claimantFullName ||
-      variables.claimantName ||
-      variables['Claimant Name'] ||
-      '';
+    // LOG_EMAIL_USAGE → Email Log tab on the Automating Master Affidavit Creation sheet.
     const payload = {
-      action: 'LOG_FEEDBACK',
+      action: 'LOG_EMAIL_USAGE',
       userName: getWorkspaceName() || 'Unknown User',
-      caseName: claimant || compiledContent.subject || 'Unknown',
-      feedback: [
-        selectedTemplate.name,
-        action,
-        deliveryChannel,
-        compiledContent.subject,
-        window.ALL4ONE_APP_VERSION || '',
-      ]
-        .filter(Boolean)
-        .join(' | '),
+      templateId: selectedTemplate.id,
+      templateName: selectedTemplate.name,
+      claimant: variables.claimantFullName || variables.claimantName || variables['Claimant Name'] || '',
+      subject: compiledContent.subject,
+      usageAction: action,
+      status: 'Success',
+      deliveryChannel,
+      appVersion: window.ALL4ONE_APP_VERSION || '',
     };
 
     fetch(GAS_API_URL, {

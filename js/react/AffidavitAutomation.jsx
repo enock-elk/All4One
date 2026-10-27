@@ -296,7 +296,8 @@ export default function AffidavitAutomation() {
     URL.revokeObjectURL(url);
   };
 
-  // GUARDIAN: Intercepts export and logs it to the shared All4One audit sheet.
+  // GUARDIAN: Intercepts export and logs feedback to the legacy Feedback sheet
+  // (same workbook/tab as Affidavit Automation — omit source so GAS uses logLegacyFeedback_).
   const handleFeedbackSubmit = async (skipped = false) => {
     const userName = await ensureWorkspaceName();
     if (!userName) return;
@@ -310,7 +311,6 @@ export default function AffidavitAutomation() {
     try {
       const payload = {
         action: 'LOG_FEEDBACK',
-        source: 'ALL4ONE',
         userName: userName || getWorkspaceName() || 'Unknown User',
         // GUARDIAN: Smart Case Name Formatting (Omits case number if empty)
         caseName: `${form.plaintiff || '[PLAINTIFF]'} v ${form.defendent || '[DEFENDANT]'}${form.case ? ` (Case: ${form.case})` : ''}`,
