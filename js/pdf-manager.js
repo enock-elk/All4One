@@ -209,6 +209,36 @@ document.addEventListener('DOMContentLoaded', () => {
         return null;
     }
 
+    /** Read file bytes with FileReader fallback for stale/cloud NotFoundError blobs. */
+    async function readFileBytes(file) {
+        if (!file) throw new Error('No file provided');
+        const label = file.name || 'file';
+        const isMissing = (err) =>
+            err?.name === 'NotFoundError'
+            || /could not be found at the time an operation was processed/i.test(String(err?.message || ''));
+
+        try {
+            return new Uint8Array(await file.arrayBuffer());
+        } catch (firstErr) {
+            try {
+                const buffer = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = () => reject(reader.error || firstErr);
+                    reader.readAsArrayBuffer(file);
+                });
+                return new Uint8Array(buffer);
+            } catch (secondErr) {
+                const detail = isMissing(firstErr) || isMissing(secondErr)
+                    ? `${label} could not be read (moved, cloud-only stub, or permission lost). Use Browse Files and pick a local copy.`
+                    : (secondErr?.message || firstErr?.message || `Could not read ${label}`);
+                const err = new Error(detail);
+                err.cause = firstErr;
+                throw err;
+            }
+        }
+    }
+
     function pageSpecs(list) {
         return list.map((p) => {
             const fileObj = files.find((f) => f.id === p.fileId);
@@ -943,12 +973,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!incoming.length) return;
         clearCompressUndo();
         setHeaderStatus('LOADING FILES...', 'busy');
+        const failures = [];
         for (const file of incoming) {
             const kind = classifyFile(file);
             if (!kind) continue;
             if (files.some((f) => f.file.name === file.name)) continue;
             try {
-                const bytes = new Uint8Array(await file.arrayBuffer());
+                const bytes = await readFileBytes(file);
                 if (kind === 'pdf') {
                     await addPdfFile(file, bytes, 'pdf');
                 } else if (kind === 'image') {
@@ -957,17 +988,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     setHeaderStatus('CONVERTING WORD...', 'busy');
                     const converted = await docxToPdf(bytes);
                     if (!converted.success) {
-                        alert(`Could not convert ${file.name}: ${converted.error}`);
+                        failures.push(`${file.name}: ${converted.error}`);
                         continue;
                     }
                     await addPdfFile(file, converted.bytes, 'docx');
                 }
             } catch (err) {
                 console.error(err);
-                alert(`Failed to add ${file.name}: ${err.message}`);
+                failures.push(`${file.name}: ${err.message}`);
             }
         }
         setHeaderStatus('SYSTEM ONLINE', 'ok');
+        if (failures.length === 1) {
+            alert(`Failed to add ${failures[0]}`);
+        } else if (failures.length > 1) {
+            alert(`Failed to add ${failures.length} file(s):\n\n${failures.join('\n')}`);
+        }
     }
 
     function preventDefaults(e) {
