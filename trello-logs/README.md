@@ -1,6 +1,8 @@
 # Trello Watcher run logs
 
-When a Trello Watcher run stops, All4One downloads a plain-text log file named like `trello-watch-2026-10-26T08-15-00-000Z.txt`.
+When a Trello Watcher run stops, All4One can download a plain-text log file named like `trello-watch-2026-10-26T08-15-00-000Z.txt`.
+
+**Currently disabled:** auto-download is off (`SAVE_WATCH_RUN_TXT = false` in `js/trello.js`). The download logic is still there — flip that flag to re-enable.
 
 Each file includes:
 
