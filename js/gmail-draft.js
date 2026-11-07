@@ -111,6 +111,22 @@ export function isGmailConnected() {
   return Boolean(getCachedToken());
 }
 
+const GMAIL_RENEW_SOON_MS = 12 * 60 * 1000;
+
+export function gmailTokenExpiresAt() {
+  const exp = Number(readStore(localStorage, TOKEN_EXP_KEY) || readStore(sessionStorage, TOKEN_EXP_KEY) || 0);
+  return Number.isFinite(exp) ? exp : 0;
+}
+
+/** True while a cached token is still valid but inside the renew window. */
+export function gmailSessionNeedsRenewSoon(withinMs = GMAIL_RENEW_SOON_MS) {
+  if (!isGmailConnected()) return false;
+  const exp = gmailTokenExpiresAt();
+  if (!exp) return false;
+  const left = exp - Date.now();
+  return left > 0 && left <= withinMs;
+}
+
 export function markEmailSessionVisited() {
   writeStore(sessionStorage, EMAIL_SESSION_KEY, '1');
 }
@@ -341,9 +357,11 @@ async function requestGmailAccessTokenViaFirebase() {
   return accessToken;
 }
 
-export async function requestGmailAccessToken({ interactive = true } = {}) {
-  const cached = getCachedToken();
-  if (cached) return cached;
+export async function requestGmailAccessToken({ interactive = true, force = false } = {}) {
+  if (!force) {
+    const cached = getCachedToken();
+    if (cached) return cached;
+  }
 
   // Non-interactive: never open Google UI. Push/create must use Connect first.
   if (!interactive) {

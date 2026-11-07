@@ -11,6 +11,7 @@ import {
   Minus,
   RotateCcw,
   ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { AC_LOGO_DATA_URI } from './ac-logo-b64.js';
 import { getWorkspaceName } from '../workspace-identity.js';
@@ -23,6 +24,8 @@ import {
   describeGmailConnectError,
   markEmailSessionVisited,
   shouldOfferGmailConnect,
+  hasPriorGmailGrant,
+  gmailSessionNeedsRenewSoon,
 } from '../gmail-draft.js';
 import { showAppToast } from '../ui-prefs.js';
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbw-M9kVkSSXKuJ49tohaconx99-l5VcbU1xSNeUTccX2gs0prok3LltyTyO7mdNKtm8/exec";
@@ -293,7 +296,48 @@ function reportSourceField(key, label, defaultValue, extra = {}) {
   };
 }
 
-const INFORMAL_REQUEST_DEFAULT = 'Please also provide the post-accident proof of earnings showing she earned [amount] per month as a self-employed informal trader from [period] to date:';
+const INFORMAL_REQUEST_DEFAULT = 'Also, please provide the proof of earnings for the (Insert Informal self employed business and time period) :';
+const DEFAULT_EARNINGS_ORDER = ['formal', 'informal'];
+const FORMAL_EARNINGS_KEYS = new Set(['secFormal', 'secFormalDocs', 'formalDocs', 'formalEarnings']);
+const INFORMAL_EARNINGS_KEYS = new Set(['secInformal', 'secInformalDocs', 'informalDocs', 'informalRequest']);
+
+function normalizeEarningsOrder(order) {
+  const seen = [];
+  for (const item of Array.isArray(order) ? order : []) {
+    if (DEFAULT_EARNINGS_ORDER.includes(item) && !seen.includes(item)) seen.push(item);
+  }
+  for (const item of DEFAULT_EARNINGS_ORDER) {
+    if (!seen.includes(item)) seen.push(item);
+  }
+  return seen;
+}
+
+function orderEarningsFields(fields, earningsOrder) {
+  const groups = { formal: [], informal: [] };
+  const before = [];
+  const after = [];
+  let seenEarnings = false;
+  for (const field of fields) {
+    if (FORMAL_EARNINGS_KEYS.has(field.key)) {
+      groups.formal.push(field);
+      seenEarnings = true;
+      continue;
+    }
+    if (INFORMAL_EARNINGS_KEYS.has(field.key)) {
+      groups.informal.push(field);
+      seenEarnings = true;
+      continue;
+    }
+    if (!seenEarnings) before.push(field);
+    else after.push(field);
+  }
+  if (!seenEarnings) return fields;
+  return [
+    ...before,
+    ...normalizeEarningsOrder(earningsOrder).flatMap((id) => groups[id]),
+    ...after,
+  ];
+}
 
 const INFORMAL_EARNINGS_PROOF = [
   'Previous clients.',
@@ -477,6 +521,7 @@ function initialVariables(template) {
       else if (field.type === 'toggle') vars[field.key] = Boolean(field.default);
       else vars[field.key] = field.default ?? '';
     });
+    if (template.id === 'draft-master-loe') vars.earningsOrder = [...DEFAULT_EARNINGS_ORDER];
     return vars;
   }
   const keys = [...extractPlaceholderKeys(template.subject), ...extractPlaceholderKeys(template.body)];
@@ -515,7 +560,7 @@ const TEMPLATES = [
     id: 'draft-master-loe',
     name: '(DRAFT) Master LOE',
     menuLabel: 'Master LOE Draft',
-    intro: 'Tick only the blocks this email needs. Notes under each block stay in the form and are left out of the draft. A block that starts with “Also” uses that word only when another request is already above it; otherwise it starts with “Kindly” or “In accordance”. The 24-hour close is always included. The Kubheka paragraph is written once, on the first earnings block.',
+    intro: 'Tick only the blocks this email needs. Notes under each block stay in the form and are left out of the draft. A block that starts with “Also” uses that word only when another request is already above it; otherwise it starts with “Kindly” or “In accordance”. The 24-hour close is always included. Each earnings block includes the Kubheka paragraph in its own place. Use Up and Down to move formal and informal earnings.',
     fields: [
       {
         key: 'subject',
@@ -779,7 +824,7 @@ const TEMPLATES = [
         key: 'secFormal',
         label: 'Formal earnings proof',
         type: 'toggle',
-        guidance: 'Use to obtain proof of earnings for formal employment. The Kubheka paragraph is included here when this is the first earnings block.',
+        guidance: 'Use to obtain proof of earnings for formal employment. Kubheka sits after the earnings note and before the acceptable-proof list.',
         loeOnly: true,
       },
       {
@@ -814,7 +859,7 @@ const TEMPLATES = [
         key: 'secInformal',
         label: 'Informal earnings proof',
         type: 'toggle',
-        guidance: 'Use to ask for proof of earnings for informal or self-employed work. The Kubheka paragraph is not repeated when the formal block above already includes it.',
+        guidance: 'Use to ask for proof of earnings for informal or self-employed work. Kubheka sits at the start of this block, then any IP document list, then the proof-of-earnings sentence.',
         loeOnly: true,
       },
       {
@@ -919,35 +964,32 @@ const TEMPLATES = [
         pushRequest(`The ${documents} provided for ${claimant} are illegible. Will you please provide clearer copies of all ${documents} in your possession?`);
       }
 
-      let kubhekaUsed = false;
-      const takeKubheka = () => {
-        if (kubhekaUsed) return '';
-        kubhekaUsed = true;
-        return kubhekaParagraph(hasPriorRequest);
-      };
-
-      if (!wrongfulArrest && vars.secFormal) {
+      const buildFormalEarnings = () => {
+        if (wrongfulArrest || !vars.secFormal) return '';
         const chunks = [];
         if (vars.secFormalDocs) {
           chunks.push(`${requestLead(hasPriorRequest)} assist us by providing the following documents referenced in the IP report:${htmlList(vars.formalDocs, '[Document referenced in the IP report]')}`);
         }
         chunks.push(`We note that the claimant was earning the following:${htmlList([withPeriod(filled(vars.formalEarnings, '[earnings description]'))], '[earnings description]')}`);
-        const kubheka = takeKubheka();
-        if (kubheka) chunks.push(kubheka);
+        chunks.push(kubhekaParagraph(hasPriorRequest));
         chunks.push(`Acceptable proof of earnings may include:${htmlList(FORMAL_EARNINGS_PROOF, '')}`);
-        pushRequest(chunks.join('<br/><br/>'));
-      }
+        return chunks.join('<br/><br/>');
+      };
 
-      if (!wrongfulArrest && vars.secInformal) {
-        const chunks = [];
+      const buildInformalEarnings = () => {
+        if (wrongfulArrest || !vars.secInformal) return '';
+        const chunks = [kubhekaParagraph(hasPriorRequest)];
         if (vars.secInformalDocs) {
           chunks.push(`${requestLead(hasPriorRequest)} assist us by providing the following documents referenced in the IP report:${htmlList(vars.informalDocs, '[Document referenced in the IP report]')}`);
         }
         chunks.push(escapeHtml(filled(vars.informalRequest, INFORMAL_REQUEST_DEFAULT)));
-        const kubheka = takeKubheka();
-        if (kubheka) chunks.push(kubheka);
         chunks.push(`Acceptable proof of self-employed earnings if no formal records can be provided may include affidavits or confirmation from:${htmlList(INFORMAL_EARNINGS_PROOF, '')}`);
-        pushRequest(chunks.join('<br/><br/>'));
+        return chunks.join('<br/><br/>');
+      };
+
+      for (const block of normalizeEarningsOrder(vars.earningsOrder)) {
+        const html = block === 'formal' ? buildFormalEarnings() : buildInformalEarnings();
+        if (html) pushRequest(html);
       }
 
       parts.push(TURNAROUND);
@@ -1249,6 +1291,12 @@ function readEmailInputsWidth() {
   return Number.isFinite(saved) && saved >= 280 ? saved : 380;
 }
 
+function readGmailHint() {
+  if (gmailSessionNeedsRenewSoon()) return 'expires-soon';
+  if (hasPriorGmailGrant() && !isGmailConnected()) return 'reconnect';
+  return '';
+}
+
 export default function EmailEngine() {
   const [selectedTemplateId, setSelectedTemplateId] = useState(TEMPLATES[0].id);
   const [variables, setVariables] = useState(() => initialVariables(TEMPLATES[0]));
@@ -1259,6 +1307,8 @@ export default function EmailEngine() {
   const [status, setStatus] = useState({ msg: '', type: '' });
   const [isPushing, setIsPushing] = useState(false);
   const [gmailLinked, setGmailLinked] = useState(() => isGmailConnected());
+  const [gmailHint, setGmailHint] = useState('');
+  const gmailHintRef = useRef('');
   const [sourceMode, setSourceMode] = useState({});
   const [blockingKeys, setBlockingKeys] = useState([]);
   const [openingOpen, setOpeningOpen] = useState(false);
@@ -1269,10 +1319,26 @@ export default function EmailEngine() {
   const inputsWidthRef = useRef(inputsWidth);
   const previewRef = useRef(null);
 
+  const applyGmailHint = (hint, { announce = false } = {}) => {
+    setGmailHint(hint);
+    if (!announce || !hint || hint === gmailHintRef.current) {
+      gmailHintRef.current = hint;
+      return;
+    }
+    gmailHintRef.current = hint;
+    setStatus({
+      msg: hint === 'expires-soon'
+        ? 'Gmail access expires soon. Click Renew Gmail before it lapses. Google opens only after you click.'
+        : 'Gmail session expired. Click Reconnect Gmail when you need drafts. Google opens only after you click.',
+      type: 'info',
+    });
+  };
+
   useEffect(() => {
     // Email-tab visitors only. Cached token on load; never open Google UI here.
     markEmailSessionVisited();
     setGmailLinked(isGmailConnected());
+    applyGmailHint(readGmailHint());
   }, []);
 
   useEffect(() => {
@@ -1282,19 +1348,26 @@ export default function EmailEngine() {
       if (document.visibilityState !== 'visible') return;
       const ok = await restoreGmailSession();
       if (cancel) return;
-      setGmailLinked(ok);
-      if (!ok && shouldOfferGmailConnect()) {
-        setStatus({
-          msg: 'Gmail session expired. Click Connect Gmail when you need drafts.',
-          type: 'info',
-        });
+      const linked = ok && isGmailConnected();
+      setGmailLinked(linked);
+      const hint = readGmailHint();
+      if (!linked && (hint === 'reconnect' || shouldOfferGmailConnect())) {
+        applyGmailHint('reconnect', { announce: true });
+        return;
       }
+      applyGmailHint(hint, { announce: true });
     };
     syncLinkState();
     document.addEventListener('visibilitychange', syncLinkState);
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      setGmailLinked(isGmailConnected());
+      applyGmailHint(readGmailHint(), { announce: true });
+    }, 60_000);
     return () => {
       cancel = true;
       document.removeEventListener('visibilitychange', syncLinkState);
+      window.clearInterval(timer);
     };
   }, []);
 
@@ -1337,6 +1410,18 @@ export default function EmailEngine() {
 
   const clearExportShading = () => {
     setBlockingKeys([]);
+  };
+
+  const moveEarningsBlock = (blockId, direction) => {
+    setVariables((prev) => {
+      const order = normalizeEarningsOrder(prev.earningsOrder);
+      const index = order.indexOf(blockId);
+      const target = index + (direction === 'up' ? -1 : 1);
+      if (index < 0 || target < 0 || target >= order.length) return prev;
+      const next = [...order];
+      [next[index], next[target]] = [next[target], next[index]];
+      return { ...prev, earningsOrder: next };
+    });
   };
 
   const handleVarChange = (key, val) => {
@@ -1508,11 +1593,17 @@ export default function EmailEngine() {
     }
   };
 
-  const connectGmail = async () => {
-    setStatus({ msg: 'Connecting Google account for Gmail drafts...', type: 'info' });
+  const connectGmail = async ({ force = false } = {}) => {
+    setStatus({
+      msg: force ? 'Renewing Gmail access...' : 'Connecting Google account for Gmail drafts...',
+      type: 'info',
+    });
     try {
-      await requestGmailAccessToken();
+      await requestGmailAccessToken({ force });
       setGmailLinked(true);
+      const hint = readGmailHint();
+      gmailHintRef.current = hint;
+      setGmailHint(hint);
       showAppToast('Gmail connected. You can push drafts to this account.');
       setStatus({ msg: 'Gmail connected. You can push drafts directly.', type: 'success' });
     } catch (err) {
@@ -1523,6 +1614,8 @@ export default function EmailEngine() {
   const disconnectGmail = () => {
     clearGmailToken();
     setGmailLinked(false);
+    gmailHintRef.current = '';
+    setGmailHint('');
     setStatus({ msg: 'Gmail disconnected.', type: 'info' });
   };
 
@@ -1635,7 +1728,17 @@ export default function EmailEngine() {
       });
     } catch (err) {
       console.error(err);
+      const expired = err?.code === 'gmail/session-expired' || /session expired/i.test(String(err?.message || ''));
       if (!isGmailConnected()) setGmailLinked(false);
+      if (expired) {
+        gmailHintRef.current = 'reconnect';
+        setGmailHint('reconnect');
+        setStatus({
+          msg: 'Gmail session expired. Click Reconnect Gmail to continue. Google opens only after you click.',
+          type: 'error',
+        });
+        return;
+      }
       const msg = describeGmailConnectError(err);
       if (/oauth|gmail|token|configured|authorized domain|sign-in method/i.test(msg)) {
         setStatus({
@@ -1654,7 +1757,9 @@ export default function EmailEngine() {
   };
 
   const allUniqueKeys = [...new Set([...parsedKeys.subject, ...parsedKeys.body])];
-  const structuredFields = selectedTemplate.fields || null;
+  const structuredFields = selectedTemplate.fields
+    ? orderEarningsFields(selectedTemplate.fields, variables.earningsOrder)
+    : null;
   const visibleFields = structuredFields
     ? structuredFields.filter((field) => fieldIsVisible(field, variables) && !field.embedded)
     : null;
@@ -1721,12 +1826,41 @@ export default function EmailEngine() {
     );
   };
 
+  const renderEarningsMove = (blockId) => {
+    const order = normalizeEarningsOrder(variables.earningsOrder);
+    const index = order.indexOf(blockId);
+    const buttonClass = 'inline-flex items-center justify-center gap-0.5 px-1.5 py-1 rounded-md text-[10px] font-bold border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed';
+    return (
+      <div className="flex flex-col gap-1 shrink-0">
+        <button
+          type="button"
+          className={buttonClass}
+          disabled={index <= 0}
+          onClick={() => moveEarningsBlock(blockId, 'up')}
+          title="Move this earnings block up"
+        >
+          <ChevronUp className="w-3 h-3" /> Up
+        </button>
+        <button
+          type="button"
+          className={buttonClass}
+          disabled={index < 0 || index >= order.length - 1}
+          onClick={() => moveEarningsBlock(blockId, 'down')}
+          title="Move this earnings block down"
+        >
+          <ChevronDown className="w-3 h-3" /> Down
+        </button>
+      </div>
+    );
+  };
+
   const renderStructuredField = (field) => {
     if (field.type === 'toggle') {
       const on = Boolean(variables[field.key]);
       const blocked = blockingKeys.includes(field.key);
-      return (
-        <label className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 cursor-pointer transition-colors ${blocked ? 'border-rose-300/80 dark:border-rose-400/50' : on ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/30' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40'}`}>
+      const earningsBlock = field.key === 'secFormal' ? 'formal' : field.key === 'secInformal' ? 'informal' : '';
+      const toggle = (
+        <label className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 cursor-pointer transition-colors ${blocked ? 'border-rose-300/80 dark:border-rose-400/50' : on ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/30' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40'} ${earningsBlock ? 'flex-1' : ''}`}>
           <input
             type="checkbox"
             checked={on}
@@ -1740,6 +1874,13 @@ export default function EmailEngine() {
             ) : null}
           </span>
         </label>
+      );
+      if (!earningsBlock) return toggle;
+      return (
+        <div className="flex items-stretch gap-2">
+          {toggle}
+          {renderEarningsMove(earningsBlock)}
+        </div>
       );
     }
 
@@ -2171,6 +2312,16 @@ export default function EmailEngine() {
             <span className="text-xs font-bold tracking-wide uppercase text-slate-500 dark:text-slate-400">HTML Compiled</span>
           </div>
           <div className="workspace-actions flex gap-3">
+            {gmailLinked && gmailHint === 'expires-soon' ? (
+              <button
+                type="button"
+                onClick={() => connectGmail({ force: true })}
+                title="Opens Google only after this click, to replace the access token before it lapses."
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold border border-amber-300 dark:border-amber-600 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-100 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-all active:scale-95"
+              >
+                <Mail className="w-4 h-4" /> Renew Gmail
+              </button>
+            ) : null}
             {gmailLinked ? (
               <button
                 type="button"
@@ -2183,11 +2334,11 @@ export default function EmailEngine() {
             ) : (
               <button
                 type="button"
-                onClick={connectGmail}
-                title="Requests Gmail draft access for your Actuary work Google account. The site hostname must be listed on the OAuth web client’s Authorized JavaScript origins."
+                onClick={() => connectGmail()}
+                title="Requests Gmail draft access for your Actuary work Google account. The site hostname must be listed on the OAuth web client’s Authorized JavaScript origins. Google opens only after this click."
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all active:scale-95"
               >
-                <Mail className="w-4 h-4" /> Connect Gmail
+                <Mail className="w-4 h-4" /> {gmailHint === 'reconnect' ? 'Reconnect Gmail' : 'Connect Gmail'}
               </button>
             )}
             <button 
@@ -2207,6 +2358,17 @@ export default function EmailEngine() {
             </button>
           </div>
         </div>
+
+        {gmailHint === 'expires-soon' ? (
+          <div className="px-6 py-2 text-[11px] font-semibold bg-amber-50 text-amber-900 border-b border-amber-200 dark:bg-amber-950/40 dark:text-amber-100 dark:border-amber-800">
+            Gmail access expires soon. Click Renew Gmail to keep drafts working. Google opens only after you click.
+          </div>
+        ) : null}
+        {gmailHint === 'reconnect' ? (
+          <div className="px-6 py-2 text-[11px] font-semibold bg-amber-50 text-amber-900 border-b border-amber-200 dark:bg-amber-950/40 dark:text-amber-100 dark:border-amber-800">
+            Gmail needs a new connection. Click Reconnect Gmail. Google opens only after you click.
+          </div>
+        ) : null}
 
         {status.msg && (
           <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 max-w-[min(90%,42rem)] px-4">

@@ -1,8 +1,17 @@
-export const APP_VERSION = '1.3.26';
-export const APP_RELEASE_DATE = '27 October 2026';
+export const APP_VERSION = '1.3.27';
+export const APP_RELEASE_DATE = '7 November 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.27',
+    date: '7 Nov 2026',
+    items: [
+      'Master LOE informal earnings put Kubheka first, then the IP document list, then the proof-of-earnings sentence. Formal earnings keep Kubheka after the earnings note. Each earnings block includes its own Kubheka paragraph.',
+      'Formal and informal earnings blocks can be moved up or down.',
+      'Gmail shows when access is about to expire or needs a reconnect. Google opens only after Renew or Connect is clicked.',
+    ],
+  },
   {
     version: '1.3.26',
     date: '27 Oct 2026',
