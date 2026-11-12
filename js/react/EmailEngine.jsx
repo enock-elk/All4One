@@ -26,6 +26,8 @@ import {
   shouldOfferGmailConnect,
   hasPriorGmailGrant,
   gmailSessionNeedsRenewSoon,
+  hasLastingGmailAccess,
+  prepareGmailConnect,
 } from '../gmail-draft.js';
 import { showAppToast } from '../ui-prefs.js';
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbw-M9kVkSSXKuJ49tohaconx99-l5VcbU1xSNeUTccX2gs0prok3LltyTyO7mdNKtm8/exec";
@@ -1339,6 +1341,7 @@ export default function EmailEngine() {
     markEmailSessionVisited();
     setGmailLinked(isGmailConnected());
     applyGmailHint(readGmailHint());
+    prepareGmailConnect();
   }, []);
 
   useEffect(() => {
@@ -1604,10 +1607,19 @@ export default function EmailEngine() {
       const hint = readGmailHint();
       gmailHintRef.current = hint;
       setGmailHint(hint);
-      showAppToast('Gmail connected. You can push drafts to this account.');
-      setStatus({ msg: 'Gmail connected. You can push drafts directly.', type: 'success' });
+      const lasting = hasLastingGmailAccess();
+      showAppToast(lasting
+        ? 'Gmail connected. This browser stays connected until you disconnect.'
+        : 'Gmail connected. You can push drafts to this account.');
+      setStatus({
+        msg: lasting
+          ? 'Gmail connected for the long term. You will not need to renew it on this browser unless you disconnect or remove access in your Google account.'
+          : 'Gmail connected for about an hour. Click Renew Gmail when asked; Google usually reuses your approval without a new consent screen.',
+        type: 'success',
+      });
     } catch (err) {
-      setStatus({ msg: describeGmailConnectError(err), type: 'error' });
+      const again = err?.code === 'gmail/consent_required' || err?.code === 'gmail/lasting-failed';
+      setStatus({ msg: describeGmailConnectError(err), type: again ? 'info' : 'error' });
     }
   };
 
