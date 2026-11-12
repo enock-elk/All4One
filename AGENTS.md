@@ -155,6 +155,31 @@ Attorney preferences sheet must remain the script’s **active/bound** spreadshe
 - Do not open Google sign-in on tab load; only on explicit **Connect Gmail** (and controlled renew paths). Unprompted popups are a regression.
 - OAuth client authorized origins must include the live Pages hostname.
 
+### Lasting connection (`gmailAuth` Cloud Function)
+
+Browser-only Google tokens last one hour and have no refresh token, so users had to reconnect several times a day. The lasting path:
+
+1. **Connect Gmail** opens the GIS *code* popup (`initCodeClient`, `ux_mode: 'popup'`).
+2. `functions/lib/gmailAuth.js` (exported as `gmailAuth` in `functions/index.js`) swaps the code for a refresh token. It seals the token with AES-256-GCM, using a key derived from the client secret, and returns the sealed blob.
+3. The browser keeps the blob in `localStorage` key `all4one_gmail_refresh_seal`. **Push to Gmail** posts `{action:'draft', sealed, raw}`. The function refreshes the access token and creates the draft. Nothing is stored server-side.
+4. If Google returns no refresh token because the account already granted the scope, the function revokes that grant and returns `409 consent_required`. The user clicks Connect once more and gets the consent screen plus a refresh token.
+5. `invalid_grant` (access removed in the Google account, or a password change) returns `401 reauth_required`. The client clears the blob and shows **Reconnect Gmail**.
+
+The client probes `GET …/gmailAuth` once per tab session (`{ready:true}`). If the function is missing or not configured, Connect falls back to the hourly token flow. That flow passes `prompt: ''` after the first grant, so a renew normally skips the consent screen. Override or disable the URL with `window.ALL4ONE_GMAIL_AUTH_URL` (empty string disables it).
+
+**One-time setup (needs Firebase project owner on `all4one-nexus`):**
+
+```bash
+firebase functions:secrets:set GMAIL_OAUTH_CLIENT_SECRET   # Web client secret of the OAuth client the app uses
+firebase deploy --only functions:gmailAuth
+```
+
+- The secret must belong to the **same** OAuth client ID the browser uses. That is either `window.ALL4ONE_GMAIL_CLIENT_ID` or the Firebase auto-created Web client, which is found via Identity Toolkit. It is shown in Firebase Console → Authentication → Sign-in method → Google → Web SDK configuration.
+- Keep the OAuth consent screen **Internal** (Workspace). An External app in *Testing* status expires refresh tokens after 7 days.
+- Rotating the client secret invalidates every sealed blob, so users reconnect once.
+- POSTs use `Content-Type: application/json` plus `X-Requested-With: XmlHttpRequest`. The function allows only the Pages origin and localhost (CORS allowlist). This is the Cloud Function, not GAS, so the `text/plain` rule does not apply here.
+- Tests: `cd functions && npm run test:gmail`.
+
 ---
 
 ## Build / Pages pitfalls

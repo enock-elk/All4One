@@ -4,6 +4,7 @@
 // ============================================================================
 
 const { onRequest } = require('firebase-functions/v2/https');
+const { defineSecret } = require('firebase-functions/params');
 const admin = require('firebase-admin');
 const cors = require('cors')({ origin: true });
 const { DocumentProcessorServiceClient } = require('@google-cloud/documentai').v1;
@@ -17,6 +18,10 @@ const { softAuditLedger } = require('./lib/softAudit');
 const { normalizeLedger } = require('./lib/zaAmounts');
 const { normalizeBlocksWithGemini, repairMismatchedRows } = require('./lib/geminiNormalize');
 const { DEFAULT_LOCATION, DEFAULT_PROCESSOR_ID, processorName, processDocumentWithRetry } = require('./lib/docAi');
+const { handleGmailAuthRequest } = require('./lib/gmailAuth');
+
+// Web client secret for the OAuth client the browser uses for Connect Gmail.
+const GMAIL_OAUTH_CLIENT_SECRET = defineSecret('GMAIL_OAUTH_CLIENT_SECRET');
 
 if (!admin.apps.length) {
     admin.initializeApp();
@@ -302,6 +307,11 @@ exports.extractBankData = onRequest({ timeoutSeconds: 540, memory: '2GiB' }, (re
         }
     });
 });
+
+exports.gmailAuth = onRequest(
+    { secrets: [GMAIL_OAUTH_CLIENT_SECRET], timeoutSeconds: 60, memory: '256MiB' },
+    (req, res) => handleGmailAuthRequest(req, res, { clientSecret: GMAIL_OAUTH_CLIENT_SECRET.value() }),
+);
 
 function taggedError(step, err, hints = []) {
     const base = err?.message || String(err);

@@ -8,8 +8,9 @@
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
     "gcp-build": "npm install",
-    "test": "node test/golden/run-golden.js",
-    "test:golden": "node test/golden/run-golden.js"
+    "test": "node test/golden/run-golden.js && node --test test/gmail-auth.test.js",
+    "test:golden": "node test/golden/run-golden.js",
+    "test:gmail": "node --test test/gmail-auth.test.js"
   },
   "engines": {
     "node": "24"

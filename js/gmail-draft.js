@@ -14,10 +14,22 @@ const HINT_KEY = 'all4one_gmail_login_hint';
 const CLIENT_ID_CACHE_KEY = 'all4one_google_web_client_id';
 const EMAIL_SESSION_KEY = 'all4one_email_tab_visited';
 const SILENT_FAIL_KEY = 'all4one_gmail_silent_fails';
+// Refresh token sealed by the gmailAuth Cloud Function; only that function can read it.
+const SEAL_KEY = 'all4one_gmail_refresh_seal';
+const BACKEND_READY_KEY = 'all4one_gmail_backend_ready';
+const DEFAULT_GMAIL_AUTH_URL = 'https://us-central1-all4one-nexus.cloudfunctions.net/gmailAuth';
 
 /** Optional override in index.html: window.ALL4ONE_GMAIL_CLIENT_ID = '....apps.googleusercontent.com' */
 export function getGmailClientId() {
   return (typeof window !== 'undefined' && window.ALL4ONE_GMAIL_CLIENT_ID) || '';
+}
+
+/** Optional override in index.html: window.ALL4ONE_GMAIL_AUTH_URL = 'https://…/gmailAuth' ('' disables it). */
+function gmailAuthUrl() {
+  if (typeof window !== 'undefined' && typeof window.ALL4ONE_GMAIL_AUTH_URL === 'string') {
+    return window.ALL4ONE_GMAIL_AUTH_URL;
+  }
+  return DEFAULT_GMAIL_AUTH_URL;
 }
 
 function loadGisScript() {
@@ -72,7 +84,71 @@ function cacheToken(token, expiresInSeconds = 3500) {
 }
 
 export function hasPriorGmailGrant() {
-  return readStore(localStorage, LINKED_KEY) === '1' || Boolean(readStore(localStorage, TOKEN_KEY));
+  return readStore(localStorage, LINKED_KEY) === '1' || Boolean(readStore(localStorage, TOKEN_KEY)) || hasLastingGmailAccess();
+}
+
+/** True when drafts go through the gmailAuth function and need no hourly sign-in. */
+export function hasLastingGmailAccess() {
+  return Boolean(readStore(localStorage, SEAL_KEY));
+}
+
+function clearLastingGmailAccess() {
+  removeStore(localStorage, SEAL_KEY);
+}
+
+function backendError(status, data) {
+  const err = new Error(data?.message || `Gmail connection service error (HTTP ${status}).`);
+  err.code = `gmail/${data?.error || 'backend_error'}`;
+  err.status = status;
+  return err;
+}
+
+async function callGmailBackend(action, payload = {}) {
+  const url = gmailAuthUrl();
+  if (!url) throw backendError(503, { error: 'not_configured', message: 'Lasting Gmail connection is turned off.' });
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XmlHttpRequest' },
+    body: JSON.stringify({ action, ...payload }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw backendError(res.status, data);
+  return data;
+}
+
+/**
+ * Checks once per browser session whether the gmailAuth function is deployed
+ * and configured. Kept short so Connect still runs inside the click's popup
+ * allowance.
+ */
+async function probeGmailBackend() {
+  const cached = readStore(sessionStorage, BACKEND_READY_KEY);
+  if (cached === '1' || cached === '0') return cached === '1';
+  const url = gmailAuthUrl();
+  let ready = false;
+  if (url) {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), 2500) : null;
+    try {
+      const res = await fetch(url, { method: 'GET', signal: controller?.signal });
+      const data = await res.json().catch(() => ({}));
+      ready = res.ok && data?.ready === true;
+    } catch {
+      ready = false;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+  writeStore(sessionStorage, BACKEND_READY_KEY, ready ? '1' : '0');
+  return ready;
+}
+
+/** Warm GIS, the OAuth client ID and the backend probe so Connect opens Google quickly. */
+export function prepareGmailConnect() {
+  if (typeof window === 'undefined') return;
+  loadGisScript().catch(() => {});
+  discoverGoogleWebClientId().catch(() => {});
+  probeGmailBackend().catch(() => {});
 }
 
 function loginHint() {
@@ -102,13 +178,16 @@ export function clearLiveGmailToken() {
 }
 
 export function clearGmailToken() {
+  const sealed = readStore(localStorage, SEAL_KEY);
+  if (sealed) callGmailBackend('revoke', { sealed }).catch(() => {});
+  clearLastingGmailAccess();
   clearLiveGmailToken();
   removeStore(localStorage, LINKED_KEY);
   removeStore(localStorage, HINT_KEY);
 }
 
 export function isGmailConnected() {
-  return Boolean(getCachedToken());
+  return hasLastingGmailAccess() || Boolean(getCachedToken());
 }
 
 const GMAIL_RENEW_SOON_MS = 12 * 60 * 1000;
@@ -120,7 +199,7 @@ export function gmailTokenExpiresAt() {
 
 /** True while a cached token is still valid but inside the renew window. */
 export function gmailSessionNeedsRenewSoon(withinMs = GMAIL_RENEW_SOON_MS) {
-  if (!isGmailConnected()) return false;
+  if (hasLastingGmailAccess() || !isGmailConnected()) return false;
   const exp = gmailTokenExpiresAt();
   if (!exp) return false;
   const left = exp - Date.now();
@@ -186,6 +265,9 @@ async function discoverGoogleWebClientId() {
 export function describeGmailConnectError(err) {
   const code = err?.code || '';
   const message = String(err?.message || '');
+  if (/^gmail\/(consent_required|scope_missing|reauth_required|session-expired|lasting-failed)$/.test(code)) {
+    return message;
+  }
   const host = typeof location !== 'undefined' ? location.hostname : '';
   const domain = host || 'enock-elk.github.io';
   if (
@@ -250,7 +332,7 @@ function requestGmailAccessTokenViaGis(clientId, { prompt = 'consent' } = {}) {
     const client = window.google.accounts.oauth2.initTokenClient({
       client_id: clientId,
       scope: `${GMAIL_SCOPE} ${GMAIL_IDENTITY_SCOPE}`,
-      ...(hint ? { hint } : {}),
+      ...(hint ? { login_hint: hint } : {}),
       callback: (resp) => {
         if (resp.error) {
           reject(new Error(resp.error_description || resp.error));
@@ -269,8 +351,59 @@ function requestGmailAccessTokenViaGis(clientId, { prompt = 'consent' } = {}) {
         reject(new Error(err?.message || err?.type || 'Gmail sign-in popup was closed.'));
       },
     });
-    client.requestAccessToken(hint ? { prompt, hint } : { prompt });
+    client.requestAccessToken(hint ? { prompt, login_hint: hint } : { prompt });
   }));
+}
+
+function requestGmailCodeViaGis(clientId) {
+  const hint = loginHint();
+  return loadGisScript().then(() => new Promise((resolve, reject) => {
+    const client = window.google.accounts.oauth2.initCodeClient({
+      client_id: clientId,
+      scope: `${GMAIL_SCOPE} ${GMAIL_IDENTITY_SCOPE}`,
+      ux_mode: 'popup',
+      ...(hint ? { login_hint: hint } : {}),
+      callback: (resp) => {
+        if (resp.error) {
+          reject(new Error(resp.error_description || resp.error));
+          return;
+        }
+        if (!resp.code) {
+          reject(new Error('Google sign-in did not return a Gmail access token.'));
+          return;
+        }
+        resolve(resp.code);
+      },
+      error_callback: (err) => {
+        const closed = new Error(err?.message || err?.type || 'Gmail sign-in popup was closed.');
+        closed.code = `gmail/${err?.type || 'popup_closed'}`;
+        reject(closed);
+      },
+    });
+    client.requestCode();
+  }));
+}
+
+/** One consent: the gmailAuth function swaps the code for a refresh token and returns it sealed. */
+async function connectLastingGmail(clientId) {
+  const code = await requestGmailCodeViaGis(clientId);
+  const data = await callGmailBackend('exchange', { code, clientId });
+  if (!data?.sealed) throw backendError(502, { error: 'exchange_failed', message: 'Gmail connection service returned no session.' });
+  writeStore(localStorage, SEAL_KEY, data.sealed);
+  if (data.accessToken) {
+    cacheToken(data.accessToken, Number(data.expiresIn) || 3500);
+    captureGoogleIdentity(data.accessToken);
+    rememberGmailAccount(data.accessToken);
+  } else {
+    writeStore(localStorage, LINKED_KEY, '1');
+    clearSilentFails();
+  }
+  return data.accessToken || 'lasting';
+}
+
+function isUserStop(err) {
+  return /^gmail\/(popup_closed|popup_failed_to_open|consent_required|scope_missing)$/.test(err?.code || '') ||
+    /access_denied/i.test(String(err?.message || ''));
 }
 
 /**
@@ -296,7 +429,34 @@ async function validateCachedGmailToken(token) {
   }
 }
 
+const LASTING_CHECK_KEY = 'all4one_gmail_lasting_checked_at';
+const LASTING_CHECK_EVERY_MS = 15 * 60 * 1000;
+
+async function validateLastingGmailAccess() {
+  const last = Number(readStore(sessionStorage, LASTING_CHECK_KEY) || 0);
+  if (Date.now() - last < LASTING_CHECK_EVERY_MS) return true;
+  try {
+    await callGmailBackend('status', { sealed: readStore(localStorage, SEAL_KEY) });
+    writeStore(sessionStorage, LASTING_CHECK_KEY, String(Date.now()));
+    clearSilentFails();
+    return true;
+  } catch (err) {
+    if (err?.code === 'gmail/reauth_required') {
+      clearLastingGmailAccess();
+      clearLiveGmailToken();
+      return false;
+    }
+    // Offline or the function is cold/unavailable: keep the connection.
+    return true;
+  }
+}
+
 export async function restoreGmailSession() {
+  if (hasLastingGmailAccess()) {
+    const ok = await validateLastingGmailAccess();
+    if (!ok) bumpSilentFail();
+    return ok;
+  }
   const token = getCachedToken();
   if (!token) {
     if (hasPriorGmailGrant()) bumpSilentFail();
@@ -357,25 +517,44 @@ async function requestGmailAccessTokenViaFirebase() {
   return accessToken;
 }
 
+function sessionExpiredError() {
+  const expired = new Error('Gmail session expired. Connect Gmail again.');
+  expired.code = 'gmail/session-expired';
+  return expired;
+}
+
 export async function requestGmailAccessToken({ interactive = true, force = false } = {}) {
   if (!force) {
     const cached = getCachedToken();
     if (cached) return cached;
+    if (hasLastingGmailAccess() && !interactive) return 'lasting';
   }
 
   // Non-interactive: never open Google UI. Push/create must use Connect first.
-  if (!interactive) {
-    const expired = new Error('Gmail session expired. Connect Gmail again.');
-    expired.code = 'gmail/session-expired';
-    throw expired;
-  }
+  if (!interactive) throw sessionExpiredError();
 
   try {
     const clientId = await discoverGoogleWebClientId();
+    if (clientId && await probeGmailBackend()) {
+      try {
+        return await connectLastingGmail(clientId);
+      } catch (lastingErr) {
+        if (isUserStop(lastingErr)) throw lastingErr;
+        console.warn('Lasting Gmail connection failed; using hourly sign-in for this session.', lastingErr);
+        writeStore(sessionStorage, BACKEND_READY_KEY, '0');
+        const fallback = new Error(
+          `Lasting Gmail connection failed (${lastingErr?.message || 'server error'}). ` +
+          'Click Connect Gmail again to connect for this session.',
+        );
+        fallback.code = 'gmail/lasting-failed';
+        throw fallback;
+      }
+    }
     if (clientId) {
       try {
-        // Explicit Connect only — consent / account picker is intentional here.
-        return await requestGmailAccessTokenViaGis(clientId, { prompt: 'consent' });
+        // Explicit Connect only. After the first grant, prompt '' reuses it
+        // without another consent screen.
+        return await requestGmailAccessTokenViaGis(clientId, { prompt: hasPriorGmailGrant() ? '' : 'consent' });
       } catch (gisErr) {
         console.warn('Gmail GIS token request failed, trying Firebase popup.', gisErr);
         try {
@@ -451,22 +630,31 @@ export async function createGmailDraft({ subject, htmlBody, to, cc }) {
     htmlBody: htmlBody || '',
   }));
 
-  let token = await requestGmailAccessToken({ interactive: false });
-  let { res, data } = await postGmailDraft(token, raw);
-  if (res.status === 401) {
-    clearLiveGmailToken();
+  if (hasLastingGmailAccess()) {
     try {
-      token = await requestGmailAccessToken({ interactive: false });
-    } catch {
-      const expired = new Error('Gmail session expired. Connect Gmail again.');
-      expired.code = 'gmail/session-expired';
-      throw expired;
+      const data = await callGmailBackend('draft', { sealed: readStore(localStorage, SEAL_KEY), raw });
+      clearSilentFails();
+      return data.draft;
+    } catch (err) {
+      if (err?.code === 'gmail/reauth_required') {
+        clearLastingGmailAccess();
+        clearLiveGmailToken();
+        throw sessionExpiredError();
+      }
+      // Backend down: a still-valid browser token can carry this push.
+      if (!getCachedToken()) throw err;
+      console.warn('Gmail connection service failed; using the browser token.', err);
     }
-    ({ res, data } = await postGmailDraft(token, raw));
   }
 
+  const token = getCachedToken();
+  if (!token) throw sessionExpiredError();
+  const { res, data } = await postGmailDraft(token, raw);
+  if (res.status === 401) {
+    clearLiveGmailToken();
+    throw sessionExpiredError();
+  }
   if (!res.ok) {
-    if (res.status === 401) clearLiveGmailToken();
     throw new Error(data?.error?.message || `Gmail API error (HTTP ${res.status})`);
   }
 

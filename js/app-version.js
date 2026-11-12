@@ -1,8 +1,16 @@
-export const APP_VERSION = '1.3.27';
-export const APP_RELEASE_DATE = '7 November 2026';
+export const APP_VERSION = '1.3.28';
+export const APP_RELEASE_DATE = '12 November 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.28',
+    date: '12 Nov 2026',
+    items: [
+      'Gmail stays connected: after one approval, the Draft Email Generator keeps working without hourly sign-ins until you disconnect or remove access in your Google account. Needs the gmailAuth Cloud Function to be deployed.',
+      'Until that function is live, Renew Gmail reuses your earlier approval instead of showing the consent screen again.',
+    ],
+  },
   {
     version: '1.3.27',
     date: '7 Nov 2026',
