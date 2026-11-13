@@ -1,8 +1,16 @@
-export const APP_VERSION = '1.3.29';
+export const APP_VERSION = '1.3.30';
 export const APP_RELEASE_DATE = '13 November 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.30',
+    date: '13 Nov 2026',
+    items: [
+      'Unclear deceased ID is a block on Master LOE and Master LOS. One illegible ID stays a sentence; extra names become a list.',
+      'Instruction letter documents is a block on both master drafts. It asks for those documents, then notes that the calculation depends on them.',
+    ],
+  },
   {
     version: '1.3.29',
     date: '13 Nov 2026',
