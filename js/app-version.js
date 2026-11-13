@@ -1,8 +1,16 @@
-export const APP_VERSION = '1.3.32';
+export const APP_VERSION = '1.3.33';
 export const APP_RELEASE_DATE = '13 November 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.33',
+    date: '13 Nov 2026',
+    items: [
+      'Master LOE no longer says deceased. The illegible-ID block is Unclear ID. The medical-expense blocks are removed. His or her follows the title.',
+      'Push to Gmail sends the draft when a token is already active. With no active token, that same click connects Gmail and then creates the draft. Connect Gmail stays for a browser that has never had a token.',
+    ],
+  },
   {
     version: '1.3.32',
     date: '13 Nov 2026',

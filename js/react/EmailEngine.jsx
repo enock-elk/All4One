@@ -267,8 +267,6 @@ function masterClaimantLabel(vars) {
 }
 
 function masterPronoun(vars) {
-  const chosen = String(vars.idPronoun || '').trim();
-  if (chosen) return chosen;
   const title = String(vars.claimantTitle || '').trim().toLowerCase();
   if (title === 'ms' || title === 'mrs' || title === 'miss') return 'her';
   if (title === 'mr') return 'his';
@@ -577,7 +575,6 @@ function collectGmailPushErrors(template, variables, { requireSubject = true } =
         .forEach((field) => {
           if (!fieldIsVisible(field, variables)) return;
           if (field.type === 'toggle') return;
-          if (field.key === 'idPronoun') return;
           if (isPageNumberField(field)) return;
           if (!fieldHasValue(field, variables)) {
             mark(field.key, `${toggle.label}: ${field.label}`);
@@ -618,7 +615,6 @@ function countRemainingDraftRequirements(template, variables, { requireSubject =
         .forEach((field) => {
           if (!fieldIsVisible(field, variables)) return;
           if (field.type === 'toggle') return;
-          if (field.key === 'idPronoun') return;
           if (isPageNumberField(field)) return;
           if (!fieldHasValue(field, variables)) remaining += 1;
         });
@@ -696,7 +692,7 @@ const TEMPLATES = [
     id: 'draft-master-loe',
     name: '(DRAFT) Master LOE',
     menuLabel: 'Master LOE Draft',
-    intro: 'Tick only the blocks this email needs. Notes under each block stay in the form and are left out of the draft. A block that starts with “Also” uses that word only when another request is already above it; otherwise it starts with “Kindly” or “In accordance”. The 24-hour close is always included. Unclear deceased ID and Instruction letter documents are their own blocks. Each earnings block includes the Kubheka paragraph in its own place. Use Up and Down to move formal and informal earnings.',
+    intro: 'Tick only the blocks this email needs. Notes under each block stay in the form and are left out of the draft. A block that starts with “Also” uses that word only when another request is already above it; otherwise it starts with “Kindly” or “In accordance”. The 24-hour close is always included. Unclear ID and Instruction letter documents are their own blocks. Each earnings block includes the Kubheka paragraph in its own place. Use Up and Down to move formal and informal earnings.',
     fields: [
       {
         key: 'subject',
@@ -922,20 +918,6 @@ const TEMPLATES = [
         loeOnly: true,
       }),
       {
-        key: 'idPronoun',
-        label: 'ID document pronoun',
-        type: 'select',
-        showWhen: { key: 'secName', equals: true },
-        nested: true,
-        loeOnly: true,
-        guidance: 'Used in “or alternatively, kindly provide a copy of his/her ID document”. Leave on “Match the title” to follow Mr or Ms.',
-        options: [
-          { value: '', label: 'Match the title' },
-          { value: 'his', label: 'his' },
-          { value: 'her', label: 'her' },
-        ],
-      },
-      {
         key: 'secNameOrder',
         label: 'Order of the claimant’s names',
         type: 'toggle',
@@ -1006,22 +988,8 @@ const TEMPLATES = [
         loeOnly: true,
       },
       {
-        key: 'secMedicalDocs',
-        label: 'Missing medical-expense documents',
-        type: 'toggle',
-        guidance: 'The instruction includes future medical expenses. Asks for the medico-legal reports to consider.',
-        loeOnly: true,
-      },
-      {
-        key: 'secFutureMedical',
-        label: 'Include future medical expenses',
-        type: 'toggle',
-        guidance: 'Asks whether future medical expenses should be included in the calculation.',
-        loeOnly: true,
-      },
-      {
         key: 'secUnclearId',
-        label: 'Unclear deceased ID',
+        label: 'Unclear ID',
         type: 'toggle',
         guidance: 'Asks for a clearer copy of an illegible ID. One name stays a sentence. Add a line for each extra person.',
         loeOnly: true,
@@ -1047,7 +1015,7 @@ const TEMPLATES = [
         key: 'instructionDocs',
         label: 'Documents',
         type: 'lines',
-        placeholder: 'e.g. Deceased payslips.',
+        placeholder: 'e.g. Payslips.',
         guidance: 'Each line is a document mentioned in the instruction letter.',
         showWhen: { key: 'secInstructionDocs', equals: true },
         nested: true,
@@ -1217,17 +1185,6 @@ const TEMPLATES = [
           hasPriorRequest,
           `If possible, kindly assist us by providing clearer copies of the following documents referenced in your report:${htmlList(vars.clearerReportDocs, '[Document referenced in the report]')}`,
         ));
-      }
-
-      if (!wrongfulArrest && vars.secMedicalDocs) {
-        pushRequest(alsoPrefix(
-          hasPriorRequest,
-          'We note that your instruction also includes the calculation of future medical expenses. Kindly provide us with the relevant medico-legal reports that you would like us to consider.',
-        ));
-      }
-
-      if (!wrongfulArrest && vars.secFutureMedical) {
-        pushRequest(`${requestLead(hasPriorRequest)} confirm if we should include future medical expenses in our calculations.`);
       }
 
       if (!wrongfulArrest && vars.secUnclearId) {
@@ -2090,11 +2047,6 @@ export default function EmailEngine() {
   };
 
   const pushToGmail = async ({ skipPageConfirm = false } = {}) => {
-    if (!gmailLinked) {
-      setStatus({ msg: 'Connect Gmail before pushing a draft.', type: 'error' });
-      return;
-    }
-
     const missing = collectGmailPushErrors(selectedTemplate, variables);
     if (missing.keys.length) {
       setBlockingKeys(missing.keys);
@@ -2116,63 +2068,21 @@ export default function EmailEngine() {
     setPageConfirm(null);
 
     setIsPushing(true);
-    setStatus({ msg: 'Pushing draft to Gmail...', type: 'info' });
-
     try {
-      // Once the user has connected Gmail, use that account directly. The
-      // Apps Script deployment may be an older revision and is unrelated to
-      // the user's OAuth-backed Gmail drafts.
-      if (gmailLinked) {
-        await pushDraftViaGmailApi();
-        return;
+      // An active token pushes straight away. A missing token uses this same
+      // click to connect, then creates the draft. Google still opens only
+      // from this click, never when the tab loads.
+      if (!isGmailConnected()) {
+        setStatus({ msg: 'Connecting Google account, then creating the draft...', type: 'info' });
+        await requestGmailAccessToken();
+        const hint = readGmailHint();
+        gmailHintRef.current = hint;
+        setGmailHint(hint);
+        setGmailLinked(isGmailConnected());
       }
 
-      const payload = {
-        action: 'CREATE_DRAFT',
-        subject: compiledContent.subject,
-        htmlBody: currentHtmlBody(),
-      };
-
-      const res = await fetch(GAS_API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload),
-      });
-
-      let result;
-      try {
-        result = await res.json();
-      } catch {
-        result = null;
-      }
-
-      const ok = String(result?.status || '').toLowerCase() === 'success';
-      if (ok) {
-        logEmailUsage('Push to Gmail');
-        setStatus({
-          msg: result.message || 'Draft created in your Gmail account!',
-          type: 'success',
-        });
-        return;
-      }
-
-      const gasError = result?.message || `HTTP ${res.status}`;
-      const needsOAuthFallback =
-        /firm not found/i.test(gasError) ||
-        /unknown action/i.test(gasError) ||
-        !result;
-
-      if (needsOAuthFallback) {
-        setStatus({ msg: 'Backend draft handler unavailable — using Gmail OAuth...', type: 'info' });
-        await pushDraftViaGmailApi();
-        setGmailLinked(true);
-        return;
-      }
-
-      setStatus({
-        msg: `Failed to push draft via GAS: ${gasError}`,
-        type: 'error',
-      });
+      setStatus({ msg: 'Pushing draft to Gmail...', type: 'info' });
+      await pushDraftViaGmailApi();
     } catch (err) {
       console.error(err);
       const expired = err?.code === 'gmail/session-expired' || /session expired/i.test(String(err?.message || ''));
@@ -2181,23 +2091,16 @@ export default function EmailEngine() {
         gmailHintRef.current = 'reconnect';
         setGmailHint('reconnect');
         setStatus({
-          msg: 'Gmail session expired. Click Reconnect Gmail to continue. Google opens only after you click.',
+          msg: 'Gmail session expired. Click Push to Gmail again. It will reconnect, then create the draft. Google opens only after you click.',
           type: 'error',
         });
         return;
       }
       const msg = describeGmailConnectError(err);
-      if (/oauth|gmail|token|configured|authorized domain|sign-in method/i.test(msg)) {
-        setStatus({
-          msg: `${msg} Click "Connect Gmail" first, or redeploy gas/Code.gs on Apps Script.`,
-          type: 'error',
-        });
-      } else {
-        setStatus({
-          msg: `Failed to create Gmail draft: ${msg}`,
-          type: 'error',
-        });
-      }
+      setStatus({
+        msg: `Failed to create Gmail draft: ${msg}`,
+        type: 'error',
+      });
     } finally {
       setIsPushing(false);
     }
@@ -2848,16 +2751,16 @@ export default function EmailEngine() {
               >
                 Disconnect
               </button>
-            ) : (
+            ) : !hasPriorGmailGrant() ? (
               <button
                 type="button"
                 onClick={() => connectGmail()}
-                title="Requests Gmail draft access for your Actuary work Google account. The site hostname must be listed on the OAuth web client’s Authorized JavaScript origins. Google opens only after this click."
+                title="Connect Gmail before you need a draft. Shown when this browser has no Gmail token yet. Google opens only after this click."
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all active:scale-95"
               >
-                <Mail className="w-4 h-4" /> {gmailHint === 'reconnect' ? 'Reconnect Gmail' : 'Connect Gmail'}
+                <Mail className="w-4 h-4" /> Connect Gmail
               </button>
-            )}
+            ) : null}
             <button 
               onClick={copyToClipboard} 
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all active:scale-95"
@@ -2866,9 +2769,9 @@ export default function EmailEngine() {
             </button>
             <button 
               onClick={() => pushToGmail()} 
-              disabled={!gmailLinked || isPushing}
-              title={gmailLinked ? 'Create a Gmail draft' : 'Connect Gmail to push this draft'}
-              className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all active:scale-95 disabled:cursor-not-allowed disabled:active:scale-100 ${gmailLinked ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/20 disabled:opacity-50' : 'bg-slate-300 text-slate-500 shadow-none dark:bg-slate-700 dark:text-slate-400'}`}
+              disabled={isPushing}
+              title={gmailLinked ? 'Create a Gmail draft' : 'Connects Gmail if this browser has no active token, then creates the draft'}
+              className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all active:scale-95 disabled:cursor-not-allowed disabled:active:scale-100 disabled:opacity-50 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/20"
             >
               {isPushing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} 
               Push to Gmail
@@ -2883,7 +2786,7 @@ export default function EmailEngine() {
         ) : null}
         {gmailHint === 'reconnect' ? (
           <div className="px-6 py-2 text-[11px] font-semibold bg-amber-50 text-amber-900 border-b border-amber-200 dark:bg-amber-950/40 dark:text-amber-100 dark:border-amber-800">
-            Gmail needs a new connection. Click Reconnect Gmail. Google opens only after you click.
+            Gmail needs a new connection. Click Push to Gmail. It will reconnect, then create the draft. Google opens only after you click.
           </div>
         ) : null}
 
