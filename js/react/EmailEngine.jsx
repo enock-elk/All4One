@@ -170,6 +170,25 @@ function thankYouLoe(claimantHtml) {
   return `Thank you for requesting a Loss of Earnings calculation for <strong>${claimantHtml}</strong>.`;
 }
 
+function thankYouForCalculation(vars) {
+  const claimant = masterClaimantHtml(vars);
+  if (vars.calculation === 'loe') {
+    return `Thank you for requesting a Loss of Earnings calculation for ${claimant}.`;
+  }
+  return `Thank you for requesting a Loss of Support calculation for the dependants of ${claimant}.`;
+}
+
+/** One illegible ID stays a sentence. Several become a list of “Name’s ID document.” */
+function clearerIdRequest(names) {
+  const cleaned = (Array.isArray(names) ? names : []).map((item) => String(item || '').trim()).filter(Boolean);
+  if (cleaned.length <= 1) {
+    const name = escapeHtml(cleaned[0] || '[Name]');
+    return `Kindly provide a clearer copy of ${name}\u2019s ID document as the current one is illegible.`;
+  }
+  const items = cleaned.map((name) => `${name}\u2019s ID document.`);
+  return `Kindly provide clearer copies of the following ID documents as the current ones are illegible:${htmlList(items, '')}`;
+}
+
 function orIdDocumentLine(gender) {
   return `or alternatively, kindly provide a copy of ${possessivePronoun(gender)} ID document.`;
 }
@@ -440,6 +459,9 @@ function collectGmailPushErrors(template, variables, { requireSubject = true } =
   if (byKey.claimantName && !String(variables.claimantName || '').trim()) {
     mark('claimantName', 'Claimant name');
   }
+  fields
+    .filter((field) => field.required && fieldIsVisible(field, variables) && !fieldHasValue(field, variables))
+    .forEach((field) => mark(field.key, field.label));
 
   fields
     .filter((field) => field.type === 'toggle' && variables?.[field.key] && fieldIsVisible(field, variables))
@@ -476,6 +498,9 @@ function countRemainingDraftRequirements(template, variables, { requireSubject =
 
   if (byKey.claimantTitle && titleNeedsChoice(variables.claimantTitle)) remaining += 1;
   if (byKey.claimantName && !String(variables.claimantName || '').trim()) remaining += 1;
+  fields
+    .filter((field) => field.required && fieldIsVisible(field, variables) && !fieldHasValue(field, variables))
+    .forEach(() => { remaining += 1; });
 
   fields
     .filter((field) => field.type === 'toggle' && variables?.[field.key] && fieldIsVisible(field, variables))
@@ -1170,6 +1195,145 @@ const TEMPLATES = [
       return {
         subject: subjectHasContent(typedSubject) ? typedSubject : generatedSubject,
         bodyHtml: parts.join('<br/><br/>'),
+      };
+    },
+  },
+  {
+    id: 'draft-unclear-id',
+    name: '(DRAFT) Unclear deceased ID',
+    menuLabel: 'Unclear deceased ID',
+    intro: 'Loss of Support thanks them for a calculation for the dependants. Loss of Earnings uses the same email and leaves out “the dependants of”. One illegible ID stays a single sentence. Add a line for each extra person.',
+    fields: [
+      {
+        key: 'subject',
+        label: 'Subject',
+        type: 'text',
+        default: '(DRAFT) ',
+        placeholder: '(DRAFT) paste the rest of the subject…',
+        guidance: '(DRAFT) is filled for you. Paste the rest of the subject after it. Required for Push to Gmail; Copy HTML does not need it.',
+      },
+      { key: 'recipientName', label: 'Recipient name', type: 'text', placeholder: 'e.g. Keletele' },
+      {
+        key: 'calculation',
+        label: 'Calculation',
+        type: 'select',
+        default: 'los',
+        options: [
+          { value: 'los', label: 'Loss of Support' },
+          { value: 'loe', label: 'Loss of Earnings' },
+        ],
+        guidance: 'Loss of Earnings removes “the dependants of” from the thank-you.',
+      },
+      {
+        key: 'claimantTitle',
+        label: 'Title',
+        type: 'select',
+        default: 'Mr/Ms',
+        row: 'claimant',
+        edge: true,
+        options: [
+          { value: 'Mr/Ms', label: 'Mr/Ms' },
+          { value: 'Mr', label: 'Mr' },
+          { value: 'Ms', label: 'Ms' },
+          { value: 'Mrs', label: 'Mrs' },
+        ],
+      },
+      {
+        key: 'claimantName',
+        label: 'Claimant',
+        type: 'text',
+        placeholder: 'e.g. ED Masombuka',
+        row: 'claimant',
+      },
+      {
+        key: 'idNames',
+        label: 'Illegible IDs',
+        type: 'lines',
+        required: true,
+        placeholder: 'e.g. LP Masombuka',
+        guidance: 'The person named on the ID. This can differ from the claimant.',
+      },
+    ],
+    compile(vars) {
+      const recipient = escapeHtml(filled(vars.recipientName, 'XXXXX'));
+      const draftName = vars.calculation === 'loe'
+        ? '(DRAFT) Unclear deceased ID \u2014 LOE'
+        : '(DRAFT) Unclear deceased ID \u2014 LOS';
+      const bodyHtml = [
+        `Dear ${recipient}`,
+        thankYouForCalculation(vars),
+        clearerIdRequest(vars.idNames),
+        TURNAROUND,
+        SIGN_OFF,
+      ].join('<br/><br/>');
+      const generatedSubject = draftSubject(draftName, masterClaimantLabel(vars));
+      const typedSubject = String(vars.subject || '').trim();
+      return {
+        subject: subjectHasContent(typedSubject) ? typedSubject : generatedSubject,
+        bodyHtml,
+      };
+    },
+  },
+  {
+    id: 'draft-instruction-docs',
+    name: '(DRAFT) Instruction letter documents',
+    menuLabel: 'Instruction letter documents',
+    intro: 'Loss of Support only. Asks for the documents named in the instruction letter, then notes that the calculation depends on them. The 24-hour close is always included.',
+    fields: [
+      {
+        key: 'subject',
+        label: 'Subject',
+        type: 'text',
+        default: '(DRAFT) ',
+        placeholder: '(DRAFT) paste the rest of the subject…',
+        guidance: '(DRAFT) is filled for you. Paste the rest of the subject after it. Required for Push to Gmail; Copy HTML does not need it.',
+      },
+      { key: 'recipientName', label: 'Recipient name', type: 'text', placeholder: 'e.g. Nomatshezi' },
+      {
+        key: 'claimantTitle',
+        label: 'Title',
+        type: 'select',
+        default: 'Mr/Ms',
+        row: 'claimant',
+        edge: true,
+        options: [
+          { value: 'Mr/Ms', label: 'Mr/Ms' },
+          { value: 'Mr', label: 'Mr' },
+          { value: 'Ms', label: 'Ms' },
+          { value: 'Mrs', label: 'Mrs' },
+        ],
+      },
+      {
+        key: 'claimantName',
+        label: 'Claimant',
+        type: 'text',
+        placeholder: 'e.g. L Gxalaba',
+        row: 'claimant',
+      },
+      {
+        key: 'instructionDocs',
+        label: 'Documents',
+        type: 'lines',
+        required: true,
+        placeholder: 'e.g. Deceased payslips.',
+        guidance: 'Each line is a document mentioned in the instruction letter.',
+      },
+    ],
+    compile(vars) {
+      const recipient = escapeHtml(filled(vars.recipientName, 'XXXXX'));
+      const bodyHtml = [
+        `Dear ${recipient}`,
+        `Thank you for requesting a Loss of Support calculation for the dependants of ${masterClaimantHtml(vars)}.`,
+        `Kindly assist us by providing the following documents mentioned in the Instruction letter:${htmlList(vars.instructionDocs, '[Document mentioned in the Instruction letter]')}`,
+        'Kindly note that the calculation is dependent on the information we have requested since it will directly increase the claim.',
+        TURNAROUND,
+        SIGN_OFF,
+      ].join('<br/><br/>');
+      const generatedSubject = draftSubject(this.name, masterClaimantLabel(vars));
+      const typedSubject = String(vars.subject || '').trim();
+      return {
+        subject: subjectHasContent(typedSubject) ? typedSubject : generatedSubject,
+        bodyHtml,
       };
     },
   },

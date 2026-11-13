@@ -1,8 +1,16 @@
-export const APP_VERSION = '1.3.28';
-export const APP_RELEASE_DATE = '12 November 2026';
+export const APP_VERSION = '1.3.29';
+export const APP_RELEASE_DATE = '13 November 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.29',
+    date: '13 Nov 2026',
+    items: [
+      'Unclear deceased ID draft: Loss of Support asks for a clearer copy of an illegible ID. Loss of Earnings uses the same email and leaves out “the dependants of”.',
+      'Instruction letter documents draft asks for the Loss of Support documents named in the instruction letter, then notes that the calculation depends on them.',
+    ],
+  },
   {
     version: '1.3.28',
     date: '12 Nov 2026',
