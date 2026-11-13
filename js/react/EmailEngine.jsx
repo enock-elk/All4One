@@ -92,6 +92,7 @@ const getSignatureHtml = () => `
 
 const KUBHEKA_APN_HTML = 'In accordance with the precedent set by the court in <em>Kubheka v RAF</em> (5 November 2025) and the Advisory Practice Note issued by the Actuarial Society of South Africa (APN 702), we are required to obtain all available supporting documentation related to earnings referenced in the Industrial Psychologist report. Compliance with these requirements is important to ensure adherence to professional standards.';
 const TURNAROUND = 'We will provide the report within 24 hours once the abovementioned information is provided and no further information is required.';
+const DEPENDENCY_NOTE = 'Kindly note that the calculation is dependent on the information we have requested since it will directly increase the claim.';
 const SIGN_OFF = 'Kind regards<br/>Namir';
 const GENDER_OPTIONS = [
   { value: 'Male', label: 'Male' },
@@ -170,23 +171,20 @@ function thankYouLoe(claimantHtml) {
   return `Thank you for requesting a Loss of Earnings calculation for <strong>${claimantHtml}</strong>.`;
 }
 
-function thankYouForCalculation(vars) {
-  const claimant = masterClaimantHtml(vars);
-  if (vars.calculation === 'loe') {
-    return `Thank you for requesting a Loss of Earnings calculation for ${claimant}.`;
-  }
-  return `Thank you for requesting a Loss of Support calculation for the dependants of ${claimant}.`;
-}
-
 /** One illegible ID stays a sentence. Several become a list of “Name’s ID document.” */
-function clearerIdRequest(names) {
+function clearerIdRequest(names, hasPriorRequest) {
+  const lead = requestLead(hasPriorRequest);
   const cleaned = (Array.isArray(names) ? names : []).map((item) => String(item || '').trim()).filter(Boolean);
   if (cleaned.length <= 1) {
     const name = escapeHtml(cleaned[0] || '[Name]');
-    return `Kindly provide a clearer copy of ${name}\u2019s ID document as the current one is illegible.`;
+    return `${lead} provide a clearer copy of ${name}\u2019s ID document as the current one is illegible.`;
   }
   const items = cleaned.map((name) => `${name}\u2019s ID document.`);
-  return `Kindly provide clearer copies of the following ID documents as the current ones are illegible:${htmlList(items, '')}`;
+  return `${lead} provide clearer copies of the following ID documents as the current ones are illegible:${htmlList(items, '')}`;
+}
+
+function instructionLetterRequest(docs, hasPriorRequest) {
+  return `${requestLead(hasPriorRequest)} assist us by providing the following documents mentioned in the Instruction letter:${htmlList(docs, '[Document mentioned in the Instruction letter]')}`;
 }
 
 function orIdDocumentLine(gender) {
@@ -459,9 +457,6 @@ function collectGmailPushErrors(template, variables, { requireSubject = true } =
   if (byKey.claimantName && !String(variables.claimantName || '').trim()) {
     mark('claimantName', 'Claimant name');
   }
-  fields
-    .filter((field) => field.required && fieldIsVisible(field, variables) && !fieldHasValue(field, variables))
-    .forEach((field) => mark(field.key, field.label));
 
   fields
     .filter((field) => field.type === 'toggle' && variables?.[field.key] && fieldIsVisible(field, variables))
@@ -498,9 +493,6 @@ function countRemainingDraftRequirements(template, variables, { requireSubject =
 
   if (byKey.claimantTitle && titleNeedsChoice(variables.claimantTitle)) remaining += 1;
   if (byKey.claimantName && !String(variables.claimantName || '').trim()) remaining += 1;
-  fields
-    .filter((field) => field.required && fieldIsVisible(field, variables) && !fieldHasValue(field, variables))
-    .forEach(() => { remaining += 1; });
 
   fields
     .filter((field) => field.type === 'toggle' && variables?.[field.key] && fieldIsVisible(field, variables))
@@ -587,7 +579,7 @@ const TEMPLATES = [
     id: 'draft-master-loe',
     name: '(DRAFT) Master LOE',
     menuLabel: 'Master LOE Draft',
-    intro: 'Tick only the blocks this email needs. Notes under each block stay in the form and are left out of the draft. A block that starts with “Also” uses that word only when another request is already above it; otherwise it starts with “Kindly” or “In accordance”. The 24-hour close is always included. Each earnings block includes the Kubheka paragraph in its own place. Use Up and Down to move formal and informal earnings.',
+    intro: 'Tick only the blocks this email needs. Notes under each block stay in the form and are left out of the draft. A block that starts with “Also” uses that word only when another request is already above it; otherwise it starts with “Kindly” or “In accordance”. The 24-hour close is always included. Unclear deceased ID and Instruction letter documents are their own blocks. Each earnings block includes the Kubheka paragraph in its own place. Use Up and Down to move formal and informal earnings.',
     fields: [
       {
         key: 'subject',
@@ -848,6 +840,40 @@ const TEMPLATES = [
         ],
       },
       {
+        key: 'secUnclearId',
+        label: 'Unclear deceased ID',
+        type: 'toggle',
+        guidance: 'Asks for a clearer copy of an illegible ID. One name stays a sentence. Add a line for each extra person.',
+        loeOnly: true,
+      },
+      {
+        key: 'idNames',
+        label: 'Illegible IDs',
+        type: 'lines',
+        placeholder: 'e.g. LP Masombuka',
+        guidance: 'The person named on the ID. This can differ from the claimant.',
+        showWhen: { key: 'secUnclearId', equals: true },
+        nested: true,
+        loeOnly: true,
+      },
+      {
+        key: 'secInstructionDocs',
+        label: 'Instruction letter documents',
+        type: 'toggle',
+        guidance: 'Asks for the documents named in the instruction letter, then notes that the calculation depends on them.',
+        loeOnly: true,
+      },
+      {
+        key: 'instructionDocs',
+        label: 'Documents',
+        type: 'lines',
+        placeholder: 'e.g. Deceased payslips.',
+        guidance: 'Each line is a document mentioned in the instruction letter.',
+        showWhen: { key: 'secInstructionDocs', equals: true },
+        nested: true,
+        loeOnly: true,
+      },
+      {
         key: 'secFormal',
         label: 'Formal earnings proof',
         type: 'toggle',
@@ -938,7 +964,7 @@ const TEMPLATES = [
         const calculation = escapeHtml(filled(vars.calculationType, 'Wrongful Arrest'));
         parts.push(`Thank you for requesting a ${calculation} calculation for ${claimant}.`);
         parts.push('The date of incident was not provided. Kindly assist by providing the date of incident.');
-        parts.push('Kindly note that the calculation is dependent on the information we have requested since it will directly increase the claim.');
+        parts.push(DEPENDENCY_NOTE);
       } else if (vars.audience === 'ip') {
         const firm = escapeHtml(filled(vars.attorneyFirm, 'XXXXX Attorneys'));
         parts.push(`Kindly note that we are undertaking Loss of Earnings Calculations for ${claimant} on behalf of <strong>${firm}</strong>.`);
@@ -991,6 +1017,17 @@ const TEMPLATES = [
         pushRequest(`The ${documents} provided for ${claimant} are illegible. Will you please provide clearer copies of all ${documents} in your possession?`);
       }
 
+      if (!wrongfulArrest && vars.secUnclearId) {
+        pushRequest(clearerIdRequest(vars.idNames, hasPriorRequest));
+      }
+
+      if (!wrongfulArrest && vars.secInstructionDocs) {
+        pushRequest([
+          instructionLetterRequest(vars.instructionDocs, hasPriorRequest),
+          DEPENDENCY_NOTE,
+        ].join('<br/><br/>'));
+      }
+
       const buildFormalEarnings = () => {
         if (wrongfulArrest || !vars.secFormal) return '';
         const chunks = [];
@@ -1034,7 +1071,7 @@ const TEMPLATES = [
     id: 'draft-master-los',
     name: '(DRAFT) Master LOS',
     menuLabel: 'Master LOS Draft',
-    intro: 'The 24-hour close is always included. The thank-you is for the dependants. Page numbers appear when both accident dates come from the same document.',
+    intro: 'The 24-hour close is always included. The thank-you is for the dependants. Unclear deceased ID and Instruction letter documents are their own blocks. Page numbers appear when both accident dates come from the same document.',
     fields: [
       {
         key: 'subject',
@@ -1145,6 +1182,36 @@ const TEMPLATES = [
         embedded: true,
       },
       {
+        key: 'secUnclearId',
+        label: 'Unclear deceased ID',
+        type: 'toggle',
+        guidance: 'Asks for a clearer copy of an illegible ID. One name stays a sentence. Add a line for each extra person.',
+      },
+      {
+        key: 'idNames',
+        label: 'Illegible IDs',
+        type: 'lines',
+        placeholder: 'e.g. LP Masombuka',
+        guidance: 'The person named on the ID. This can differ from the claimant.',
+        showWhen: { key: 'secUnclearId', equals: true },
+        nested: true,
+      },
+      {
+        key: 'secInstructionDocs',
+        label: 'Instruction letter documents',
+        type: 'toggle',
+        guidance: 'Asks for the documents named in the instruction letter, then notes that the calculation depends on them.',
+      },
+      {
+        key: 'instructionDocs',
+        label: 'Documents',
+        type: 'lines',
+        placeholder: 'e.g. Deceased payslips.',
+        guidance: 'Each line is a document mentioned in the instruction letter.',
+        showWhen: { key: 'secInstructionDocs', equals: true },
+        nested: true,
+      },
+      {
         key: 'secIpDocs',
         label: 'Dependants documents',
         type: 'toggle',
@@ -1183,10 +1250,20 @@ const TEMPLATES = [
         ])}`);
         hasPriorRequest = true;
       }
+      if (vars.secUnclearId) {
+        parts.push(clearerIdRequest(vars.idNames, hasPriorRequest));
+        hasPriorRequest = true;
+      }
       if (vars.secIpDocs) {
         parts.push(`${requestLead(hasPriorRequest)} assist us by providing the following documents referenced in the IP report:${htmlList(vars.ipDocs, '[Document referenced in the IP report]')}`);
-        parts.push('Kindly note that the calculation is dependent on the information we have requested since it will directly increase the claim.');
         hasPriorRequest = true;
+      }
+      if (vars.secInstructionDocs) {
+        parts.push(instructionLetterRequest(vars.instructionDocs, hasPriorRequest));
+        hasPriorRequest = true;
+      }
+      if (vars.secIpDocs || vars.secInstructionDocs) {
+        parts.push(DEPENDENCY_NOTE);
       }
       parts.push(TURNAROUND);
       parts.push(SIGN_OFF);
@@ -1195,145 +1272,6 @@ const TEMPLATES = [
       return {
         subject: subjectHasContent(typedSubject) ? typedSubject : generatedSubject,
         bodyHtml: parts.join('<br/><br/>'),
-      };
-    },
-  },
-  {
-    id: 'draft-unclear-id',
-    name: '(DRAFT) Unclear deceased ID',
-    menuLabel: 'Unclear deceased ID',
-    intro: 'Loss of Support thanks them for a calculation for the dependants. Loss of Earnings uses the same email and leaves out “the dependants of”. One illegible ID stays a single sentence. Add a line for each extra person.',
-    fields: [
-      {
-        key: 'subject',
-        label: 'Subject',
-        type: 'text',
-        default: '(DRAFT) ',
-        placeholder: '(DRAFT) paste the rest of the subject…',
-        guidance: '(DRAFT) is filled for you. Paste the rest of the subject after it. Required for Push to Gmail; Copy HTML does not need it.',
-      },
-      { key: 'recipientName', label: 'Recipient name', type: 'text', placeholder: 'e.g. Keletele' },
-      {
-        key: 'calculation',
-        label: 'Calculation',
-        type: 'select',
-        default: 'los',
-        options: [
-          { value: 'los', label: 'Loss of Support' },
-          { value: 'loe', label: 'Loss of Earnings' },
-        ],
-        guidance: 'Loss of Earnings removes “the dependants of” from the thank-you.',
-      },
-      {
-        key: 'claimantTitle',
-        label: 'Title',
-        type: 'select',
-        default: 'Mr/Ms',
-        row: 'claimant',
-        edge: true,
-        options: [
-          { value: 'Mr/Ms', label: 'Mr/Ms' },
-          { value: 'Mr', label: 'Mr' },
-          { value: 'Ms', label: 'Ms' },
-          { value: 'Mrs', label: 'Mrs' },
-        ],
-      },
-      {
-        key: 'claimantName',
-        label: 'Claimant',
-        type: 'text',
-        placeholder: 'e.g. ED Masombuka',
-        row: 'claimant',
-      },
-      {
-        key: 'idNames',
-        label: 'Illegible IDs',
-        type: 'lines',
-        required: true,
-        placeholder: 'e.g. LP Masombuka',
-        guidance: 'The person named on the ID. This can differ from the claimant.',
-      },
-    ],
-    compile(vars) {
-      const recipient = escapeHtml(filled(vars.recipientName, 'XXXXX'));
-      const draftName = vars.calculation === 'loe'
-        ? '(DRAFT) Unclear deceased ID \u2014 LOE'
-        : '(DRAFT) Unclear deceased ID \u2014 LOS';
-      const bodyHtml = [
-        `Dear ${recipient}`,
-        thankYouForCalculation(vars),
-        clearerIdRequest(vars.idNames),
-        TURNAROUND,
-        SIGN_OFF,
-      ].join('<br/><br/>');
-      const generatedSubject = draftSubject(draftName, masterClaimantLabel(vars));
-      const typedSubject = String(vars.subject || '').trim();
-      return {
-        subject: subjectHasContent(typedSubject) ? typedSubject : generatedSubject,
-        bodyHtml,
-      };
-    },
-  },
-  {
-    id: 'draft-instruction-docs',
-    name: '(DRAFT) Instruction letter documents',
-    menuLabel: 'Instruction letter documents',
-    intro: 'Loss of Support only. Asks for the documents named in the instruction letter, then notes that the calculation depends on them. The 24-hour close is always included.',
-    fields: [
-      {
-        key: 'subject',
-        label: 'Subject',
-        type: 'text',
-        default: '(DRAFT) ',
-        placeholder: '(DRAFT) paste the rest of the subject…',
-        guidance: '(DRAFT) is filled for you. Paste the rest of the subject after it. Required for Push to Gmail; Copy HTML does not need it.',
-      },
-      { key: 'recipientName', label: 'Recipient name', type: 'text', placeholder: 'e.g. Nomatshezi' },
-      {
-        key: 'claimantTitle',
-        label: 'Title',
-        type: 'select',
-        default: 'Mr/Ms',
-        row: 'claimant',
-        edge: true,
-        options: [
-          { value: 'Mr/Ms', label: 'Mr/Ms' },
-          { value: 'Mr', label: 'Mr' },
-          { value: 'Ms', label: 'Ms' },
-          { value: 'Mrs', label: 'Mrs' },
-        ],
-      },
-      {
-        key: 'claimantName',
-        label: 'Claimant',
-        type: 'text',
-        placeholder: 'e.g. L Gxalaba',
-        row: 'claimant',
-      },
-      {
-        key: 'instructionDocs',
-        label: 'Documents',
-        type: 'lines',
-        required: true,
-        placeholder: 'e.g. Deceased payslips.',
-        guidance: 'Each line is a document mentioned in the instruction letter.',
-      },
-    ],
-    compile(vars) {
-      const recipient = escapeHtml(filled(vars.recipientName, 'XXXXX'));
-      const bodyHtml = [
-        `Dear ${recipient}`,
-        `Thank you for requesting a Loss of Support calculation for the dependants of ${masterClaimantHtml(vars)}.`,
-        `Kindly assist us by providing the following documents mentioned in the Instruction letter:${htmlList(vars.instructionDocs, '[Document mentioned in the Instruction letter]')}`,
-        'Kindly note that the calculation is dependent on the information we have requested since it will directly increase the claim.',
-        TURNAROUND,
-        SIGN_OFF,
-      ].join('<br/><br/>');
-      const generatedSubject = draftSubject(this.name, masterClaimantLabel(vars));
-      const typedSubject = String(vars.subject || '').trim();
-      return {
-        subject: subjectHasContent(typedSubject) ? typedSubject : generatedSubject,
-        bodyHtml,
       };
     },
   },
