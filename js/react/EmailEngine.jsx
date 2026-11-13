@@ -936,6 +936,38 @@ const TEMPLATES = [
         ],
       },
       {
+        key: 'secNameOrder',
+        label: 'Order of the claimant’s names',
+        type: 'toggle',
+        guidance: 'The full names and surname are in an unclear order. Asks for the full names and surname, or the ID.',
+        loeOnly: true,
+      },
+      {
+        key: 'secSurname',
+        label: 'Discrepancy in the claimant’s surname',
+        type: 'toggle',
+        guidance: 'Two surname spellings, one from the email and one from the IP report.',
+        loeOnly: true,
+      },
+      {
+        key: 'surnameEmail',
+        label: 'Surname on the email',
+        type: 'text',
+        placeholder: 'e.g. Nkosi',
+        showWhen: { key: 'secSurname', equals: true },
+        nested: true,
+        loeOnly: true,
+      },
+      {
+        key: 'surnameIp',
+        label: 'Surname in the IP report',
+        type: 'text',
+        placeholder: 'e.g. Nkosii',
+        showWhen: { key: 'secSurname', equals: true },
+        nested: true,
+        loeOnly: true,
+      },
+      {
         key: 'secPayslips',
         label: 'Clearer payslips or bank statements',
         type: 'toggle',
@@ -955,6 +987,37 @@ const TEMPLATES = [
           { value: 'bank statements', label: 'Bank statements' },
           { value: 'payslips and bank statements', label: 'Payslips and bank statements' },
         ],
+      },
+      {
+        key: 'secClearerReport',
+        label: 'Clearer copies of documents',
+        type: 'toggle',
+        guidance: 'Asks for clearer copies of documents named in the report. This is separate from clearer payslips.',
+        loeOnly: true,
+      },
+      {
+        key: 'clearerReportDocs',
+        label: 'Documents',
+        type: 'lines',
+        placeholder: 'e.g. Hospital records',
+        guidance: 'Each line is a document in the report that needs a clearer copy.',
+        showWhen: { key: 'secClearerReport', equals: true },
+        nested: true,
+        loeOnly: true,
+      },
+      {
+        key: 'secMedicalDocs',
+        label: 'Missing medical-expense documents',
+        type: 'toggle',
+        guidance: 'The instruction includes future medical expenses. Asks for the medico-legal reports to consider.',
+        loeOnly: true,
+      },
+      {
+        key: 'secFutureMedical',
+        label: 'Include future medical expenses',
+        type: 'toggle',
+        guidance: 'Asks whether future medical expenses should be included in the calculation.',
+        loeOnly: true,
       },
       {
         key: 'secUnclearId',
@@ -1125,6 +1188,21 @@ const TEMPLATES = [
         ])}${orIdDocumentPronoun(masterPronoun(vars))}`);
       }
 
+      if (!wrongfulArrest && vars.secNameOrder) {
+        const pronoun = masterPronoun(vars);
+        pushRequest(alsoPrefix(
+          hasPriorRequest,
+          `The order of ${claimant} full names and surname are unclear. Kindly assist by providing ${claimant}\u2019s full names and surname, or alternatively, ${pronoun} ID document.`,
+        ));
+      }
+
+      if (!wrongfulArrest && vars.secSurname) {
+        pushRequest(`${requestLead(hasPriorRequest)} note that there is a discrepancy in the claimant\u2019s surname:${htmlRichList([
+          `<strong>${escapeHtml(filled(vars.surnameEmail, '[surname]'))}</strong> as per the Email`,
+          `<strong>${escapeHtml(filled(vars.surnameIp, '[surname]'))}</strong> as per the IP report`,
+        ])}<br/><br/>Could you please confirm the correct spelling of the claimant\u2019s surname, or alternatively provide a copy of their identification documents to verify the correct spelling?`);
+      }
+
       if (!wrongfulArrest && vars.secPayslips) {
         const documents = {
           payslips: 'payslips',
@@ -1132,6 +1210,24 @@ const TEMPLATES = [
           'payslips and bank statements': 'payslips and bank statements',
         }[vars.clearerDocs] || 'payslips';
         pushRequest(`The ${documents} provided for ${claimant} are illegible. Will you please provide clearer copies of all ${documents} in your possession?`);
+      }
+
+      if (!wrongfulArrest && vars.secClearerReport) {
+        pushRequest(alsoPrefix(
+          hasPriorRequest,
+          `If possible, kindly assist us by providing clearer copies of the following documents referenced in your report:${htmlList(vars.clearerReportDocs, '[Document referenced in the report]')}`,
+        ));
+      }
+
+      if (!wrongfulArrest && vars.secMedicalDocs) {
+        pushRequest(alsoPrefix(
+          hasPriorRequest,
+          'We note that your instruction also includes the calculation of future medical expenses. Kindly provide us with the relevant medico-legal reports that you would like us to consider.',
+        ));
+      }
+
+      if (!wrongfulArrest && vars.secFutureMedical) {
+        pushRequest(`${requestLead(hasPriorRequest)} confirm if we should include future medical expenses in our calculations.`);
       }
 
       if (!wrongfulArrest && vars.secUnclearId) {

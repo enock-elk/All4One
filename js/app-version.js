@@ -1,8 +1,15 @@
-export const APP_VERSION = '1.3.31';
+export const APP_VERSION = '1.3.32';
 export const APP_RELEASE_DATE = '13 November 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.32',
+    date: '13 Nov 2026',
+    items: [
+      'Master LOE can ask for the order of the claimant’s names, a surname discrepancy, clearer copies of documents in the report, the medico-legal reports for future medical expenses, and whether those expenses should be included.',
+    ],
+  },
   {
     version: '1.3.31',
     date: '13 Nov 2026',
