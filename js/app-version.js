@@ -1,8 +1,17 @@
-export const APP_VERSION = '1.3.30';
+export const APP_VERSION = '1.3.31';
 export const APP_RELEASE_DATE = '13 November 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.31',
+    date: '13 Nov 2026',
+    items: [
+      'Master LOS follows the LOS matrix: formal and informal proof of the deceased’s earnings, clearer payslips, death certificate, up to three adult dependants, and up to eight children. A follow-up thanks them for their response.',
+      'Dragging the divider between the form and the email preview lets the preview use the extra width.',
+      'When both formal and informal earnings are on, the Kubheka paragraph stays only in the upper earnings block.',
+    ],
+  },
   {
     version: '1.3.30',
     date: '13 Nov 2026',

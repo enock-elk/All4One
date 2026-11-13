@@ -409,6 +409,110 @@ function titleNeedsChoice(title) {
   return !value || value === 'Mr/Ms';
 }
 
+function titlePronouns(title) {
+  const value = String(title || '').trim().toLowerCase();
+  if (value === 'ms' || value === 'mrs' || value === 'miss') return { subject: 'she', possessive: 'her' };
+  if (value === 'mr') return { subject: 'he', possessive: 'his' };
+  return { subject: 'he/she', possessive: 'his/her' };
+}
+
+const ADULT_REQUESTS = [
+  { key: 'outstandingId', label: 'Outstanding ID' },
+  { key: 'clearerId', label: 'Clearer ID' },
+  { key: 'allQueries', label: 'All queries' },
+  { key: 'residing', label: 'Residing only' },
+  { key: 'claiming', label: 'Claiming only' },
+];
+
+const CHILD_REQUESTS = [
+  { key: 'outstandingBirth', label: 'Birth certificate' },
+  { key: 'clearerBirth', label: 'Clearer birth certificate' },
+  { key: 'extendAge', label: 'Extend dependency age' },
+];
+
+function dependantRequests(role) {
+  return role === 'child' ? CHILD_REQUESTS : ADULT_REQUESTS;
+}
+
+function blankDependant(role) {
+  const person = { name: '', title: 'Mr/Ms' };
+  dependantRequests(role).forEach((item) => { person[item.key] = false; });
+  return person;
+}
+
+function dependantIncomplete(role, person) {
+  if (!String(person?.name || '').trim()) return true;
+  if (role !== 'child' && titleNeedsChoice(person?.title)) return true;
+  return !dependantRequests(role).some((item) => person?.[item.key]);
+}
+
+function boldPerson(person, { titled = false } = {}) {
+  const name = filled(person?.name, '[Name]');
+  if (!titled) return `<strong>${escapeHtml(name)}</strong>`;
+  const title = filled(person?.title, 'Mr/Ms');
+  return `<strong>${escapeHtml(title)} ${escapeHtml(formatClaimantDisplayName(name))}</strong>`;
+}
+
+function alsoPrefix(hasPriorRequest, sentence) {
+  if (!hasPriorRequest) return sentence;
+  return `Also, ${sentence.charAt(0).toLowerCase()}${sentence.slice(1)}`;
+}
+
+function losFormalEarnings(deceasedHtml, pronouns, hasPriorRequest) {
+  const { subject, possessive } = pronouns;
+  return [
+    `${requestLead(hasPriorRequest)} note that, in accordance with our latest regulations, we require independent proof of earnings (not self-reported) before we are able to proceed with any calculation. We therefore request that you please provide proof of earnings for ${deceasedHtml}:`,
+    'Employment at the time of the accident',
+    `Acceptable documentation may include:${htmlList([
+      'Payslips',
+      'Bank statements',
+      'An employer certificate',
+      `An affidavit from the employer confirming ${possessive} earnings`,
+    ], '')}`,
+    `Should it not be possible to obtain proof of earnings from the former employer, we will require independent confirmation of ${possessive} job description. This may be obtained from a colleague, a competitor in the area where ${subject} worked, or another independent third party who is not related to the claimant.`,
+    `Once we receive confirmation of ${possessive} job title and duties, we will be able to benchmark ${possessive} earnings accordingly. This approach ensures a more accurate and reliable assessment than relying on self-reported earnings.`,
+  ].join('<br/><br/>');
+}
+
+function losInformalEarnings(hasPriorRequest) {
+  const opening = hasPriorRequest
+    ? 'Also, as part of our updated requirements for self-employed claimants'
+    : 'As part of our updated requirements for self-employed claimants';
+  return [
+    `${opening}, we are now required to obtain independent verification that the business existed and that the stated earnings are reasonable when compared to those of similar businesses. This measure has been introduced in response to an increase in irregularities noted in reported earnings and will now form part of our standard assessment process.`,
+    `Accordingly, we kindly request the following additional information in respect of the deceased self-employment:${htmlList([
+      'At least three affidavits from independent individuals (for example, clients and not family members) confirming that the deceased performed work for them; and',
+      'Affidavits from competitors operating in the same area confirming typical profit or income levels for similar work, to enable us to assess the reasonableness of the reported earnings.',
+    ], '')}`,
+  ].join('<br/><br/>');
+}
+
+function losAllQueries(nameHtml, pronouns, hasPriorRequest) {
+  return [
+    `${requestLead(hasPriorRequest)} assist us by confirming if ${nameHtml} is also claiming for Loss of Support.`,
+    'If yes, please provide the following information:',
+    htmlList([
+      `What is ${pronouns.possessive} relation to the deceased?`,
+      `Did ${pronouns.subject} reside with the deceased?`,
+      `Did ${pronouns.subject} contribute to the household income? If yes, please provide proof of earnings in the form of payslips/bank statements/affidavits.`,
+    ], ''),
+  ].join('<br/><br/>');
+}
+
+function losExtendAge(nameHtml, hasPriorRequest) {
+  return [
+    `${requestLead(hasPriorRequest)} note the standard dependency ages are 18 and 21, as accepted by RAF. However, the dependency period can potentially be extended if evidence supports it.`,
+    `To assess if the dependency age can be extended, we require documentation for ${nameHtml}, specifically:`,
+    `a. Educational Extension:${htmlList([
+      'School Records/Matric Certificate: To confirm the date of their final schooling.',
+      'Tertiary Qualification/Enrollment Proof: Indicating that they were still studying past the age of 21.',
+    ], '')}`,
+    `b. Medical Extension:${htmlList([
+      'Medical Records/Disability Proof: To confirm any medical condition or disability that would necessitate the dependency continuing beyond the assumed ages.',
+    ], '')}`,
+  ].join('<br/><br/>');
+}
+
 function collectMissingPageFields(template, variables) {
   const fields = template?.fields || [];
   if (!fields.length) return [];
@@ -457,6 +561,12 @@ function collectGmailPushErrors(template, variables, { requireSubject = true } =
   if (byKey.claimantName && !String(variables.claimantName || '').trim()) {
     mark('claimantName', 'Claimant name');
   }
+  fields
+    .filter((field) => field.type === 'dependants' && fieldIsVisible(field, variables))
+    .forEach((field) => {
+      const people = Array.isArray(variables[field.key]) ? variables[field.key] : [];
+      if (people.some((person) => dependantIncomplete(field.role, person))) mark(field.key, field.label);
+    });
 
   fields
     .filter((field) => field.type === 'toggle' && variables?.[field.key] && fieldIsVisible(field, variables))
@@ -493,6 +603,12 @@ function countRemainingDraftRequirements(template, variables, { requireSubject =
 
   if (byKey.claimantTitle && titleNeedsChoice(variables.claimantTitle)) remaining += 1;
   if (byKey.claimantName && !String(variables.claimantName || '').trim()) remaining += 1;
+  fields
+    .filter((field) => field.type === 'dependants' && fieldIsVisible(field, variables))
+    .forEach((field) => {
+      const people = Array.isArray(variables[field.key]) ? variables[field.key] : [];
+      people.forEach((person) => { if (dependantIncomplete(field.role, person)) remaining += 1; });
+    });
 
   fields
     .filter((field) => field.type === 'toggle' && variables?.[field.key] && fieldIsVisible(field, variables))
@@ -537,6 +653,7 @@ function initialVariables(template) {
     const vars = {};
     template.fields.forEach((field) => {
       if (field.type === 'lines') vars[field.key] = Array.isArray(field.default) && field.default.length ? [...field.default] : [''];
+      else if (field.type === 'dependants') vars[field.key] = [];
       else if (field.type === 'toggle') vars[field.key] = Boolean(field.default);
       else vars[field.key] = field.default ?? '';
     });
@@ -877,7 +994,7 @@ const TEMPLATES = [
         key: 'secFormal',
         label: 'Formal earnings proof',
         type: 'toggle',
-        guidance: 'Use to obtain proof of earnings for formal employment. Kubheka sits after the earnings note and before the acceptable-proof list.',
+        guidance: 'Use to obtain proof of earnings for formal employment. Kubheka sits after the earnings note and before the acceptable-proof list. When informal earnings is also on, Kubheka stays only in the upper earnings block.',
         loeOnly: true,
       },
       {
@@ -912,7 +1029,7 @@ const TEMPLATES = [
         key: 'secInformal',
         label: 'Informal earnings proof',
         type: 'toggle',
-        guidance: 'Use to ask for proof of earnings for informal or self-employed work. Kubheka sits at the start of this block, then any IP document list, then the proof-of-earnings sentence.',
+        guidance: 'Use to ask for proof of earnings for informal or self-employed work. Kubheka sits at the start of this block, then any IP document list, then the proof-of-earnings sentence. When formal earnings is above it, Kubheka is left in that upper block only.',
         loeOnly: true,
       },
       {
@@ -1028,6 +1145,11 @@ const TEMPLATES = [
         ].join('<br/><br/>'));
       }
 
+      const activeEarnings = normalizeEarningsOrder(vars.earningsOrder).filter((block) => (
+        (block === 'formal' && vars.secFormal) || (block === 'informal' && vars.secInformal)
+      ));
+      const topEarnings = activeEarnings[0] || '';
+
       const buildFormalEarnings = () => {
         if (wrongfulArrest || !vars.secFormal) return '';
         const chunks = [];
@@ -1035,14 +1157,15 @@ const TEMPLATES = [
           chunks.push(`${requestLead(hasPriorRequest)} assist us by providing the following documents referenced in the IP report:${htmlList(vars.formalDocs, '[Document referenced in the IP report]')}`);
         }
         chunks.push(`We note that the claimant was earning the following:${htmlList([withPeriod(filled(vars.formalEarnings, '[earnings description]'))], '[earnings description]')}`);
-        chunks.push(kubhekaParagraph(hasPriorRequest));
+        if (topEarnings === 'formal') chunks.push(kubhekaParagraph(hasPriorRequest));
         chunks.push(`Acceptable proof of earnings may include:${htmlList(FORMAL_EARNINGS_PROOF, '')}`);
         return chunks.join('<br/><br/>');
       };
 
       const buildInformalEarnings = () => {
         if (wrongfulArrest || !vars.secInformal) return '';
-        const chunks = [kubhekaParagraph(hasPriorRequest)];
+        const chunks = [];
+        if (topEarnings === 'informal') chunks.push(kubhekaParagraph(hasPriorRequest));
         if (vars.secInformalDocs) {
           chunks.push(`${requestLead(hasPriorRequest)} assist us by providing the following documents referenced in the IP report:${htmlList(vars.informalDocs, '[Document referenced in the IP report]')}`);
         }
@@ -1071,7 +1194,7 @@ const TEMPLATES = [
     id: 'draft-master-los',
     name: '(DRAFT) Master LOS',
     menuLabel: 'Master LOS Draft',
-    intro: 'The 24-hour close is always included. The thank-you is for the dependants. Unclear deceased ID and Instruction letter documents are their own blocks. Page numbers appear when both accident dates come from the same document.',
+    intro: 'The 24-hour close is always included. The thank-you is for the dependants. Deceased, adult, and child requests follow the LOS matrix. A later request starts with “Also”. Unclear deceased ID and Instruction letter documents stay available. Page numbers appear when both accident dates come from the same document.',
     fields: [
       {
         key: 'subject',
@@ -1093,6 +1216,18 @@ const TEMPLATES = [
           { value: 'attorneys', label: 'Loss of Support — instructing attorneys' },
           { value: 'ip', label: 'Loss of Support — IP or others' },
         ],
+      },
+      {
+        key: 'draftStage',
+        label: 'Draft',
+        type: 'select',
+        default: 'first',
+        showWhen: { key: 'audience', equals: 'attorneys' },
+        options: [
+          { value: 'first', label: 'First draft' },
+          { value: 'followup', label: 'Follow-up' },
+        ],
+        guidance: 'Follow-up thanks them for their response instead of the first request.',
       },
       {
         key: 'claimantTitle',
@@ -1182,6 +1317,52 @@ const TEMPLATES = [
         embedded: true,
       },
       {
+        key: 'secLosFormal',
+        label: 'Formal proof of earnings',
+        type: 'toggle',
+        guidance: 'Asks for independent proof of the deceased’s earnings, including payslips, bank statements, an employer certificate, or an affidavit.',
+      },
+      {
+        key: 'secLosInformal',
+        label: 'Informal proof of earnings',
+        type: 'toggle',
+        guidance: 'Asks for client and competitor affidavits for the deceased’s self-employment.',
+      },
+      {
+        key: 'secLosPayslips',
+        label: 'Clearer payslips',
+        type: 'toggle',
+        guidance: 'Use when some of the deceased’s payslips are illegible.',
+      },
+      {
+        key: 'secLosDeathCert',
+        label: 'Death certificate',
+        type: 'toggle',
+        guidance: 'Asks for the deceased’s death certificate.',
+      },
+      {
+        key: 'secLosClearerDeath',
+        label: 'Clearer death certificate',
+        type: 'toggle',
+        guidance: 'Use when the death certificate on file is illegible.',
+      },
+      {
+        key: 'adults',
+        label: 'Adult dependants',
+        type: 'dependants',
+        role: 'adult',
+        max: 3,
+        guidance: 'Up to 3 adults. All queries already includes residing and claiming, so those two are left out when All queries is ticked.',
+      },
+      {
+        key: 'children',
+        label: 'Child dependants',
+        type: 'dependants',
+        role: 'child',
+        max: 8,
+        guidance: 'Up to 8 children. Birth certificate, a clearer copy, and an extended dependency age.',
+      },
+      {
         key: 'secUnclearId',
         label: 'Unclear deceased ID',
         type: 'toggle',
@@ -1239,17 +1420,51 @@ const TEMPLATES = [
       if (vars.audience === 'ip') {
         const firm = escapeHtml(filled(vars.attorneyFirm, 'XXXXX Attorneys'));
         parts.push(`Kindly note that we are undertaking Loss of Support Calculations for ${claimant} on behalf of <strong>${firm}</strong>.`);
+      } else if (vars.draftStage === 'followup') {
+        parts.push(`Thank you for your response regarding the Loss of Support calculations for the dependants of ${claimant}.`);
       } else {
         parts.push(`Thank you for requesting a Loss of Support calculation for the dependants of ${claimant}.`);
       }
+      const deceasedPronouns = titlePronouns(vars.claimantTitle);
+      const push = (html) => {
+        parts.push(html);
+        hasPriorRequest = true;
+      };
       if (vars.secAccident) {
         const sameAccidentSource = sameDocument(vars.accidentOtSource, vars.accidentIpSource);
-        parts.push(`${requestLead(hasPriorRequest)} assist us by confirming the correct date of accident.${htmlRichList([
+        push(`${requestLead(hasPriorRequest)} assist us by confirming the correct date of accident.${htmlRichList([
           boldReportLine(vars.accidentOt, vars.accidentOtSource, '[date]', 'Post-mortem report', sameAccidentSource ? vars.accidentOtPage : ''),
           boldReportLine(vars.accidentIp, vars.accidentIpSource, '[date]', 'IP report', sameAccidentSource ? vars.accidentIpPage : ''),
         ])}`);
-        hasPriorRequest = true;
       }
+      if (vars.secLosFormal) push(losFormalEarnings(claimant, deceasedPronouns, hasPriorRequest));
+      if (vars.secLosInformal) push(losInformalEarnings(hasPriorRequest));
+      if (vars.secLosPayslips) {
+        push(alsoPrefix(hasPriorRequest, `Some of the payslips provided for ${claimant} are illegible. Will you please be able to provide us with clearer copies of all payslips in your possession?`));
+      }
+      if (vars.secLosDeathCert) {
+        push(`${requestLead(hasPriorRequest)} provide the Death Certificate of ${claimant}.`);
+      }
+      if (vars.secLosClearerDeath) {
+        push(`${requestLead(hasPriorRequest)} provide a clearer copy of the Death Certificate for ${claimant}.`);
+      }
+      (Array.isArray(vars.adults) ? vars.adults : []).forEach((person) => {
+        const nameHtml = boldPerson(person, { titled: true });
+        const pronouns = titlePronouns(person?.title);
+        if (person?.outstandingId) push(`${requestLead(hasPriorRequest)} provide the ID document of ${nameHtml}.`);
+        if (person?.clearerId) push(`${requestLead(hasPriorRequest)} provide a clearer copy of ${nameHtml}\u2019s ID document as the current one is illegible.`);
+        if (person?.allQueries) push(losAllQueries(nameHtml, pronouns, hasPriorRequest));
+        else {
+          if (person?.residing) push(`${requestLead(hasPriorRequest)} assist us by confirming if ${nameHtml} resided with the deceased.`);
+          if (person?.claiming) push(`${requestLead(hasPriorRequest)} assist us by confirming if ${nameHtml} is also claiming for Loss of Support.`);
+        }
+      });
+      (Array.isArray(vars.children) ? vars.children : []).forEach((person) => {
+        const nameHtml = boldPerson(person);
+        if (person?.outstandingBirth) push(`${requestLead(hasPriorRequest)} provide the Birth Certificate of ${nameHtml}.`);
+        if (person?.clearerBirth) push(`${requestLead(hasPriorRequest)} provide a clearer copy of ${nameHtml}\u2019s Birth Certificate as the current one is illegible.`);
+        if (person?.extendAge) push(losExtendAge(nameHtml, hasPriorRequest));
+      });
       if (vars.secUnclearId) {
         parts.push(clearerIdRequest(vars.idNames, hasPriorRequest));
         hasPriorRequest = true;
@@ -1583,6 +1798,28 @@ export default function EmailEngine() {
       const curr = [...(prev[key] || [''])];
       if (curr.length <= 1) return { ...prev, [key]: [''] };
       return { ...prev, [key]: curr.filter((_, i) => i !== index) };
+    });
+    clearExportShading();
+  };
+
+  const addDependant = (key, role) => {
+    setVariables((prev) => ({ ...prev, [key]: [...(prev[key] || []), blankDependant(role)] }));
+    clearExportShading();
+  };
+
+  const removeDependant = (key, index) => {
+    setVariables((prev) => ({
+      ...prev,
+      [key]: (prev[key] || []).filter((_, i) => i !== index),
+    }));
+    clearExportShading();
+  };
+
+  const patchDependant = (key, index, patch) => {
+    setVariables((prev) => {
+      const people = [...(prev[key] || [])];
+      people[index] = { ...people[index], ...patch };
+      return { ...prev, [key]: people };
     });
     clearExportShading();
   };
@@ -1969,6 +2206,76 @@ export default function EmailEngine() {
   };
 
   const renderStructuredField = (field) => {
+    if (field.type === 'dependants') {
+      const people = Array.isArray(variables[field.key]) ? variables[field.key] : [];
+      const requests = dependantRequests(field.role);
+      const max = field.max || requests.length;
+      const adult = field.role !== 'child';
+      const blocked = blockingKeys.includes(field.key);
+      return (
+        <div className="space-y-2">
+          {people.map((person, idx) => (
+            <div key={`${field.key}-${idx}`} className={`rounded-xl border p-3 space-y-2 ${blocked && dependantIncomplete(field.role, person) ? 'border-rose-300/80 dark:border-rose-400/50' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40'}`}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{adult ? `Adult ${idx + 1}` : `Child ${idx + 1}`}</span>
+                <button
+                  type="button"
+                  onClick={() => removeDependant(field.key, idx)}
+                  className="text-[10px] font-bold text-rose-500 hover:underline"
+                >
+                  Remove
+                </button>
+              </div>
+              <div className="flex items-stretch gap-2">
+                {adult ? (
+                  <select
+                    value={person.title || 'Mr/Ms'}
+                    onChange={(e) => patchDependant(field.key, idx, { title: e.target.value })}
+                    aria-label={`${adult ? 'Adult' : 'Child'} ${idx + 1} title`}
+                    className={`${INPUT_CLASS} shrink-0 w-[5.5rem] appearance-none cursor-pointer`}
+                  >
+                    {['Mr/Ms', 'Mr', 'Ms', 'Mrs'].map((title) => (
+                      <option key={title} value={title} className={NATIVE_OPTION_CLASS}>{title}</option>
+                    ))}
+                  </select>
+                ) : null}
+                <input
+                  type="text"
+                  value={person.name || ''}
+                  onChange={(e) => patchDependant(field.key, idx, { name: e.target.value })}
+                  placeholder={adult ? 'e.g. ED Masombuka' : 'e.g. A Melaeli'}
+                  aria-label={`${adult ? 'Adult' : 'Child'} ${idx + 1} name`}
+                  className={`${INPUT_CLASS} min-w-0 flex-1`}
+                />
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {requests.map((item) => (
+                  <label key={item.key} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold border cursor-pointer ${person[item.key] ? 'border-amber-400 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-100' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300'}`}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(person[item.key])}
+                      onChange={(e) => patchDependant(field.key, idx, { [item.key]: e.target.checked })}
+                      className="rounded border-slate-300 text-amber-500 focus:ring-amber-500"
+                    />
+                    {item.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
+          {people.length < max ? (
+            <button
+              type="button"
+              onClick={() => addDependant(field.key, field.role)}
+              className="flex items-center justify-center gap-2 w-full text-xs font-bold px-4 py-2.5 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 transition-all"
+            >
+              <Plus className="w-4 h-4" /> Add {adult ? 'adult' : 'child'}
+            </button>
+          ) : null}
+        </div>
+      );
+    }
+
     if (field.type === 'toggle') {
       const on = Boolean(variables[field.key]);
       const blocked = blockingKeys.includes(field.key);
@@ -2500,7 +2807,7 @@ export default function EmailEngine() {
         )}
 
         <div className="flex-1 overflow-y-auto p-8 custom-scroll flex justify-center">
-          <div className="w-full max-w-3xl bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden flex flex-col self-start" style={{ colorScheme: 'light' }}>
+          <div className="w-full bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden flex flex-col self-start" style={{ colorScheme: 'light' }}>
             <div className="bg-slate-50 px-6 py-4 border-b border-slate-100">
               <div className="flex items-center gap-4 mb-3">
                 <span className="text-slate-400 font-medium text-sm w-16">To</span>
