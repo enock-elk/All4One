@@ -1,8 +1,17 @@
-export const APP_VERSION = '1.3.33';
-export const APP_RELEASE_DATE = '13 November 2026';
+export const APP_VERSION = '1.3.34';
+export const APP_RELEASE_DATE = '27 November 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.34',
+    date: '27 Nov 2026',
+    items: [
+      'Edits in the email preview stay when you change the form, including when you add another block. A block you have not edited still follows the form. Reset rebuilds the preview.',
+      'Page A and Page B show under the sources when both documents match, including IP report, Ortho report, and the other source types. Name spelling uses the same page row.',
+      'Connect Gmail and Reconnect Gmail are back. They only connect an account. Push to Gmail is what creates the draft.',
+    ],
+  },
   {
     version: '1.3.33',
     date: '13 Nov 2026',

@@ -33,6 +33,7 @@ import { showAppToast } from '../ui-prefs.js';
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbw-M9kVkSSXKuJ49tohaconx99-l5VcbU1xSNeUTccX2gs0prok3LltyTyO7mdNKtm8/exec";
 
 const INPUT_CLASS = "w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm outline-none focus:border-amber-500 text-slate-900 dark:text-slate-100 dark:[color-scheme:dark] transition-all";
+const INPUT_PAGE_CLASS = "w-full p-3 rounded-xl border border-amber-300/80 dark:border-amber-500/50 bg-amber-50/70 dark:bg-amber-950/30 text-sm outline-none focus:border-amber-500 text-slate-900 dark:text-slate-100 dark:[color-scheme:dark] transition-all";
 const INPUT_BLOCKING_CLASS = "w-full p-3 rounded-xl border border-rose-300/80 dark:border-rose-400/50 bg-rose-50/50 dark:bg-rose-950/20 text-sm outline-none focus:border-rose-400 text-slate-900 dark:text-slate-100 dark:[color-scheme:dark] transition-all";
 const CHROME_CLASS = "flex items-stretch rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-hidden focus-within:border-amber-500 dark:[color-scheme:dark] transition-all";
 const CHROME_BLOCKING_CLASS = "flex items-stretch rounded-xl border border-rose-300/80 dark:border-rose-400/50 bg-rose-50/50 dark:bg-rose-950/20 overflow-hidden focus-within:border-rose-400 dark:[color-scheme:dark] transition-all";
@@ -627,11 +628,175 @@ function htmlListWithIdFollowup(items, emptyPlaceholder, gender) {
   return `${htmlList(items, emptyPlaceholder)}${orIdDocumentLine(gender)}`;
 }
 
-function wrapCompiledEmail(subject, bodyHtml) {
+function editorSignatureHtml() {
+  return getSignatureHtml().replace(/^\s*(?:<br\s*\/?>\s*)+/i, '');
+}
+
+function normalizePreviewHtml(html) {
+  if (typeof document === 'undefined') return String(html ?? '');
+  const el = document.createElement('div');
+  el.innerHTML = String(html ?? '');
+  return el.innerHTML;
+}
+
+/** Keep a hand-edited block. Fold in a generated change when its old text is still there once. */
+function mergeBlockHtml(userHtml, previousHtml, nextHtml) {
+  if (userHtml === previousHtml) return nextHtml;
+  if (!previousHtml || previousHtml === nextHtml) return userHtml;
+
+  let start = 0;
+  const maxStart = Math.min(previousHtml.length, nextHtml.length);
+  while (start < maxStart && previousHtml[start] === nextHtml[start]) start += 1;
+  let end = 0;
+  while (
+    end < maxStart - start &&
+    previousHtml[previousHtml.length - 1 - end] === nextHtml[nextHtml.length - 1 - end]
+  ) end += 1;
+
+  const oldRight = previousHtml.length - end;
+  const newRight = nextHtml.length - end;
+  if (start >= oldRight && start >= newRight) return userHtml;
+
+  let padLeft = 0;
+  let padRight = 0;
+  while (true) {
+    const oldSlice = previousHtml.slice(start - padLeft, oldRight + padRight);
+    const newSlice = nextHtml.slice(start - padLeft, newRight + padRight);
+    if (!oldSlice) return userHtml;
+    const count = userHtml.split(oldSlice).length - 1;
+    if (count === 1) return userHtml.replace(oldSlice, newSlice);
+    if (count === 0) return userHtml;
+    const canLeft = start - padLeft > 0;
+    const canRight = oldRight + padRight < previousHtml.length && newRight + padRight < nextHtml.length;
+    if (!canLeft && !canRight) return userHtml;
+    if (canLeft) padLeft += 1;
+    if (canRight) padRight += 1;
+  }
+}
+
+const EMAIL_FONT_STYLE = 'font-family: Verdana, Geneva, sans-serif; font-size: 13px; color: #000; line-height: 1.35;';
+
+function blockMargin(id) {
+  return id === 'signature' ? '0' : '0 0 1.15em';
+}
+
+function wrapCompiledEmail(subject, parts) {
+  const content = (Array.isArray(parts) ? parts : []).filter((part) => part && String(part.html ?? '').length);
+  const joined = content.map((part) => part.html).join('<br/><br/>');
   return {
     subject,
-    htmlBody: `<div style="font-family: Verdana, Geneva, sans-serif; font-size: 13px; color: #000; line-height: 1.35;">${bodyHtml}${getSignatureHtml()}</div>`,
+    blocks: [
+      ...content.map((part) => ({ id: part.id, html: part.html })),
+      { id: 'signature', html: editorSignatureHtml() },
+    ],
+    htmlBody: `<div style="${EMAIL_FONT_STYLE}">${joined}${getSignatureHtml()}</div>`,
   };
+}
+
+function paintEmailBlocks(host, blocks, baselines) {
+  const existing = new Map();
+  host.querySelectorAll(':scope > [data-email-block]').forEach((el) => {
+    existing.set(el.dataset.emailBlock, el);
+  });
+
+  if (!existing.size && host.textContent && host.textContent.trim()) {
+    blocks.forEach((block) => {
+      if (block.id === 'signature' || baselines.has(block.id)) return;
+      const el = document.createElement('div');
+      el.dataset.emailBlock = block.id;
+      el.style.margin = blockMargin(block.id);
+      el.innerHTML = block.html;
+      host.appendChild(el);
+      baselines.set(block.id, el.innerHTML);
+    });
+    return;
+  }
+
+  const seen = new Set();
+  blocks.forEach((block) => {
+    seen.add(block.id);
+    const nextNorm = normalizePreviewHtml(block.html);
+    let el = existing.get(block.id);
+    if (!el) {
+      el = document.createElement('div');
+      el.dataset.emailBlock = block.id;
+      el.style.margin = blockMargin(block.id);
+      el.innerHTML = block.html;
+      host.appendChild(el);
+      baselines.set(block.id, el.innerHTML);
+      return;
+    }
+    el.style.margin = blockMargin(block.id);
+    const previous = baselines.get(block.id);
+    const userHtml = el.innerHTML;
+    if (previous == null || userHtml === previous) {
+      if (userHtml !== nextNorm) el.innerHTML = block.html;
+      baselines.set(block.id, el.innerHTML);
+    } else {
+      const merged = mergeBlockHtml(userHtml, previous, nextNorm);
+      if (merged !== userHtml) el.innerHTML = merged;
+      baselines.set(block.id, nextNorm);
+    }
+  });
+
+  existing.forEach((el, id) => {
+    if (!seen.has(id)) {
+      el.remove();
+      baselines.delete(id);
+    }
+  });
+
+  const ordered = blocks
+    .map((block) => host.querySelector(`:scope > [data-email-block="${CSS.escape(block.id)}"]`))
+    .filter(Boolean);
+  const current = [...host.querySelectorAll(':scope > [data-email-block]')];
+  const sameOrder = current.length === ordered.length && current.every((el, index) => el === ordered[index]);
+  if (!sameOrder) ordered.forEach((el) => host.appendChild(el));
+}
+
+function mountEmailPreview(root, blocks, baselines, { replace }) {
+  let host = root.querySelector(':scope > [data-email-root]');
+  const rootText = (root.textContent || '').trim();
+  if (replace || (!host && !rootText)) {
+    root.innerHTML = `<div data-email-root="1" style="${EMAIL_FONT_STYLE}"></div>`;
+    host = root.querySelector(':scope > [data-email-root]');
+    if (replace) baselines.clear();
+  } else if (!host) {
+    const previousIds = new Set(baselines.keys());
+    blocks.forEach((block) => {
+      if (block.id === 'signature' || previousIds.has(block.id)) return;
+      const el = document.createElement('div');
+      el.dataset.emailBlock = block.id;
+      el.style.margin = blockMargin(block.id);
+      el.innerHTML = block.html;
+      root.appendChild(el);
+      baselines.set(block.id, el.innerHTML);
+    });
+    return;
+  }
+  paintEmailBlocks(host, blocks, baselines);
+}
+
+function signatureExportHtml(el) {
+  if (el.innerHTML === normalizePreviewHtml(editorSignatureHtml())) return getSignatureHtml();
+  const trimmed = el.innerHTML.trim();
+  if (/^(?:<br\s*\/?>\s*){2,}/i.test(trimmed)) return trimmed;
+  return `<br><br>${trimmed}`;
+}
+
+function serializeEmailPreview(root, fallbackHtml) {
+  if (!root) return fallbackHtml || '';
+  const host = root.querySelector(':scope > [data-email-root]');
+  const blocks = host ? [...host.querySelectorAll(':scope > [data-email-block]')] : [];
+  if (!blocks.length) return root.innerHTML || fallbackHtml || '';
+  const content = blocks
+    .filter((el) => el.dataset.emailBlock !== 'signature')
+    .map((el) => el.innerHTML.trim())
+    .filter(Boolean)
+    .join('<br/><br/>');
+  const signature = blocks.find((el) => el.dataset.emailBlock === 'signature');
+  const signatureHtml = signature ? signatureExportHtml(signature) : getSignatureHtml();
+  return `<div style="${EMAIL_FONT_STYLE}">${content}${signatureHtml}</div>`;
 }
 
 function extractPlaceholderKeys(text) {
@@ -675,7 +840,10 @@ function compilePlaceholderTemplate(template, variables) {
     compBody = compBody.replace(replaceRegex, val);
   });
 
-  return wrapCompiledEmail(compSubject, compBody.replace(/\n/g, '<br/>'));
+  return {
+    subject: compSubject,
+    parts: [{ id: 'body', html: compBody.replace(/\n/g, '<br/>') }],
+  };
 }
 
 const ATTORNEY_FIELD = { key: 'attorneyFirstName', label: 'Attorney first name', type: 'text', placeholder: 'e.g. Ntembeko' };
@@ -774,7 +942,6 @@ const TEMPLATES = [
         showWhen: { key: 'secAccident', equals: true },
         nested: true,
         loeOnly: true,
-        pageKey: 'accidentOtPage',
       }),
       {
         key: 'accidentIp',
@@ -791,17 +958,16 @@ const TEMPLATES = [
         showWhen: { key: 'secAccident', equals: true },
         nested: true,
         loeOnly: true,
-        pageKey: 'accidentIpPage',
       }),
       {
         key: 'accidentOtPage',
         label: 'Page A',
         type: 'text',
         placeholder: 'e.g. 6',
+        row: 'accident-pages',
         showWhen: { key: 'secAccident', equals: true },
         sameSource: ['accidentOtSource', 'accidentIpSource'],
         nested: true,
-        embedded: true,
         loeOnly: true,
       },
       {
@@ -809,10 +975,10 @@ const TEMPLATES = [
         label: 'Page B',
         type: 'text',
         placeholder: 'e.g. 8',
+        row: 'accident-pages',
         showWhen: { key: 'secAccident', equals: true },
         sameSource: ['accidentOtSource', 'accidentIpSource'],
         nested: true,
-        embedded: true,
         loeOnly: true,
       },
       {
@@ -837,7 +1003,6 @@ const TEMPLATES = [
         showWhen: { key: 'secDob', equals: true },
         nested: true,
         loeOnly: true,
-        pageKey: 'dobOtPage',
       }),
       {
         key: 'dobIp',
@@ -854,17 +1019,16 @@ const TEMPLATES = [
         showWhen: { key: 'secDob', equals: true },
         nested: true,
         loeOnly: true,
-        pageKey: 'dobIpPage',
       }),
       {
         key: 'dobOtPage',
         label: 'Page A',
         type: 'text',
         placeholder: 'e.g. 6',
+        row: 'dob-pages',
         showWhen: { key: 'secDob', equals: true },
         sameSource: ['dobOtSource', 'dobIpSource'],
         nested: true,
-        embedded: true,
         loeOnly: true,
       },
       {
@@ -872,10 +1036,10 @@ const TEMPLATES = [
         label: 'Page B',
         type: 'text',
         placeholder: 'e.g. 8',
+        row: 'dob-pages',
         showWhen: { key: 'secDob', equals: true },
         sameSource: ['dobOtSource', 'dobIpSource'],
         nested: true,
-        embedded: true,
         loeOnly: true,
       },
       {
@@ -917,6 +1081,28 @@ const TEMPLATES = [
         nested: true,
         loeOnly: true,
       }),
+      {
+        key: 'nameOtPage',
+        label: 'Page A',
+        type: 'text',
+        placeholder: 'e.g. 6',
+        row: 'name-pages',
+        showWhen: { key: 'secName', equals: true },
+        sameSource: ['nameOtSource', 'nameIpSource'],
+        nested: true,
+        loeOnly: true,
+      },
+      {
+        key: 'nameIpPage',
+        label: 'Page B',
+        type: 'text',
+        placeholder: 'e.g. 8',
+        row: 'name-pages',
+        showWhen: { key: 'secName', equals: true },
+        sameSource: ['nameOtSource', 'nameIpSource'],
+        nested: true,
+        loeOnly: true,
+      },
       {
         key: 'secNameOrder',
         label: 'Order of the claimant’s names',
@@ -1106,28 +1292,30 @@ const TEMPLATES = [
       const recipient = escapeHtml(filled(vars.recipientName, 'XXXXX'));
       const claimant = masterClaimantHtml(vars);
       const wrongfulArrest = vars.audience === 'incident';
-      const parts = [`Dear ${recipient}`];
+      const parts = [];
+      const add = (id, html) => { parts.push({ id, html }); };
+      add('greeting', `Dear ${recipient}`);
 
       if (wrongfulArrest) {
         const calculation = escapeHtml(filled(vars.calculationType, 'Wrongful Arrest'));
-        parts.push(`Thank you for requesting a ${calculation} calculation for ${claimant}.`);
-        parts.push('The date of incident was not provided. Kindly assist by providing the date of incident.');
-        parts.push(DEPENDENCY_NOTE);
+        add('opening', `Thank you for requesting a ${calculation} calculation for ${claimant}.`);
+        add('incident', 'The date of incident was not provided. Kindly assist by providing the date of incident.');
+        add('dependency', DEPENDENCY_NOTE);
       } else if (vars.audience === 'ip') {
         const firm = escapeHtml(filled(vars.attorneyFirm, 'XXXXX Attorneys'));
-        parts.push(`Kindly note that we are undertaking Loss of Earnings Calculations for ${claimant} on behalf of <strong>${firm}</strong>.`);
+        add('opening', `Kindly note that we are undertaking Loss of Earnings Calculations for ${claimant} on behalf of <strong>${firm}</strong>.`);
       } else {
-        parts.push(`Thank you for requesting a Loss of Earnings calculation for ${claimant}.`);
+        add('opening', `Thank you for requesting a Loss of Earnings calculation for ${claimant}.`);
       }
 
       let hasPriorRequest = false;
-      const pushRequest = (html) => {
-        parts.push(html);
+      const pushRequest = (id, html) => {
+        add(id, html);
         hasPriorRequest = true;
       };
 
       if (!wrongfulArrest && vars.secNoIp) {
-        pushRequest([
+        pushRequest('no-ip', [
           `${requestLead(hasPriorRequest)} note that we require an Industrial Psychologist report in order to perform Loss of Earnings calculations.`,
           'Kindly assist by providing an Industrial Psychologist report.',
         ].join('<br/><br/>'));
@@ -1135,7 +1323,7 @@ const TEMPLATES = [
 
       if (!wrongfulArrest && vars.secAccident) {
         const sameAccidentSource = sameDocument(vars.accidentOtSource, vars.accidentIpSource);
-        pushRequest(`${requestLead(hasPriorRequest)} assist us by confirming the correct date of accident.${htmlRichList([
+        pushRequest('accident', `${requestLead(hasPriorRequest)} assist us by confirming the correct date of accident.${htmlRichList([
           boldReportLine(vars.accidentOt, vars.accidentOtSource, '[date]', 'OT report', sameAccidentSource ? vars.accidentOtPage : ''),
           boldReportLine(vars.accidentIp, vars.accidentIpSource, '[date]', 'IP report', sameAccidentSource ? vars.accidentIpPage : ''),
         ])}`);
@@ -1143,29 +1331,30 @@ const TEMPLATES = [
 
       if (!wrongfulArrest && vars.secDob) {
         const sameDobSource = sameDocument(vars.dobOtSource, vars.dobIpSource);
-        pushRequest(`${requestLead(hasPriorRequest)} assist us by confirming the claimant\u2019s date of birth.${htmlRichList([
+        pushRequest('dob', `${requestLead(hasPriorRequest)} assist us by confirming the claimant\u2019s date of birth.${htmlRichList([
           boldReportLine(vars.dobOt, vars.dobOtSource, '[date of birth]', 'OT report', sameDobSource ? vars.dobOtPage : ''),
           boldReportLine(vars.dobIp, vars.dobIpSource, '[date of birth]', 'IP report', sameDobSource ? vars.dobIpPage : ''),
         ])}`);
       }
 
       if (!wrongfulArrest && vars.secName) {
-        pushRequest(`${requestLead(hasPriorRequest)} assist us by confirming the correct spelling of the claimant\u2019s name.${htmlRichList([
-          boldReportLine(vars.nameOt, vars.nameOtSource, '[spelling]', 'OT report'),
-          boldReportLine(vars.nameIp, vars.nameIpSource, '[spelling]', 'IP report'),
+        const sameNameSource = sameDocument(vars.nameOtSource, vars.nameIpSource);
+        pushRequest('name', `${requestLead(hasPriorRequest)} assist us by confirming the correct spelling of the claimant\u2019s name.${htmlRichList([
+          boldReportLine(vars.nameOt, vars.nameOtSource, '[spelling]', 'OT report', sameNameSource ? vars.nameOtPage : ''),
+          boldReportLine(vars.nameIp, vars.nameIpSource, '[spelling]', 'IP report', sameNameSource ? vars.nameIpPage : ''),
         ])}${orIdDocumentPronoun(masterPronoun(vars))}`);
       }
 
       if (!wrongfulArrest && vars.secNameOrder) {
         const pronoun = masterPronoun(vars);
-        pushRequest(alsoPrefix(
+        pushRequest('name-order', alsoPrefix(
           hasPriorRequest,
           `The order of ${claimant} full names and surname are unclear. Kindly assist by providing ${claimant}\u2019s full names and surname, or alternatively, ${pronoun} ID document.`,
         ));
       }
 
       if (!wrongfulArrest && vars.secSurname) {
-        pushRequest(`${requestLead(hasPriorRequest)} note that there is a discrepancy in the claimant\u2019s surname:${htmlRichList([
+        pushRequest('surname', `${requestLead(hasPriorRequest)} note that there is a discrepancy in the claimant\u2019s surname:${htmlRichList([
           `<strong>${escapeHtml(filled(vars.surnameEmail, '[surname]'))}</strong> as per the Email`,
           `<strong>${escapeHtml(filled(vars.surnameIp, '[surname]'))}</strong> as per the IP report`,
         ])}<br/><br/>Could you please confirm the correct spelling of the claimant\u2019s surname, or alternatively provide a copy of their identification documents to verify the correct spelling?`);
@@ -1177,22 +1366,22 @@ const TEMPLATES = [
           'bank statements': 'bank statements',
           'payslips and bank statements': 'payslips and bank statements',
         }[vars.clearerDocs] || 'payslips';
-        pushRequest(`The ${documents} provided for ${claimant} are illegible. Will you please provide clearer copies of all ${documents} in your possession?`);
+        pushRequest('payslips', `The ${documents} provided for ${claimant} are illegible. Will you please provide clearer copies of all ${documents} in your possession?`);
       }
 
       if (!wrongfulArrest && vars.secClearerReport) {
-        pushRequest(alsoPrefix(
+        pushRequest('clearer-report', alsoPrefix(
           hasPriorRequest,
           `If possible, kindly assist us by providing clearer copies of the following documents referenced in your report:${htmlList(vars.clearerReportDocs, '[Document referenced in the report]')}`,
         ));
       }
 
       if (!wrongfulArrest && vars.secUnclearId) {
-        pushRequest(clearerIdRequest(vars.idNames, hasPriorRequest));
+        pushRequest('unclear-id', clearerIdRequest(vars.idNames, hasPriorRequest));
       }
 
       if (!wrongfulArrest && vars.secInstructionDocs) {
-        pushRequest([
+        pushRequest('instruction-docs', [
           instructionLetterRequest(vars.instructionDocs, hasPriorRequest),
           DEPENDENCY_NOTE,
         ].join('<br/><br/>'));
@@ -1229,17 +1418,17 @@ const TEMPLATES = [
 
       for (const block of normalizeEarningsOrder(vars.earningsOrder)) {
         const html = block === 'formal' ? buildFormalEarnings() : buildInformalEarnings();
-        if (html) pushRequest(html);
+        if (html) pushRequest(block === 'formal' ? 'earnings-formal' : 'earnings-informal', html);
       }
 
-      parts.push(TURNAROUND);
-      parts.push(SIGN_OFF);
+      add('turnaround', TURNAROUND);
+      add('signoff', SIGN_OFF);
 
       const generatedSubject = draftSubject(this.name, masterClaimantLabel(vars));
       const typedSubject = String(vars.subject || '').trim();
       return {
         subject: subjectHasContent(typedSubject) ? typedSubject : generatedSubject,
-        bodyHtml: parts.join('<br/><br/>'),
+        parts,
       };
     },
   },
@@ -1331,7 +1520,6 @@ const TEMPLATES = [
         showWhen: { key: 'secAccident', equals: true },
         nested: true,
         options: LOS_SOURCES,
-        pageKey: 'accidentOtPage',
       }),
       {
         key: 'accidentIp',
@@ -1347,27 +1535,26 @@ const TEMPLATES = [
         showWhen: { key: 'secAccident', equals: true },
         nested: true,
         options: LOS_SOURCES,
-        pageKey: 'accidentIpPage',
       }),
       {
         key: 'accidentOtPage',
         label: 'Page A',
         type: 'text',
         placeholder: 'e.g. 6',
+        row: 'accident-pages',
         showWhen: { key: 'secAccident', equals: true },
         sameSource: ['accidentOtSource', 'accidentIpSource'],
         nested: true,
-        embedded: true,
       },
       {
         key: 'accidentIpPage',
         label: 'Page B',
         type: 'text',
         placeholder: 'e.g. 8',
+        row: 'accident-pages',
         showWhen: { key: 'secAccident', equals: true },
         sameSource: ['accidentOtSource', 'accidentIpSource'],
         nested: true,
-        embedded: true,
       },
       {
         key: 'secLosFormal',
@@ -1468,78 +1655,80 @@ const TEMPLATES = [
     compile(vars) {
       const recipient = escapeHtml(filled(vars.recipientName, 'XXXXX'));
       const claimant = masterClaimantHtml(vars);
-      const parts = [`Dear ${recipient}`];
+      const parts = [];
+      const add = (id, html) => { parts.push({ id, html }); };
+      add('greeting', `Dear ${recipient}`);
       let hasPriorRequest = false;
       if (vars.audience === 'ip') {
         const firm = escapeHtml(filled(vars.attorneyFirm, 'XXXXX Attorneys'));
-        parts.push(`Kindly note that we are undertaking Loss of Support Calculations for ${claimant} on behalf of <strong>${firm}</strong>.`);
+        add('opening', `Kindly note that we are undertaking Loss of Support Calculations for ${claimant} on behalf of <strong>${firm}</strong>.`);
       } else if (vars.draftStage === 'followup') {
-        parts.push(`Thank you for your response regarding the Loss of Support calculations for the dependants of ${claimant}.`);
+        add('opening', `Thank you for your response regarding the Loss of Support calculations for the dependants of ${claimant}.`);
       } else {
-        parts.push(`Thank you for requesting a Loss of Support calculation for the dependants of ${claimant}.`);
+        add('opening', `Thank you for requesting a Loss of Support calculation for the dependants of ${claimant}.`);
       }
       const deceasedPronouns = titlePronouns(vars.claimantTitle);
-      const push = (html) => {
-        parts.push(html);
+      const push = (id, html) => {
+        add(id, html);
         hasPriorRequest = true;
       };
       if (vars.secAccident) {
         const sameAccidentSource = sameDocument(vars.accidentOtSource, vars.accidentIpSource);
-        push(`${requestLead(hasPriorRequest)} assist us by confirming the correct date of accident.${htmlRichList([
+        push('accident', `${requestLead(hasPriorRequest)} assist us by confirming the correct date of accident.${htmlRichList([
           boldReportLine(vars.accidentOt, vars.accidentOtSource, '[date]', 'Post-mortem report', sameAccidentSource ? vars.accidentOtPage : ''),
           boldReportLine(vars.accidentIp, vars.accidentIpSource, '[date]', 'IP report', sameAccidentSource ? vars.accidentIpPage : ''),
         ])}`);
       }
-      if (vars.secLosFormal) push(losFormalEarnings(claimant, deceasedPronouns, hasPriorRequest));
-      if (vars.secLosInformal) push(losInformalEarnings(hasPriorRequest));
+      if (vars.secLosFormal) push('formal', losFormalEarnings(claimant, deceasedPronouns, hasPriorRequest));
+      if (vars.secLosInformal) push('informal', losInformalEarnings(hasPriorRequest));
       if (vars.secLosPayslips) {
-        push(alsoPrefix(hasPriorRequest, `Some of the payslips provided for ${claimant} are illegible. Will you please be able to provide us with clearer copies of all payslips in your possession?`));
+        push('payslips', alsoPrefix(hasPriorRequest, `Some of the payslips provided for ${claimant} are illegible. Will you please be able to provide us with clearer copies of all payslips in your possession?`));
       }
       if (vars.secLosDeathCert) {
-        push(`${requestLead(hasPriorRequest)} provide the Death Certificate of ${claimant}.`);
+        push('death-cert', `${requestLead(hasPriorRequest)} provide the Death Certificate of ${claimant}.`);
       }
       if (vars.secLosClearerDeath) {
-        push(`${requestLead(hasPriorRequest)} provide a clearer copy of the Death Certificate for ${claimant}.`);
+        push('clearer-death', `${requestLead(hasPriorRequest)} provide a clearer copy of the Death Certificate for ${claimant}.`);
       }
-      (Array.isArray(vars.adults) ? vars.adults : []).forEach((person) => {
+      (Array.isArray(vars.adults) ? vars.adults : []).forEach((person, index) => {
         const nameHtml = boldPerson(person, { titled: true });
         const pronouns = titlePronouns(person?.title);
-        if (person?.outstandingId) push(`${requestLead(hasPriorRequest)} provide the ID document of ${nameHtml}.`);
-        if (person?.clearerId) push(`${requestLead(hasPriorRequest)} provide a clearer copy of ${nameHtml}\u2019s ID document as the current one is illegible.`);
-        if (person?.allQueries) push(losAllQueries(nameHtml, pronouns, hasPriorRequest));
+        if (person?.outstandingId) push(`adult-${index}-id`, `${requestLead(hasPriorRequest)} provide the ID document of ${nameHtml}.`);
+        if (person?.clearerId) push(`adult-${index}-clearer`, `${requestLead(hasPriorRequest)} provide a clearer copy of ${nameHtml}\u2019s ID document as the current one is illegible.`);
+        if (person?.allQueries) push(`adult-${index}-queries`, losAllQueries(nameHtml, pronouns, hasPriorRequest));
         else {
-          if (person?.residing) push(`${requestLead(hasPriorRequest)} assist us by confirming if ${nameHtml} resided with the deceased.`);
-          if (person?.claiming) push(`${requestLead(hasPriorRequest)} assist us by confirming if ${nameHtml} is also claiming for Loss of Support.`);
+          if (person?.residing) push(`adult-${index}-residing`, `${requestLead(hasPriorRequest)} assist us by confirming if ${nameHtml} resided with the deceased.`);
+          if (person?.claiming) push(`adult-${index}-claiming`, `${requestLead(hasPriorRequest)} assist us by confirming if ${nameHtml} is also claiming for Loss of Support.`);
         }
       });
-      (Array.isArray(vars.children) ? vars.children : []).forEach((person) => {
+      (Array.isArray(vars.children) ? vars.children : []).forEach((person, index) => {
         const nameHtml = boldPerson(person);
-        if (person?.outstandingBirth) push(`${requestLead(hasPriorRequest)} provide the Birth Certificate of ${nameHtml}.`);
-        if (person?.clearerBirth) push(`${requestLead(hasPriorRequest)} provide a clearer copy of ${nameHtml}\u2019s Birth Certificate as the current one is illegible.`);
-        if (person?.extendAge) push(losExtendAge(nameHtml, hasPriorRequest));
+        if (person?.outstandingBirth) push(`child-${index}-birth`, `${requestLead(hasPriorRequest)} provide the Birth Certificate of ${nameHtml}.`);
+        if (person?.clearerBirth) push(`child-${index}-clearer`, `${requestLead(hasPriorRequest)} provide a clearer copy of ${nameHtml}\u2019s Birth Certificate as the current one is illegible.`);
+        if (person?.extendAge) push(`child-${index}-age`, losExtendAge(nameHtml, hasPriorRequest));
       });
       if (vars.secUnclearId) {
-        parts.push(clearerIdRequest(vars.idNames, hasPriorRequest));
+        add('unclear-id', clearerIdRequest(vars.idNames, hasPriorRequest));
         hasPriorRequest = true;
       }
       if (vars.secIpDocs) {
-        parts.push(`${requestLead(hasPriorRequest)} assist us by providing the following documents referenced in the IP report:${htmlList(vars.ipDocs, '[Document referenced in the IP report]')}`);
+        add('ip-docs', `${requestLead(hasPriorRequest)} assist us by providing the following documents referenced in the IP report:${htmlList(vars.ipDocs, '[Document referenced in the IP report]')}`);
         hasPriorRequest = true;
       }
       if (vars.secInstructionDocs) {
-        parts.push(instructionLetterRequest(vars.instructionDocs, hasPriorRequest));
+        add('instruction-docs', instructionLetterRequest(vars.instructionDocs, hasPriorRequest));
         hasPriorRequest = true;
       }
       if (vars.secIpDocs || vars.secInstructionDocs) {
-        parts.push(DEPENDENCY_NOTE);
+        add('dependency', DEPENDENCY_NOTE);
       }
-      parts.push(TURNAROUND);
-      parts.push(SIGN_OFF);
+      add('turnaround', TURNAROUND);
+      add('signoff', SIGN_OFF);
       const generatedSubject = draftSubject(this.name, masterClaimantLabel(vars));
       const typedSubject = String(vars.subject || '').trim();
       return {
         subject: subjectHasContent(typedSubject) ? typedSubject : generatedSubject,
-        bodyHtml: parts.join('<br/><br/>'),
+        parts,
       };
     },
   },
@@ -1637,12 +1826,19 @@ const TEMPLATES = [
   },
 ];
 
-const EditablePreview = memo(function EditablePreview({ html, previewRef }) {
+const PREVIEW_HTML_LOCK = { __html: '' };
+
+const EditablePreview = memo(function EditablePreview({ blocks, epoch, previewRef }) {
+  const baselines = useRef(new Map());
+  const epochSeen = useRef(null);
+
   useEffect(() => {
     const node = previewRef.current;
-    if (!node) return;
-    node.innerHTML = html;
-  }, [html, previewRef]);
+    if (!node || !blocks) return;
+    const replace = epochSeen.current !== epoch;
+    epochSeen.current = epoch;
+    mountEmailPreview(node, blocks, baselines.current, { replace });
+  }, [blocks, epoch, previewRef]);
 
   return (
     <div
@@ -1650,6 +1846,7 @@ const EditablePreview = memo(function EditablePreview({ html, previewRef }) {
       className="email-preview-body p-8 pt-3 text-sm text-black leading-relaxed min-h-[400px] outline-none"
       contentEditable
       suppressContentEditableWarning
+      dangerouslySetInnerHTML={PREVIEW_HTML_LOCK}
       spellCheck
       aria-label="Email text"
     />
@@ -1688,6 +1885,7 @@ export default function EmailEngine() {
   const [pageConfirm, setPageConfirm] = useState(null);
   const [allowEmptyPages, setAllowEmptyPages] = useState(false);
   const [inputsWidth, setInputsWidth] = useState(readEmailInputsWidth);
+  const [previewEpoch, setPreviewEpoch] = useState(0);
   const inputsWidthRef = useRef(inputsWidth);
   const previewRef = useRef(null);
 
@@ -1763,6 +1961,9 @@ export default function EmailEngine() {
       setBlockingKeys([]);
       setOpeningOpen(false);
       setRecipientConfirm('');
+      setPageConfirm(null);
+      setAllowEmptyPages(false);
+      setPreviewEpoch((epoch) => epoch + 1);
       setStatus({ msg: '', type: '' });
       return;
     }
@@ -1778,6 +1979,7 @@ export default function EmailEngine() {
     setRecipientConfirm('');
     setPageConfirm(null);
     setAllowEmptyPages(false);
+    setPreviewEpoch((epoch) => epoch + 1);
     setStatus({ msg: '', type: '' });
   }, [selectedTemplateId]);
 
@@ -1879,14 +2081,16 @@ export default function EmailEngine() {
 
   const compiledContent = useMemo(() => {
     const template = TEMPLATES.find(t => t.id === selectedTemplateId) || TEMPLATES[0];
-    if (typeof template.compile === 'function') {
-      const { subject, bodyHtml } = template.compile(variables);
-      return wrapCompiledEmail(subject, bodyHtml);
-    }
-    return compilePlaceholderTemplate(template, variables);
+    const compiled = typeof template.compile === 'function'
+      ? template.compile(variables)
+      : compilePlaceholderTemplate(template, variables);
+    const parts = compiled.parts || String(compiled.bodyHtml || '')
+      .split('<br/><br/>')
+      .map((html, index) => ({ id: `part-${index}`, html }));
+    return wrapCompiledEmail(compiled.subject, parts);
   }, [selectedTemplateId, variables]);
 
-  const currentHtmlBody = () => previewRef.current?.innerHTML || compiledContent.htmlBody;
+  const currentHtmlBody = () => serializeEmailPreview(previewRef.current, compiledContent.htmlBody);
 
   const setSplitWidth = (next, boundsWidth) => {
     const max = Math.max(280, (boundsWidth || next) - 320);
@@ -2031,6 +2235,7 @@ export default function EmailEngine() {
     setRecipientConfirm('');
     setPageConfirm(null);
     setAllowEmptyPages(false);
+    setPreviewEpoch((epoch) => epoch + 1);
     setStatus({ msg: 'Draft fields cleared.', type: 'info' });
   };
 
@@ -2091,7 +2296,7 @@ export default function EmailEngine() {
         gmailHintRef.current = 'reconnect';
         setGmailHint('reconnect');
         setStatus({
-          msg: 'Gmail session expired. Click Push to Gmail again. It will reconnect, then create the draft. Google opens only after you click.',
+          msg: 'Gmail session expired. Click Reconnect Gmail to connect only, or Push to Gmail again to connect and create the draft.',
           type: 'error',
         });
         return;
@@ -2498,7 +2703,7 @@ export default function EmailEngine() {
           placeholder={field.key === 'subject'
             ? draftSubject(selectedTemplate.name, masterClaimantLabel(variables))
             : (field.placeholder || `Enter ${field.label}...`)}
-          className={inputClassFor(field.key)}
+          className={pageConfirmKeys.has(field.key) ? INPUT_PAGE_CLASS : inputClassFor(field.key)}
         />
         {field.key === 'recipientName' && recipientConfirm ? (
           <div className="rounded-xl border border-amber-300/80 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-[11px] text-slate-700 dark:text-slate-200 space-y-2">
@@ -2751,16 +2956,16 @@ export default function EmailEngine() {
               >
                 Disconnect
               </button>
-            ) : !hasPriorGmailGrant() ? (
+            ) : (
               <button
                 type="button"
                 onClick={() => connectGmail()}
-                title="Connect Gmail before you need a draft. Shown when this browser has no Gmail token yet. Google opens only after this click."
+                title="Connects Gmail without creating a draft. Google opens only after this click."
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all active:scale-95"
               >
-                <Mail className="w-4 h-4" /> Connect Gmail
+                <Mail className="w-4 h-4" /> {hasPriorGmailGrant() ? 'Reconnect Gmail' : 'Connect Gmail'}
               </button>
-            ) : null}
+            )}
             <button 
               onClick={copyToClipboard} 
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all active:scale-95"
@@ -2770,7 +2975,7 @@ export default function EmailEngine() {
             <button 
               onClick={() => pushToGmail()} 
               disabled={isPushing}
-              title={gmailLinked ? 'Create a Gmail draft' : 'Connects Gmail if this browser has no active token, then creates the draft'}
+              title={gmailLinked ? 'Create a Gmail draft' : 'Creates a Gmail draft. Use Connect Gmail if you only want to connect.'}
               className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all active:scale-95 disabled:cursor-not-allowed disabled:active:scale-100 disabled:opacity-50 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/20"
             >
               {isPushing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} 
@@ -2786,7 +2991,7 @@ export default function EmailEngine() {
         ) : null}
         {gmailHint === 'reconnect' ? (
           <div className="px-6 py-2 text-[11px] font-semibold bg-amber-50 text-amber-900 border-b border-amber-200 dark:bg-amber-950/40 dark:text-amber-100 dark:border-amber-800">
-            Gmail needs a new connection. Click Push to Gmail. It will reconnect, then create the draft. Google opens only after you click.
+            Gmail needs a new connection. Click Reconnect Gmail to connect without creating a draft. Google opens only after you click.
           </div>
         ) : null}
 
@@ -2822,7 +3027,7 @@ export default function EmailEngine() {
               </div>
             </div>
 
-            <EditablePreview html={compiledContent.htmlBody} previewRef={previewRef} />
+            <EditablePreview blocks={compiledContent.blocks} epoch={previewEpoch} previewRef={previewRef} />
           </div>
         </div>
       </div>
