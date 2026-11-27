@@ -1,8 +1,17 @@
-export const APP_VERSION = '1.3.35';
+export const APP_VERSION = '1.3.36';
 export const APP_RELEASE_DATE = '27 November 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.36',
+    date: '27 Nov 2026',
+    items: [
+      'Opening is one dropdown. Source lists that already include IP report also include Addendum IP Report and Joint IP Report, and RAF Form sits with RAF Report.',
+      'The draft notes sit behind More info. Legacy drafts are a different colour in the template list.',
+      'A ticked block moves up with the blocks already ticked. Drag the handle to reorder, including the earnings blocks. Preview shows that block on its own.',
+    ],
+  },
   {
     version: '1.3.35',
     date: '27 Nov 2026',

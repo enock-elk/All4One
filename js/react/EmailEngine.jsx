@@ -10,8 +10,9 @@ import {
   Plus,
   Minus,
   RotateCcw,
-  ChevronDown,
-  ChevronUp,
+  GripVertical,
+  Info,
+  X,
 } from 'lucide-react';
 import { AC_LOGO_DATA_URI } from './ac-logo-b64.js';
 import { getWorkspaceName } from '../workspace-identity.js';
@@ -286,9 +287,12 @@ function requestLead(hasPriorRequest) {
 const REPORT_SOURCES = [
   'OT report',
   'IP report',
+  'Addendum IP Report',
+  'Joint IP Report',
   'Instruction Email',
   'Instruction Letter',
   'RAF Report',
+  'RAF Form',
   'Ortho Report',
   'Hospital records',
   'Medico-legal report',
@@ -355,6 +359,104 @@ function orderEarningsFields(fields, earningsOrder) {
     ...normalizeEarningsOrder(earningsOrder).flatMap((id) => groups[id]),
     ...after,
   ];
+}
+
+function isBlockStart(field) {
+  if (!field || field.showWhen || field.nested || field.embedded) return false;
+  return field.type === 'toggle' || field.type === 'dependants';
+}
+
+function templateBlocks(fields) {
+  const fixed = [];
+  const blocks = [];
+  let current = null;
+  (fields || []).forEach((field) => {
+    if (isBlockStart(field)) {
+      current = { id: field.key, fields: [field] };
+      blocks.push(current);
+      return;
+    }
+    if (current && (field.nested || field.showWhen || field.embedded)) {
+      current.fields.push(field);
+      return;
+    }
+    current = null;
+    fixed.push(field);
+  });
+  return { fixed, blocks };
+}
+
+function templateBlockKeys(template) {
+  return templateBlocks(template?.fields).blocks.map((block) => block.id);
+}
+
+function normalizeBlockOrder(order, keys) {
+  const known = new Set(keys);
+  const next = [];
+  (Array.isArray(order) ? order : []).forEach((key) => {
+    if (known.has(key) && !next.includes(key)) next.push(key);
+  });
+  keys.forEach((key) => {
+    if (!next.includes(key)) next.push(key);
+  });
+  return next;
+}
+
+function blockIsTicked(key, variables) {
+  return variables?.[key] === true;
+}
+
+function promoteTickedBlock(order, keys, variables, key) {
+  const normalized = normalizeBlockOrder(order, keys);
+  const selected = normalized.filter((id) => id !== key && blockIsTicked(id, variables));
+  const rest = normalized.filter((id) => id !== key && !blockIsTicked(id, variables));
+  return [...selected, key, ...rest];
+}
+
+function releaseTickedBlock(order, keys, variables, key) {
+  const normalized = normalizeBlockOrder(order, keys);
+  const selected = normalized.filter((id) => id !== key && blockIsTicked(id, variables));
+  const parked = keys.filter((id) => !selected.includes(id));
+  return [...selected, ...parked];
+}
+
+function moveBlockBefore(order, keys, fromId, toId) {
+  const list = normalizeBlockOrder(order, keys);
+  const from = list.indexOf(fromId);
+  if (from < 0 || !list.includes(toId) || fromId === toId) return list;
+  const next = list.filter((id) => id !== fromId);
+  next.splice(next.indexOf(toId), 0, fromId);
+  return next;
+}
+
+function groupFieldRows(fields) {
+  return fields.reduce((rows, field) => {
+    const previous = rows[rows.length - 1];
+    if (field.row && previous?.[0]?.row === field.row) previous.push(field);
+    else rows.push([field]);
+    return rows;
+  }, []);
+}
+
+const PREVIEW_SKIP_PARTS = new Set(['greeting', 'opening', 'turnaround', 'signoff']);
+
+function previewBlockHtml(template, blockKey) {
+  if (typeof template?.compile !== 'function') return '';
+  const vars = initialVariables(template);
+  const header = (template.fields || []).find((field) => field.key === blockKey);
+  if (header?.type === 'toggle') vars[blockKey] = true;
+  if (blockKey === 'adults') {
+    vars.adults = [{ title: 'Mr/Ms', name: '', outstandingId: true }];
+  }
+  if (blockKey === 'children') {
+    vars.children = [{ name: '', outstandingBirth: true }];
+  }
+  vars.blockOrder = [blockKey, ...templateBlockKeys(template).filter((key) => key !== blockKey)];
+  const compiled = template.compile(vars);
+  return (compiled?.parts || [])
+    .filter((part) => part && !PREVIEW_SKIP_PARTS.has(part.id) && String(part.html || '').trim())
+    .map((part) => part.html)
+    .join('<br/><br/>');
 }
 
 const INFORMAL_EARNINGS_PROOF = [
@@ -823,6 +925,13 @@ function initialVariables(template) {
       else vars[field.key] = field.default ?? '';
     });
     if (template.id === 'draft-master-loe') vars.earningsOrder = [...DEFAULT_EARNINGS_ORDER];
+    const blockKeys = templateBlockKeys(template);
+    vars.blockOrder = template.id === 'draft-master-los'
+      ? normalizeBlockOrder([
+        'secAccident', 'secLosFormal', 'secLosInformal', 'secLosPayslips', 'secLosDeathCert',
+        'secLosClearerDeath', 'adults', 'children', 'secUnclearId', 'secIpDocs', 'secInstructionDocs',
+      ], blockKeys)
+      : blockKeys;
     return vars;
   }
   const keys = [...extractPlaceholderKeys(template.subject), ...extractPlaceholderKeys(template.body)];
@@ -864,7 +973,7 @@ const TEMPLATES = [
     id: 'draft-master-loe',
     name: '(DRAFT) Master LOE',
     menuLabel: 'Master LOE Draft',
-    intro: 'Tick only the blocks this email needs. Notes under each block stay in the form and are left out of the draft. A block that starts with “Also” uses that word only when another request is already above it; otherwise it starts with “Kindly” or “In accordance”. The 24-hour close is always included. Unclear ID and Instruction letter documents are their own blocks. Each earnings block includes the Kubheka paragraph in its own place. Use Up and Down to move formal and informal earnings.',
+    intro: 'Tick only the blocks this email needs. Notes under each block stay in the form and are left out of the draft. A block that starts with “Also” uses that word only when another request is already above it; otherwise it starts with “Kindly” or “In accordance”. The 24-hour close is always included. Unclear ID and Instruction letter documents are their own blocks. Each earnings block includes the Kubheka paragraph in its own place. A block you tick moves up with the blocks already ticked, and the next one you tick sits underneath them. Drag a block by its handle to change that order.',
     fields: [
       {
         key: 'subject',
@@ -880,7 +989,6 @@ const TEMPLATES = [
         label: 'Opening',
         type: 'select',
         default: 'attorneys',
-        accordion: true,
         guidance: 'Loss of Earnings openings. Only one is used in the draft.',
         options: [
           { value: 'attorneys', label: 'Loss of Earnings — instructing attorneys' },
@@ -1309,83 +1417,16 @@ const TEMPLATES = [
         hasPriorRequest = true;
       };
 
-      if (vars.secNoIp) {
-        pushRequest('no-ip', [
-          `${requestLead(hasPriorRequest)} note that we require an Industrial Psychologist report in order to perform Loss of Earnings calculations.`,
-          'Kindly assist by providing an Industrial Psychologist report.',
-        ].join('<br/><br/>'));
-      }
-
-      if (vars.secAccident) {
-        const sameAccidentSource = sameDocument(vars.accidentOtSource, vars.accidentIpSource);
-        pushRequest('accident', `${requestLead(hasPriorRequest)} assist us by confirming the correct date of accident.${htmlRichList([
-          boldReportLine(vars.accidentOt, vars.accidentOtSource, '[date]', 'OT report', sameAccidentSource ? vars.accidentOtPage : ''),
-          boldReportLine(vars.accidentIp, vars.accidentIpSource, '[date]', 'IP report', sameAccidentSource ? vars.accidentIpPage : ''),
-        ])}`);
-      }
-
-      if (vars.secDob) {
-        const sameDobSource = sameDocument(vars.dobOtSource, vars.dobIpSource);
-        pushRequest('dob', `${requestLead(hasPriorRequest)} assist us by confirming the claimant\u2019s date of birth.${htmlRichList([
-          boldReportLine(vars.dobOt, vars.dobOtSource, '[date of birth]', 'OT report', sameDobSource ? vars.dobOtPage : ''),
-          boldReportLine(vars.dobIp, vars.dobIpSource, '[date of birth]', 'IP report', sameDobSource ? vars.dobIpPage : ''),
-        ])}`);
-      }
-
-      if (vars.secName) {
-        const sameNameSource = sameDocument(vars.nameOtSource, vars.nameIpSource);
-        pushRequest('name', `${requestLead(hasPriorRequest)} assist us by confirming the correct spelling of the claimant\u2019s name.${htmlRichList([
-          boldReportLine(vars.nameOt, vars.nameOtSource, '[spelling]', 'OT report', sameNameSource ? vars.nameOtPage : ''),
-          boldReportLine(vars.nameIp, vars.nameIpSource, '[spelling]', 'IP report', sameNameSource ? vars.nameIpPage : ''),
-        ])}${orIdDocumentPronoun(masterPronoun(vars))}`);
-      }
-
-      if (vars.secNameOrder) {
-        const pronoun = masterPronoun(vars);
-        pushRequest('name-order', alsoPrefix(
-          hasPriorRequest,
-          `The order of ${claimant} full names and surname are unclear. Kindly assist by providing ${claimant}\u2019s full names and surname, or alternatively, ${pronoun} ID document.`,
-        ));
-      }
-
-      if (vars.secSurname) {
-        pushRequest('surname', `${requestLead(hasPriorRequest)} note that there is a discrepancy in the claimant\u2019s surname:${htmlRichList([
-          `<strong>${escapeHtml(filled(vars.surnameEmail, '[surname]'))}</strong> as per the Email`,
-          `<strong>${escapeHtml(filled(vars.surnameIp, '[surname]'))}</strong> as per the IP report`,
-        ])}<br/><br/>Could you please confirm the correct spelling of the claimant\u2019s surname, or alternatively provide a copy of their identification documents to verify the correct spelling?`);
-      }
-
-      if (vars.secPayslips) {
-        const documents = {
-          payslips: 'payslips',
-          'bank statements': 'bank statements',
-          'payslips and bank statements': 'payslips and bank statements',
-        }[vars.clearerDocs] || 'payslips';
-        pushRequest('payslips', `The ${documents} provided for ${claimant} are illegible. Will you please provide clearer copies of all ${documents} in your possession?`);
-      }
-
-      if (vars.secClearerReport) {
-        pushRequest('clearer-report', alsoPrefix(
-          hasPriorRequest,
-          `If possible, kindly assist us by providing clearer copies of the following documents referenced in your report:${htmlList(vars.clearerReportDocs, '[Document referenced in the report]')}`,
-        ));
-      }
-
-      if (vars.secUnclearId) {
-        pushRequest('unclear-id', clearerIdRequest(vars.idNames, hasPriorRequest));
-      }
-
-      if (vars.secInstructionDocs) {
-        pushRequest('instruction-docs', [
-          instructionLetterRequest(vars.instructionDocs, hasPriorRequest),
-          DEPENDENCY_NOTE,
-        ].join('<br/><br/>'));
-      }
-
-      const activeEarnings = normalizeEarningsOrder(vars.earningsOrder).filter((block) => (
-        (block === 'formal' && vars.secFormal) || (block === 'informal' && vars.secInformal)
+      const loeKeys = [
+        'secNoIp', 'secAccident', 'secDob', 'secName', 'secNameOrder', 'secSurname',
+        'secPayslips', 'secClearerReport', 'secUnclearId', 'secInstructionDocs',
+        'secFormal', 'secInformal',
+      ];
+      const loeOrder = normalizeBlockOrder(vars.blockOrder, loeKeys);
+      const topEarningsKey = loeOrder.find((key) => (
+        (key === 'secFormal' && vars.secFormal) || (key === 'secInformal' && vars.secInformal)
       ));
-      const topEarnings = activeEarnings[0] || '';
+      const topEarnings = topEarningsKey === 'secFormal' ? 'formal' : topEarningsKey === 'secInformal' ? 'informal' : '';
 
       const buildFormalEarnings = () => {
         if (!vars.secFormal) return '';
@@ -1411,10 +1452,91 @@ const TEMPLATES = [
         return chunks.join('<br/><br/>');
       };
 
-      for (const block of normalizeEarningsOrder(vars.earningsOrder)) {
-        const html = block === 'formal' ? buildFormalEarnings() : buildInformalEarnings();
-        if (html) pushRequest(block === 'formal' ? 'earnings-formal' : 'earnings-informal', html);
-      }
+      const emitLoe = {
+        secNoIp() {
+          if (!vars.secNoIp) return;
+          pushRequest('no-ip', [
+            `${requestLead(hasPriorRequest)} note that we require an Industrial Psychologist report in order to perform Loss of Earnings calculations.`,
+            'Kindly assist by providing an Industrial Psychologist report.',
+          ].join('<br/><br/>'));
+        },
+        secAccident() {
+          if (!vars.secAccident) return;
+          const sameAccidentSource = sameDocument(vars.accidentOtSource, vars.accidentIpSource);
+          pushRequest('accident', `${requestLead(hasPriorRequest)} assist us by confirming the correct date of accident.${htmlRichList([
+            boldReportLine(vars.accidentOt, vars.accidentOtSource, '[date]', 'OT report', sameAccidentSource ? vars.accidentOtPage : ''),
+            boldReportLine(vars.accidentIp, vars.accidentIpSource, '[date]', 'IP report', sameAccidentSource ? vars.accidentIpPage : ''),
+          ])}`);
+        },
+        secDob() {
+          if (!vars.secDob) return;
+          const sameDobSource = sameDocument(vars.dobOtSource, vars.dobIpSource);
+          pushRequest('dob', `${requestLead(hasPriorRequest)} assist us by confirming the claimant\u2019s date of birth.${htmlRichList([
+            boldReportLine(vars.dobOt, vars.dobOtSource, '[date of birth]', 'OT report', sameDobSource ? vars.dobOtPage : ''),
+            boldReportLine(vars.dobIp, vars.dobIpSource, '[date of birth]', 'IP report', sameDobSource ? vars.dobIpPage : ''),
+          ])}`);
+        },
+        secName() {
+          if (!vars.secName) return;
+          const sameNameSource = sameDocument(vars.nameOtSource, vars.nameIpSource);
+          pushRequest('name', `${requestLead(hasPriorRequest)} assist us by confirming the correct spelling of the claimant\u2019s name.${htmlRichList([
+            boldReportLine(vars.nameOt, vars.nameOtSource, '[spelling]', 'OT report', sameNameSource ? vars.nameOtPage : ''),
+            boldReportLine(vars.nameIp, vars.nameIpSource, '[spelling]', 'IP report', sameNameSource ? vars.nameIpPage : ''),
+          ])}${orIdDocumentPronoun(masterPronoun(vars))}`);
+        },
+        secNameOrder() {
+          if (!vars.secNameOrder) return;
+          const pronoun = masterPronoun(vars);
+          pushRequest('name-order', alsoPrefix(
+            hasPriorRequest,
+            `The order of ${claimant} full names and surname are unclear. Kindly assist by providing ${claimant}\u2019s full names and surname, or alternatively, ${pronoun} ID document.`,
+          ));
+        },
+        secSurname() {
+          if (!vars.secSurname) return;
+          pushRequest('surname', `${requestLead(hasPriorRequest)} note that there is a discrepancy in the claimant\u2019s surname:${htmlRichList([
+            `<strong>${escapeHtml(filled(vars.surnameEmail, '[surname]'))}</strong> as per the Email`,
+            `<strong>${escapeHtml(filled(vars.surnameIp, '[surname]'))}</strong> as per the IP report`,
+          ])}<br/><br/>Could you please confirm the correct spelling of the claimant\u2019s surname, or alternatively provide a copy of their identification documents to verify the correct spelling?`);
+        },
+        secPayslips() {
+          if (!vars.secPayslips) return;
+          const documents = {
+            payslips: 'payslips',
+            'bank statements': 'bank statements',
+            'payslips and bank statements': 'payslips and bank statements',
+          }[vars.clearerDocs] || 'payslips';
+          pushRequest('payslips', `The ${documents} provided for ${claimant} are illegible. Will you please provide clearer copies of all ${documents} in your possession?`);
+        },
+        secClearerReport() {
+          if (!vars.secClearerReport) return;
+          pushRequest('clearer-report', alsoPrefix(
+            hasPriorRequest,
+            `If possible, kindly assist us by providing clearer copies of the following documents referenced in your report:${htmlList(vars.clearerReportDocs, '[Document referenced in the report]')}`,
+          ));
+        },
+        secUnclearId() {
+          if (!vars.secUnclearId) return;
+          pushRequest('unclear-id', clearerIdRequest(vars.idNames, hasPriorRequest));
+        },
+        secInstructionDocs() {
+          if (!vars.secInstructionDocs) return;
+          pushRequest('instruction-docs', [
+            instructionLetterRequest(vars.instructionDocs, hasPriorRequest),
+            DEPENDENCY_NOTE,
+          ].join('<br/><br/>'));
+        },
+        secFormal() {
+          const html = buildFormalEarnings();
+          if (html) pushRequest('earnings-formal', html);
+        },
+        secInformal() {
+          const html = buildInformalEarnings();
+          if (html) pushRequest('earnings-informal', html);
+        },
+      };
+      loeOrder.forEach((key) => emitLoe[key]?.());
+
 
       add('turnaround', TURNAROUND);
       add('signoff', SIGN_OFF);
@@ -1431,7 +1553,7 @@ const TEMPLATES = [
     id: 'draft-master-los',
     name: '(DRAFT) Master LOS',
     menuLabel: 'Master LOS Draft',
-    intro: 'The 24-hour close is always included. The thank-you is for the dependants. Deceased, adult, and child requests follow the LOS matrix. A later request starts with “Also”. Unclear deceased ID and Instruction letter documents stay available. Page numbers appear when both accident dates come from the same document.',
+    intro: 'The 24-hour close is always included. The thank-you is for the dependants. Deceased, adult, and child requests follow the LOS matrix. A later request starts with “Also”. Unclear deceased ID and Instruction letter documents stay available. Page numbers appear when both accident dates come from the same document. A block you tick moves up with the blocks already ticked, and the next one you tick sits underneath them. Drag a block by its handle to change that order.',
     fields: [
       {
         key: 'subject',
@@ -1447,7 +1569,6 @@ const TEMPLATES = [
         label: 'Opening',
         type: 'select',
         default: 'attorneys',
-        accordion: true,
         guidance: 'The thank-you goes to the instructing attorneys. The other opening is for an IP or someone else.',
         options: [
           { value: 'attorneys', label: 'Loss of Support — instructing attorneys' },
@@ -1669,56 +1790,77 @@ const TEMPLATES = [
         add(id, html);
         hasPriorRequest = true;
       };
-      if (vars.secAccident) {
-        const sameAccidentSource = sameDocument(vars.accidentOtSource, vars.accidentIpSource);
-        push('accident', `${requestLead(hasPriorRequest)} assist us by confirming the correct date of accident.${htmlRichList([
-          boldReportLine(vars.accidentOt, vars.accidentOtSource, '[date]', 'Post-mortem report', sameAccidentSource ? vars.accidentOtPage : ''),
-          boldReportLine(vars.accidentIp, vars.accidentIpSource, '[date]', 'IP report', sameAccidentSource ? vars.accidentIpPage : ''),
-        ])}`);
-      }
-      if (vars.secLosFormal) push('formal', losFormalEarnings(claimant, deceasedPronouns, hasPriorRequest));
-      if (vars.secLosInformal) push('informal', losInformalEarnings(hasPriorRequest));
-      if (vars.secLosPayslips) {
-        push('payslips', alsoPrefix(hasPriorRequest, `Some of the payslips provided for ${claimant} are illegible. Will you please be able to provide us with clearer copies of all payslips in your possession?`));
-      }
-      if (vars.secLosDeathCert) {
-        push('death-cert', `${requestLead(hasPriorRequest)} provide the Death Certificate of ${claimant}.`);
-      }
-      if (vars.secLosClearerDeath) {
-        push('clearer-death', `${requestLead(hasPriorRequest)} provide a clearer copy of the Death Certificate for ${claimant}.`);
-      }
-      (Array.isArray(vars.adults) ? vars.adults : []).forEach((person, index) => {
-        const nameHtml = boldPerson(person, { titled: true });
-        const pronouns = titlePronouns(person?.title);
-        if (person?.outstandingId) push(`adult-${index}-id`, `${requestLead(hasPriorRequest)} provide the ID document of ${nameHtml}.`);
-        if (person?.clearerId) push(`adult-${index}-clearer`, `${requestLead(hasPriorRequest)} provide a clearer copy of ${nameHtml}\u2019s ID document as the current one is illegible.`);
-        if (person?.allQueries) push(`adult-${index}-queries`, losAllQueries(nameHtml, pronouns, hasPriorRequest));
-        else {
-          if (person?.residing) push(`adult-${index}-residing`, `${requestLead(hasPriorRequest)} assist us by confirming if ${nameHtml} resided with the deceased.`);
-          if (person?.claiming) push(`adult-${index}-claiming`, `${requestLead(hasPriorRequest)} assist us by confirming if ${nameHtml} is also claiming for Loss of Support.`);
-        }
-      });
-      (Array.isArray(vars.children) ? vars.children : []).forEach((person, index) => {
-        const nameHtml = boldPerson(person);
-        if (person?.outstandingBirth) push(`child-${index}-birth`, `${requestLead(hasPriorRequest)} provide the Birth Certificate of ${nameHtml}.`);
-        if (person?.clearerBirth) push(`child-${index}-clearer`, `${requestLead(hasPriorRequest)} provide a clearer copy of ${nameHtml}\u2019s Birth Certificate as the current one is illegible.`);
-        if (person?.extendAge) push(`child-${index}-age`, losExtendAge(nameHtml, hasPriorRequest));
-      });
-      if (vars.secUnclearId) {
-        add('unclear-id', clearerIdRequest(vars.idNames, hasPriorRequest));
-        hasPriorRequest = true;
-      }
-      if (vars.secIpDocs) {
-        add('ip-docs', `${requestLead(hasPriorRequest)} assist us by providing the following documents referenced in the IP report:${htmlList(vars.ipDocs, '[Document referenced in the IP report]')}`);
-        hasPriorRequest = true;
-      }
-      if (vars.secInstructionDocs) {
-        add('instruction-docs', instructionLetterRequest(vars.instructionDocs, hasPriorRequest));
-        hasPriorRequest = true;
-      }
-      if (vars.secIpDocs || vars.secInstructionDocs) {
-        add('dependency', DEPENDENCY_NOTE);
-      }
+      const losKeys = [
+        'secAccident', 'secLosFormal', 'secLosInformal', 'secLosPayslips', 'secLosDeathCert',
+        'secLosClearerDeath', 'adults', 'children', 'secUnclearId', 'secInstructionDocs', 'secIpDocs',
+      ];
+      const losOrder = normalizeBlockOrder(vars.blockOrder, losKeys);
+      const dependencyAfter = losOrder.filter((key) => (
+        (key === 'secIpDocs' && vars.secIpDocs) || (key === 'secInstructionDocs' && vars.secInstructionDocs)
+      )).pop();
+      const emitLos = {
+        secAccident() {
+          if (!vars.secAccident) return;
+          const sameAccidentSource = sameDocument(vars.accidentOtSource, vars.accidentIpSource);
+          push('accident', `${requestLead(hasPriorRequest)} assist us by confirming the correct date of accident.${htmlRichList([
+            boldReportLine(vars.accidentOt, vars.accidentOtSource, '[date]', 'Post-mortem report', sameAccidentSource ? vars.accidentOtPage : ''),
+            boldReportLine(vars.accidentIp, vars.accidentIpSource, '[date]', 'IP report', sameAccidentSource ? vars.accidentIpPage : ''),
+          ])}`);
+        },
+        secLosFormal() {
+          if (vars.secLosFormal) push('formal', losFormalEarnings(claimant, deceasedPronouns, hasPriorRequest));
+        },
+        secLosInformal() {
+          if (vars.secLosInformal) push('informal', losInformalEarnings(hasPriorRequest));
+        },
+        secLosPayslips() {
+          if (vars.secLosPayslips) {
+            push('payslips', alsoPrefix(hasPriorRequest, `Some of the payslips provided for ${claimant} are illegible. Will you please be able to provide us with clearer copies of all payslips in your possession?`));
+          }
+        },
+        secLosDeathCert() {
+          if (vars.secLosDeathCert) push('death-cert', `${requestLead(hasPriorRequest)} provide the Death Certificate of ${claimant}.`);
+        },
+        secLosClearerDeath() {
+          if (vars.secLosClearerDeath) push('clearer-death', `${requestLead(hasPriorRequest)} provide a clearer copy of the Death Certificate for ${claimant}.`);
+        },
+        adults() {
+          (Array.isArray(vars.adults) ? vars.adults : []).forEach((person, index) => {
+            const nameHtml = boldPerson(person, { titled: true });
+            const pronouns = titlePronouns(person?.title);
+            if (person?.outstandingId) push(`adult-${index}-id`, `${requestLead(hasPriorRequest)} provide the ID document of ${nameHtml}.`);
+            if (person?.clearerId) push(`adult-${index}-clearer`, `${requestLead(hasPriorRequest)} provide a clearer copy of ${nameHtml}\u2019s ID document as the current one is illegible.`);
+            if (person?.allQueries) push(`adult-${index}-queries`, losAllQueries(nameHtml, pronouns, hasPriorRequest));
+            else {
+              if (person?.residing) push(`adult-${index}-residing`, `${requestLead(hasPriorRequest)} assist us by confirming if ${nameHtml} resided with the deceased.`);
+              if (person?.claiming) push(`adult-${index}-claiming`, `${requestLead(hasPriorRequest)} assist us by confirming if ${nameHtml} is also claiming for Loss of Support.`);
+            }
+          });
+        },
+        children() {
+          (Array.isArray(vars.children) ? vars.children : []).forEach((person, index) => {
+            const nameHtml = boldPerson(person);
+            if (person?.outstandingBirth) push(`child-${index}-birth`, `${requestLead(hasPriorRequest)} provide the Birth Certificate of ${nameHtml}.`);
+            if (person?.clearerBirth) push(`child-${index}-clearer`, `${requestLead(hasPriorRequest)} provide a clearer copy of ${nameHtml}\u2019s Birth Certificate as the current one is illegible.`);
+            if (person?.extendAge) push(`child-${index}-age`, losExtendAge(nameHtml, hasPriorRequest));
+          });
+        },
+        secUnclearId() {
+          if (!vars.secUnclearId) return;
+          push('unclear-id', clearerIdRequest(vars.idNames, hasPriorRequest));
+        },
+        secIpDocs() {
+          if (!vars.secIpDocs) return;
+          push('ip-docs', `${requestLead(hasPriorRequest)} assist us by providing the following documents referenced in the IP report:${htmlList(vars.ipDocs, '[Document referenced in the IP report]')}`);
+          if (dependencyAfter === 'secIpDocs') add('dependency', DEPENDENCY_NOTE);
+        },
+        secInstructionDocs() {
+          if (!vars.secInstructionDocs) return;
+          push('instruction-docs', instructionLetterRequest(vars.instructionDocs, hasPriorRequest));
+          if (dependencyAfter === 'secInstructionDocs') add('dependency', DEPENDENCY_NOTE);
+        },
+      };
+      losOrder.forEach((key) => emitLos[key]?.());
       add('turnaround', TURNAROUND);
       add('signoff', SIGN_OFF);
       const generatedSubject = draftSubject(this.name, masterClaimantLabel(vars));
@@ -1941,6 +2083,12 @@ export default function EmailEngine() {
   const [sourceMode, setSourceMode] = useState({});
   const [blockingKeys, setBlockingKeys] = useState([]);
   const [openingOpen, setOpeningOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [templateMenuOpen, setTemplateMenuOpen] = useState(false);
+  const [blockPreview, setBlockPreview] = useState(null);
+  const [dragOverId, setDragOverId] = useState('');
+  const dragRef = useRef({ from: '', over: '' });
+  const templateMenuRef = useRef(null);
   const [recipientConfirm, setRecipientConfirm] = useState('');
   const [pageConfirm, setPageConfirm] = useState(null);
   const [allowEmptyPages, setAllowEmptyPages] = useState(false);
@@ -2009,6 +2157,24 @@ export default function EmailEngine() {
     return () => window.clearTimeout(timer);
   }, [status]);
 
+  useEffect(() => {
+    if (!templateMenuOpen) return undefined;
+    const close = (event) => {
+      if (!templateMenuRef.current?.contains(event.target)) setTemplateMenuOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [templateMenuOpen]);
+
+  useEffect(() => {
+    if (!blockPreview) return undefined;
+    const onKey = (event) => {
+      if (event.key === 'Escape') setBlockPreview(null);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [blockPreview]);
+
   const selectedTemplate = TEMPLATES.find((t) => t.id === selectedTemplateId) || TEMPLATES[0];
 
   useEffect(() => {
@@ -2024,6 +2190,9 @@ export default function EmailEngine() {
       setPageConfirm(null);
       setAllowEmptyPages(false);
       setPreviewEpoch((epoch) => epoch + 1);
+      setInfoOpen(false);
+      setTemplateMenuOpen(false);
+      setBlockPreview(null);
       setStatus({ msg: '', type: '' });
       return;
     }
@@ -2040,6 +2209,9 @@ export default function EmailEngine() {
     setPageConfirm(null);
     setAllowEmptyPages(false);
     setPreviewEpoch((epoch) => epoch + 1);
+    setInfoOpen(false);
+    setTemplateMenuOpen(false);
+    setBlockPreview(null);
     setStatus({ msg: '', type: '' });
   }, [selectedTemplateId]);
 
@@ -2047,23 +2219,17 @@ export default function EmailEngine() {
     setBlockingKeys([]);
   };
 
-  const moveEarningsBlock = (blockId, direction) => {
-    setVariables((prev) => {
-      const order = normalizeEarningsOrder(prev.earningsOrder);
-      const index = order.indexOf(blockId);
-      const target = index + (direction === 'up' ? -1 : 1);
-      if (index < 0 || target < 0 || target >= order.length) return prev;
-      const next = [...order];
-      [next[index], next[target]] = [next[target], next[index]];
-      return { ...prev, earningsOrder: next };
-    });
-  };
-
   const handleVarChange = (key, val) => {
     setVariables((prev) => {
       const next = { ...prev, [key]: val };
       if (key === 'secFormal' && !val) next.secFormalDocs = false;
       if (key === 'secInformal' && !val) next.secInformalDocs = false;
+      const blockKeys = templateBlockKeys(selectedTemplate);
+      if (blockKeys.includes(key) && typeof val === 'boolean') {
+        next.blockOrder = val
+          ? promoteTickedBlock(prev.blockOrder, blockKeys, prev, key)
+          : releaseTickedBlock(prev.blockOrder, blockKeys, prev, key);
+      }
       return next;
     });
     clearExportShading();
@@ -2372,22 +2538,14 @@ export default function EmailEngine() {
   };
 
   const allUniqueKeys = [...new Set([...parsedKeys.subject, ...parsedKeys.body])];
-  const structuredFields = selectedTemplate.fields
-    ? orderEarningsFields(selectedTemplate.fields, variables.earningsOrder)
-    : null;
-  const visibleFields = structuredFields
-    ? structuredFields.filter((field) => fieldIsVisible(field, variables) && !field.embedded)
-    : null;
-  const structuredRows = visibleFields
-    ? visibleFields.reduce((rows, field) => {
-        const previous = rows[rows.length - 1];
-        if (field.row && previous?.[0]?.row === field.row) {
-          previous.push(field);
-        } else {
-          rows.push([field]);
-        }
-        return rows;
-      }, [])
+  const fieldLayout = selectedTemplate.fields ? templateBlocks(selectedTemplate.fields) : null;
+  const orderedBlocks = fieldLayout
+    ? normalizeBlockOrder(variables.blockOrder, fieldLayout.blocks.map((block) => block.id))
+      .map((id) => fieldLayout.blocks.find((block) => block.id === id))
+      .filter(Boolean)
+    : [];
+  const fixedRows = fieldLayout
+    ? groupFieldRows(fieldLayout.fixed.filter((field) => fieldIsVisible(field, variables) && !field.embedded))
     : null;
   const remainingCount = countRemainingDraftRequirements(selectedTemplate, variables);
   const pageConfirmKeys = new Set((pageConfirm || []).map((item) => item.key));
@@ -2441,32 +2599,53 @@ export default function EmailEngine() {
     );
   };
 
-  const renderEarningsMove = (blockId) => {
-    const order = normalizeEarningsOrder(variables.earningsOrder);
-    const index = order.indexOf(blockId);
-    const buttonClass = 'inline-flex items-center justify-center gap-0.5 px-1.5 py-1 rounded-md text-[10px] font-bold border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed';
-    return (
-      <div className="flex flex-col gap-1 shrink-0">
-        <button
-          type="button"
-          className={buttonClass}
-          disabled={index <= 0}
-          onClick={() => moveEarningsBlock(blockId, 'up')}
-          title="Move this earnings block up"
-        >
-          <ChevronUp className="w-3 h-3" /> Up
-        </button>
-        <button
-          type="button"
-          className={buttonClass}
-          disabled={index < 0 || index >= order.length - 1}
-          onClick={() => moveEarningsBlock(blockId, 'down')}
-          title="Move this earnings block down"
-        >
-          <ChevronDown className="w-3 h-3" /> Down
-        </button>
-      </div>
-    );
+  const finishBlockDrag = () => {
+    const { from, over } = dragRef.current;
+    dragRef.current = { from: '', over: '' };
+    setDragOverId('');
+    if (!from || !over || from === over) return;
+    const blockKeys = templateBlockKeys(selectedTemplate);
+    setVariables((prev) => ({
+      ...prev,
+      blockOrder: moveBlockBefore(prev.blockOrder, blockKeys, from, over),
+    }));
+  };
+
+  const startBlockDrag = (event, blockId) => {
+    if (event.button != null && event.button !== 0) return;
+    event.preventDefault();
+    dragRef.current = { from: blockId, over: blockId };
+    setDragOverId(blockId);
+    const scroller = event.currentTarget.closest('.overflow-y-auto');
+    const move = (ev) => {
+      if (scroller) {
+        const bounds = scroller.getBoundingClientRect();
+        if (ev.clientY < bounds.top + 36) scroller.scrollTop -= 14;
+        else if (ev.clientY > bounds.bottom - 36) scroller.scrollTop += 14;
+      }
+      const el = document.elementFromPoint(ev.clientX, ev.clientY);
+      const card = el?.closest?.('[data-block-id]');
+      const over = card?.dataset.blockId || '';
+      if (over && over !== dragRef.current.over) {
+        dragRef.current.over = over;
+        setDragOverId(over);
+      }
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      finishBlockDrag();
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
+  const openBlockPreview = (field) => {
+    const html = previewBlockHtml(selectedTemplate, field.key);
+    setBlockPreview({
+      title: field.label,
+      html: html || '<p>This block has no preview text yet.</p>',
+    });
   };
 
   const renderStructuredField = (field) => {
@@ -2543,9 +2722,8 @@ export default function EmailEngine() {
     if (field.type === 'toggle') {
       const on = Boolean(variables[field.key]);
       const blocked = blockingKeys.includes(field.key);
-      const earningsBlock = field.key === 'secFormal' ? 'formal' : field.key === 'secInformal' ? 'informal' : '';
       const toggle = (
-        <label className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 cursor-pointer transition-colors ${blocked ? 'border-rose-300/80 dark:border-rose-400/50' : on ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/30' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40'} ${earningsBlock ? 'flex-1' : ''}`}>
+        <label className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 cursor-pointer transition-colors ${blocked ? 'border-rose-300/80 dark:border-rose-400/50' : on ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/30' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40'}`}>
           <input
             type="checkbox"
             checked={on}
@@ -2560,13 +2738,7 @@ export default function EmailEngine() {
           </span>
         </label>
       );
-      if (!earningsBlock) return toggle;
-      return (
-        <div className="flex items-stretch gap-2">
-          {toggle}
-          {renderEarningsMove(earningsBlock)}
-        </div>
-      );
+      return toggle;
     }
 
     if (field.type === 'select') {
@@ -2584,31 +2756,7 @@ export default function EmailEngine() {
           ))}
         </select>
       );
-      if (!field.accordion) return selectEl;
-      const current = options.find((opt) => opt.value === (variables[field.key] || field.default))?.label || field.label;
-      return (
-        <div className={`rounded-xl border ${blockingKeys.includes(field.key) ? 'border-rose-300/80 dark:border-rose-400/50' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40'}`}>
-          <button
-            type="button"
-            onClick={() => setOpeningOpen((open) => !open)}
-            className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left"
-          >
-            <span className="min-w-0">
-              <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">{field.label}</span>
-              <span className="block text-sm font-medium text-slate-800 dark:text-slate-100 truncate">{current}</span>
-            </span>
-            <ChevronDown className={`w-4 h-4 shrink-0 text-slate-400 transition-transform ${openingOpen ? 'rotate-180' : ''}`} />
-          </button>
-          {openingOpen ? (
-            <div className="px-3 pb-3 space-y-2 border-t border-slate-100 dark:border-slate-700 pt-2">
-              {field.guidance ? (
-                <p className="text-[11px] leading-snug text-slate-500 dark:text-slate-400">{field.guidance}</p>
-              ) : null}
-              {selectEl}
-            </div>
-          ) : null}
-        </div>
-      );
+      return selectEl;
     }
 
     if (field.type === 'source') {
@@ -2617,7 +2765,7 @@ export default function EmailEngine() {
       const known = options.includes(value);
       const isOther = sourceMode[field.key] === 'other' || (value && !known);
       const pageField = field.pageKey
-        ? structuredFields?.find((item) => item.key === field.pageKey)
+        ? selectedTemplate.fields?.find((item) => item.key === field.pageKey)
         : null;
       const pageVisible = Boolean(pageField && fieldIsVisible(pageField, variables));
       const pageSoft = pageVisible && pageConfirmKeys.has(pageField.key);
@@ -2809,6 +2957,89 @@ export default function EmailEngine() {
     return `min-w-0 ${nested}`;
   };
 
+  const renderRows = (rows) => rows.map((row) => {
+    const titleField = row.find((field) => field.key === 'claimantTitle');
+    const nameField = row.find((field) => field.key === 'claimantName');
+    if (titleField && nameField) {
+      return (
+        <div key="claimant-chrome" className="min-w-0 space-y-1">
+          <div className="flex items-end gap-2">
+            <div className="w-[5.5rem] shrink-0">
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">Title</label>
+            </div>
+            <div className="min-w-0 flex-1">
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">Claimant name</label>
+            </div>
+          </div>
+          {renderClaimantChrome(titleField, nameField)}
+        </div>
+      );
+    }
+    return (
+      <div key={row.map((field) => field.key).join('-')} className={rowLayoutClass(row)}>
+        {row.map((field) => (
+          <div key={field.key} className={fieldCellClass(field, row)}>
+            {field.type === 'toggle' || field.accordion ? null : (
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">{field.label}</label>
+            )}
+            {field.type !== 'toggle' && !field.accordion && field.guidance ? (
+              <p className="text-[11px] leading-snug text-slate-500 dark:text-slate-400 mb-1">{field.guidance}</p>
+            ) : null}
+            {renderStructuredField(field)}
+          </div>
+        ))}
+      </div>
+    );
+  });
+
+  const renderBlock = (block) => {
+    const header = block.fields[0];
+    const rest = block.fields.slice(1).filter((field) => fieldIsVisible(field, variables) && !field.embedded);
+    const dropping = dragOverId === block.id && dragRef.current.from && dragRef.current.from !== block.id;
+    return (
+      <div
+        key={block.id}
+        data-block-id={block.id}
+        className={`rounded-xl ${dropping ? 'ring-2 ring-amber-400' : ''}`}
+      >
+        <div className="flex items-start gap-1.5">
+          <button
+            type="button"
+            aria-label={`Drag ${header.label}`}
+            title="Drag to move this block"
+            onPointerDown={(event) => startBlockDrag(event, block.id)}
+            className="mt-2.5 shrink-0 p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-grab active:cursor-grabbing touch-none"
+          >
+            <GripVertical className="w-4 h-4" />
+          </button>
+          <div className="min-w-0 flex-1">
+            {header.type === 'toggle' ? renderStructuredField(header) : (
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40 px-3 py-2.5">
+                <span className="block text-sm font-semibold text-slate-800 dark:text-slate-100">{header.label}</span>
+                {header.guidance ? (
+                  <span className="block text-[11px] leading-snug text-slate-500 dark:text-slate-400 mt-0.5">{header.guidance}</span>
+                ) : null}
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => openBlockPreview(header)}
+            className="mt-2 shrink-0 px-2 py-1 rounded-lg text-[10px] font-bold border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800"
+          >
+            Preview
+          </button>
+        </div>
+        {header.type === 'dependants' ? (
+          <div className="mt-2 pl-7">{renderStructuredField(header)}</div>
+        ) : null}
+        {rest.length ? (
+          <div className="mt-2 pl-7 space-y-3">{renderRows(groupFieldRows(rest))}</div>
+        ) : null}
+      </div>
+    );
+  };
+
   return (
     <div className="email-split relative h-full flex overflow-hidden bg-slate-50 dark:bg-slate-900/50">
       {/* COLUMN 1: TEMPLATE & VARIABLES */}
@@ -2825,27 +3056,69 @@ export default function EmailEngine() {
             <label className="block text-xs font-bold uppercase tracking-wider mb-2 text-slate-500 dark:text-slate-400">
               1. Select Template
             </label>
-            <div className="relative">
+            <div className="relative" ref={templateMenuRef}>
                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
                  <FileText size={16} />
                </span>
-              <select 
-                value={selectedTemplateId}
-                onChange={(e) => setSelectedTemplateId(e.target.value)}
-                className="w-full pl-9 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm font-medium outline-none focus:ring-2 focus:ring-amber-500/20 text-slate-900 dark:text-white transition-all appearance-none cursor-pointer"
+              <button
+                type="button"
+                aria-haspopup="listbox"
+                aria-expanded={templateMenuOpen}
+                onClick={() => setTemplateMenuOpen((open) => !open)}
+                className="w-full pl-9 pr-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm font-medium text-left text-slate-900 dark:text-white transition-all cursor-pointer"
               >
-                {TEMPLATES.filter((t) => !t.legacy).map((t) => (
-                  <option key={t.id} value={t.id} className={NATIVE_OPTION_CLASS}>{t.menuLabel || t.name}</option>
-                ))}
-                <optgroup label="Legacy Drafts" className={NATIVE_OPTION_CLASS}>
-                  {TEMPLATES.filter((t) => t.legacy).map((t) => (
-                    <option key={t.id} value={t.id} className={NATIVE_OPTION_CLASS}>{t.menuLabel || t.name}</option>
+                {selectedTemplate.menuLabel || selectedTemplate.name}
+              </button>
+              {templateMenuOpen ? (
+                <div role="listbox" className="absolute z-30 mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-lg py-1 max-h-80 overflow-y-auto">
+                  {TEMPLATES.filter((item) => !item.legacy).map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      role="option"
+                      aria-selected={item.id === selectedTemplateId}
+                      onClick={() => {
+                        setSelectedTemplateId(item.id);
+                        setTemplateMenuOpen(false);
+                      }}
+                      className={`block w-full text-left px-3 py-2 text-sm font-medium text-slate-800 dark:text-slate-100 hover:bg-amber-50 dark:hover:bg-slate-700 ${item.id === selectedTemplateId ? 'bg-amber-50/80 dark:bg-slate-700/70' : ''}`}
+                    >
+                      {item.menuLabel || item.name}
+                    </button>
                   ))}
-                </optgroup>
-              </select>
+                  <div className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-sky-700/80 dark:text-sky-300/80">Legacy Drafts</div>
+                  {TEMPLATES.filter((item) => item.legacy).map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      role="option"
+                      aria-selected={item.id === selectedTemplateId}
+                      onClick={() => {
+                        setSelectedTemplateId(item.id);
+                        setTemplateMenuOpen(false);
+                      }}
+                      className={`block w-full text-left px-3 py-2 text-sm text-sky-800/80 dark:text-sky-200/80 hover:bg-sky-50 dark:hover:bg-sky-950/40 ${item.id === selectedTemplateId ? 'bg-sky-50 dark:bg-sky-950/50' : ''}`}
+                    >
+                      {item.menuLabel || item.name}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
             {selectedTemplate.intro ? (
-              <p className="mt-3 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">{selectedTemplate.intro}</p>
+              <div className="mt-2">
+                <button
+                  type="button"
+                  onClick={() => setInfoOpen((open) => !open)}
+                  aria-expanded={infoOpen}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800"
+                >
+                  <Info className="w-3.5 h-3.5" /> More info
+                </button>
+                {infoOpen ? (
+                  <p className="mt-2 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">{selectedTemplate.intro}</p>
+                ) : null}
+              </div>
             ) : null}
           </div>
 
@@ -2869,48 +3142,10 @@ export default function EmailEngine() {
               </div>
             </div>
 
-            {structuredFields ? (
+            {fieldLayout ? (
               <div className="space-y-4">
-                {structuredRows.map((row) => {
-                  const titleField = row.find((field) => field.key === 'claimantTitle');
-                  const nameField = row.find((field) => field.key === 'claimantName');
-                  if (titleField && nameField) {
-                    return (
-                      <div key="claimant-chrome" className="min-w-0 space-y-1">
-                        <div className="flex items-end gap-2">
-                          <div className="w-[5.5rem] shrink-0">
-                            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">Title</label>
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">Claimant name</label>
-                          </div>
-                        </div>
-                        {renderClaimantChrome(titleField, nameField)}
-                      </div>
-                    );
-                  }
-                  return (
-                    <div
-                      key={row.map((field) => field.key).join('-')}
-                      className={rowLayoutClass(row)}
-                    >
-                      {row.map((field) => (
-                        <div
-                          key={field.key}
-                          className={fieldCellClass(field, row)}
-                        >
-                          {field.type === 'toggle' || field.accordion ? null : (
-                            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">{field.label}</label>
-                          )}
-                          {field.type !== 'toggle' && !field.accordion && field.guidance ? (
-                            <p className="text-[11px] leading-snug text-slate-500 dark:text-slate-400 mb-1">{field.guidance}</p>
-                          ) : null}
-                          {renderStructuredField(field)}
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
+                {renderRows(fixedRows)}
+                {orderedBlocks.map((block) => renderBlock(block))}
                 {pageConfirm?.length ? (
                   <div className="rounded-xl border border-amber-300/80 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-[11px] text-slate-700 dark:text-slate-200 space-y-2">
                     <p>
@@ -3092,6 +3327,42 @@ export default function EmailEngine() {
           </div>
         </div>
       </div>
+      {blockPreview ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/45"
+          onClick={() => setBlockPreview(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            data-block-preview="1"
+            aria-label={blockPreview.title}
+            onClick={(event) => event.stopPropagation()}
+            className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden"
+            style={{ colorScheme: 'light' }}
+          >
+            <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-slate-100 bg-slate-50">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Block preview</p>
+                <h3 className="text-sm font-bold text-slate-800">{blockPreview.title}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBlockPreview(null)}
+                aria-label="Close preview"
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div
+              className="px-5 py-4 text-sm text-black leading-relaxed"
+              style={{ fontFamily: 'Verdana, Geneva, sans-serif', fontSize: '13px', lineHeight: 1.45 }}
+              dangerouslySetInnerHTML={{ __html: blockPreview.html }}
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
