@@ -1,8 +1,16 @@
-export const APP_VERSION = '1.3.34';
+export const APP_VERSION = '1.3.35';
 export const APP_RELEASE_DATE = '27 November 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.35',
+    date: '27 Nov 2026',
+    items: [
+      'Page numbers sit on the far right of Source A and Source B again, and only when both documents match.',
+      'Non-RAF Draft sits under the two master drafts. Type the case type into the thank-you. The only request for now is the date of the incident.',
+    ],
+  },
   {
     version: '1.3.34',
     date: '27 Nov 2026',

@@ -560,6 +560,9 @@ function collectGmailPushErrors(template, variables, { requireSubject = true } =
   if (byKey.claimantName && !String(variables.claimantName || '').trim()) {
     mark('claimantName', 'Claimant name');
   }
+  if (byKey.caseType && !String(variables.caseType || '').trim()) {
+    mark('caseType', 'Case type');
+  }
   fields
     .filter((field) => field.type === 'dependants' && fieldIsVisible(field, variables))
     .forEach((field) => {
@@ -601,6 +604,7 @@ function countRemainingDraftRequirements(template, variables, { requireSubject =
 
   if (byKey.claimantTitle && titleNeedsChoice(variables.claimantTitle)) remaining += 1;
   if (byKey.claimantName && !String(variables.claimantName || '').trim()) remaining += 1;
+  if (byKey.caseType && !String(variables.caseType || '').trim()) remaining += 1;
   fields
     .filter((field) => field.type === 'dependants' && fieldIsVisible(field, variables))
     .forEach((field) => {
@@ -877,11 +881,10 @@ const TEMPLATES = [
         type: 'select',
         default: 'attorneys',
         accordion: true,
-        guidance: 'Loss of Earnings and Wrongful Arrest are separate openings. Only one is used in the draft.',
+        guidance: 'Loss of Earnings openings. Only one is used in the draft.',
         options: [
           { value: 'attorneys', label: 'Loss of Earnings — instructing attorneys' },
           { value: 'ip', label: 'Loss of Earnings — IP or others' },
-          { value: 'incident', label: 'Wrongful Arrest — date of incident not provided' },
         ],
       },
       {
@@ -942,6 +945,7 @@ const TEMPLATES = [
         showWhen: { key: 'secAccident', equals: true },
         nested: true,
         loeOnly: true,
+        pageKey: 'accidentOtPage',
       }),
       {
         key: 'accidentIp',
@@ -958,27 +962,28 @@ const TEMPLATES = [
         showWhen: { key: 'secAccident', equals: true },
         nested: true,
         loeOnly: true,
+        pageKey: 'accidentIpPage',
       }),
       {
         key: 'accidentOtPage',
         label: 'Page A',
         type: 'text',
-        placeholder: 'e.g. 6',
-        row: 'accident-pages',
+        placeholder: 'Pg',
         showWhen: { key: 'secAccident', equals: true },
         sameSource: ['accidentOtSource', 'accidentIpSource'],
         nested: true,
+        embedded: true,
         loeOnly: true,
       },
       {
         key: 'accidentIpPage',
         label: 'Page B',
         type: 'text',
-        placeholder: 'e.g. 8',
-        row: 'accident-pages',
+        placeholder: 'Pg',
         showWhen: { key: 'secAccident', equals: true },
         sameSource: ['accidentOtSource', 'accidentIpSource'],
         nested: true,
+        embedded: true,
         loeOnly: true,
       },
       {
@@ -1003,6 +1008,7 @@ const TEMPLATES = [
         showWhen: { key: 'secDob', equals: true },
         nested: true,
         loeOnly: true,
+        pageKey: 'dobOtPage',
       }),
       {
         key: 'dobIp',
@@ -1019,27 +1025,28 @@ const TEMPLATES = [
         showWhen: { key: 'secDob', equals: true },
         nested: true,
         loeOnly: true,
+        pageKey: 'dobIpPage',
       }),
       {
         key: 'dobOtPage',
         label: 'Page A',
         type: 'text',
-        placeholder: 'e.g. 6',
-        row: 'dob-pages',
+        placeholder: 'Pg',
         showWhen: { key: 'secDob', equals: true },
         sameSource: ['dobOtSource', 'dobIpSource'],
         nested: true,
+        embedded: true,
         loeOnly: true,
       },
       {
         key: 'dobIpPage',
         label: 'Page B',
         type: 'text',
-        placeholder: 'e.g. 8',
-        row: 'dob-pages',
+        placeholder: 'Pg',
         showWhen: { key: 'secDob', equals: true },
         sameSource: ['dobOtSource', 'dobIpSource'],
         nested: true,
+        embedded: true,
         loeOnly: true,
       },
       {
@@ -1064,6 +1071,7 @@ const TEMPLATES = [
         showWhen: { key: 'secName', equals: true },
         nested: true,
         loeOnly: true,
+        pageKey: 'nameOtPage',
       }),
       {
         key: 'nameIp',
@@ -1080,27 +1088,28 @@ const TEMPLATES = [
         showWhen: { key: 'secName', equals: true },
         nested: true,
         loeOnly: true,
+        pageKey: 'nameIpPage',
       }),
       {
         key: 'nameOtPage',
         label: 'Page A',
         type: 'text',
-        placeholder: 'e.g. 6',
-        row: 'name-pages',
+        placeholder: 'Pg',
         showWhen: { key: 'secName', equals: true },
         sameSource: ['nameOtSource', 'nameIpSource'],
         nested: true,
+        embedded: true,
         loeOnly: true,
       },
       {
         key: 'nameIpPage',
         label: 'Page B',
         type: 'text',
-        placeholder: 'e.g. 8',
-        row: 'name-pages',
+        placeholder: 'Pg',
         showWhen: { key: 'secName', equals: true },
         sameSource: ['nameOtSource', 'nameIpSource'],
         nested: true,
+        embedded: true,
         loeOnly: true,
       },
       {
@@ -1279,29 +1288,15 @@ const TEMPLATES = [
         nested: true,
         loeOnly: true,
       },
-      {
-        key: 'calculationType',
-        label: 'Calculation type',
-        type: 'text',
-        placeholder: 'Wrongful Arrest',
-        showWhen: { key: 'audience', equals: 'incident' },
-        guidance: 'Used in the Wrongful Arrest thank-you. Leave blank for Wrongful Arrest.',
-      },
     ],
     compile(vars) {
       const recipient = escapeHtml(filled(vars.recipientName, 'XXXXX'));
       const claimant = masterClaimantHtml(vars);
-      const wrongfulArrest = vars.audience === 'incident';
       const parts = [];
       const add = (id, html) => { parts.push({ id, html }); };
       add('greeting', `Dear ${recipient}`);
 
-      if (wrongfulArrest) {
-        const calculation = escapeHtml(filled(vars.calculationType, 'Wrongful Arrest'));
-        add('opening', `Thank you for requesting a ${calculation} calculation for ${claimant}.`);
-        add('incident', 'The date of incident was not provided. Kindly assist by providing the date of incident.');
-        add('dependency', DEPENDENCY_NOTE);
-      } else if (vars.audience === 'ip') {
+      if (vars.audience === 'ip') {
         const firm = escapeHtml(filled(vars.attorneyFirm, 'XXXXX Attorneys'));
         add('opening', `Kindly note that we are undertaking Loss of Earnings Calculations for ${claimant} on behalf of <strong>${firm}</strong>.`);
       } else {
@@ -1314,14 +1309,14 @@ const TEMPLATES = [
         hasPriorRequest = true;
       };
 
-      if (!wrongfulArrest && vars.secNoIp) {
+      if (vars.secNoIp) {
         pushRequest('no-ip', [
           `${requestLead(hasPriorRequest)} note that we require an Industrial Psychologist report in order to perform Loss of Earnings calculations.`,
           'Kindly assist by providing an Industrial Psychologist report.',
         ].join('<br/><br/>'));
       }
 
-      if (!wrongfulArrest && vars.secAccident) {
+      if (vars.secAccident) {
         const sameAccidentSource = sameDocument(vars.accidentOtSource, vars.accidentIpSource);
         pushRequest('accident', `${requestLead(hasPriorRequest)} assist us by confirming the correct date of accident.${htmlRichList([
           boldReportLine(vars.accidentOt, vars.accidentOtSource, '[date]', 'OT report', sameAccidentSource ? vars.accidentOtPage : ''),
@@ -1329,7 +1324,7 @@ const TEMPLATES = [
         ])}`);
       }
 
-      if (!wrongfulArrest && vars.secDob) {
+      if (vars.secDob) {
         const sameDobSource = sameDocument(vars.dobOtSource, vars.dobIpSource);
         pushRequest('dob', `${requestLead(hasPriorRequest)} assist us by confirming the claimant\u2019s date of birth.${htmlRichList([
           boldReportLine(vars.dobOt, vars.dobOtSource, '[date of birth]', 'OT report', sameDobSource ? vars.dobOtPage : ''),
@@ -1337,7 +1332,7 @@ const TEMPLATES = [
         ])}`);
       }
 
-      if (!wrongfulArrest && vars.secName) {
+      if (vars.secName) {
         const sameNameSource = sameDocument(vars.nameOtSource, vars.nameIpSource);
         pushRequest('name', `${requestLead(hasPriorRequest)} assist us by confirming the correct spelling of the claimant\u2019s name.${htmlRichList([
           boldReportLine(vars.nameOt, vars.nameOtSource, '[spelling]', 'OT report', sameNameSource ? vars.nameOtPage : ''),
@@ -1345,7 +1340,7 @@ const TEMPLATES = [
         ])}${orIdDocumentPronoun(masterPronoun(vars))}`);
       }
 
-      if (!wrongfulArrest && vars.secNameOrder) {
+      if (vars.secNameOrder) {
         const pronoun = masterPronoun(vars);
         pushRequest('name-order', alsoPrefix(
           hasPriorRequest,
@@ -1353,14 +1348,14 @@ const TEMPLATES = [
         ));
       }
 
-      if (!wrongfulArrest && vars.secSurname) {
+      if (vars.secSurname) {
         pushRequest('surname', `${requestLead(hasPriorRequest)} note that there is a discrepancy in the claimant\u2019s surname:${htmlRichList([
           `<strong>${escapeHtml(filled(vars.surnameEmail, '[surname]'))}</strong> as per the Email`,
           `<strong>${escapeHtml(filled(vars.surnameIp, '[surname]'))}</strong> as per the IP report`,
         ])}<br/><br/>Could you please confirm the correct spelling of the claimant\u2019s surname, or alternatively provide a copy of their identification documents to verify the correct spelling?`);
       }
 
-      if (!wrongfulArrest && vars.secPayslips) {
+      if (vars.secPayslips) {
         const documents = {
           payslips: 'payslips',
           'bank statements': 'bank statements',
@@ -1369,18 +1364,18 @@ const TEMPLATES = [
         pushRequest('payslips', `The ${documents} provided for ${claimant} are illegible. Will you please provide clearer copies of all ${documents} in your possession?`);
       }
 
-      if (!wrongfulArrest && vars.secClearerReport) {
+      if (vars.secClearerReport) {
         pushRequest('clearer-report', alsoPrefix(
           hasPriorRequest,
           `If possible, kindly assist us by providing clearer copies of the following documents referenced in your report:${htmlList(vars.clearerReportDocs, '[Document referenced in the report]')}`,
         ));
       }
 
-      if (!wrongfulArrest && vars.secUnclearId) {
+      if (vars.secUnclearId) {
         pushRequest('unclear-id', clearerIdRequest(vars.idNames, hasPriorRequest));
       }
 
-      if (!wrongfulArrest && vars.secInstructionDocs) {
+      if (vars.secInstructionDocs) {
         pushRequest('instruction-docs', [
           instructionLetterRequest(vars.instructionDocs, hasPriorRequest),
           DEPENDENCY_NOTE,
@@ -1393,7 +1388,7 @@ const TEMPLATES = [
       const topEarnings = activeEarnings[0] || '';
 
       const buildFormalEarnings = () => {
-        if (wrongfulArrest || !vars.secFormal) return '';
+        if (!vars.secFormal) return '';
         const chunks = [];
         if (vars.secFormalDocs) {
           chunks.push(`${requestLead(hasPriorRequest)} assist us by providing the following documents referenced in the IP report:${htmlList(vars.formalDocs, '[Document referenced in the IP report]')}`);
@@ -1405,7 +1400,7 @@ const TEMPLATES = [
       };
 
       const buildInformalEarnings = () => {
-        if (wrongfulArrest || !vars.secInformal) return '';
+        if (!vars.secInformal) return '';
         const chunks = [];
         if (topEarnings === 'informal') chunks.push(kubhekaParagraph(hasPriorRequest));
         if (vars.secInformalDocs) {
@@ -1520,6 +1515,7 @@ const TEMPLATES = [
         showWhen: { key: 'secAccident', equals: true },
         nested: true,
         options: LOS_SOURCES,
+        pageKey: 'accidentOtPage',
       }),
       {
         key: 'accidentIp',
@@ -1535,26 +1531,27 @@ const TEMPLATES = [
         showWhen: { key: 'secAccident', equals: true },
         nested: true,
         options: LOS_SOURCES,
+        pageKey: 'accidentIpPage',
       }),
       {
         key: 'accidentOtPage',
         label: 'Page A',
         type: 'text',
-        placeholder: 'e.g. 6',
-        row: 'accident-pages',
+        placeholder: 'Pg',
         showWhen: { key: 'secAccident', equals: true },
         sameSource: ['accidentOtSource', 'accidentIpSource'],
         nested: true,
+        embedded: true,
       },
       {
         key: 'accidentIpPage',
         label: 'Page B',
         type: 'text',
-        placeholder: 'e.g. 8',
-        row: 'accident-pages',
+        placeholder: 'Pg',
         showWhen: { key: 'secAccident', equals: true },
         sameSource: ['accidentOtSource', 'accidentIpSource'],
         nested: true,
+        embedded: true,
       },
       {
         key: 'secLosFormal',
@@ -1722,6 +1719,69 @@ const TEMPLATES = [
       if (vars.secIpDocs || vars.secInstructionDocs) {
         add('dependency', DEPENDENCY_NOTE);
       }
+      add('turnaround', TURNAROUND);
+      add('signoff', SIGN_OFF);
+      const generatedSubject = draftSubject(this.name, masterClaimantLabel(vars));
+      const typedSubject = String(vars.subject || '').trim();
+      return {
+        subject: subjectHasContent(typedSubject) ? typedSubject : generatedSubject,
+        parts,
+      };
+    },
+  },
+  {
+    id: 'draft-non-raf',
+    name: '(DRAFT) Non-RAF',
+    menuLabel: 'Non-RAF Draft',
+    intro: 'For calculations that are not Loss of Earnings or Loss of Support, including general damages and wrongful arrest. Type the case type into the thank-you. For now the only request is the date of the incident. The 24-hour close is always included.',
+    fields: [
+      {
+        key: 'subject',
+        label: 'Subject',
+        type: 'text',
+        default: '(DRAFT) ',
+        placeholder: '(DRAFT) paste the rest of the subject…',
+        guidance: '(DRAFT) is filled for you. Paste the rest of the subject after it. Required for Push to Gmail; Copy HTML does not need it.',
+      },
+      { key: 'recipientName', label: 'Recipient name', type: 'text', placeholder: 'e.g. Luzuko' },
+      {
+        key: 'claimantTitle',
+        label: 'Title',
+        type: 'select',
+        default: 'Mr/Ms',
+        row: 'claimant',
+        edge: true,
+        options: [
+          { value: 'Mr/Ms', label: 'Mr/Ms' },
+          { value: 'Mr', label: 'Mr' },
+          { value: 'Ms', label: 'Ms' },
+          { value: 'Mrs', label: 'Mrs' },
+        ],
+      },
+      {
+        key: 'claimantName',
+        label: 'Claimant',
+        type: 'text',
+        placeholder: 'e.g. S Singonzo',
+        row: 'claimant',
+      },
+      {
+        key: 'caseType',
+        label: 'Case type',
+        type: 'text',
+        placeholder: 'e.g. General Damages',
+        guidance: 'Written into the thank-you, for example General Damages or Wrongful Arrest.',
+      },
+    ],
+    compile(vars) {
+      const recipient = escapeHtml(filled(vars.recipientName, 'XXXXX'));
+      const claimant = masterClaimantHtml(vars);
+      const caseType = escapeHtml(filled(vars.caseType, '[Case type]'));
+      const parts = [];
+      const add = (id, html) => { parts.push({ id, html }); };
+      add('greeting', `Dear ${recipient}`);
+      add('opening', `Thank you for requesting a ${caseType} calculation for ${claimant}.`);
+      add('incident', 'The date of incident was not provided. Kindly assist by providing the date of incident.');
       add('turnaround', TURNAROUND);
       add('signoff', SIGN_OFF);
       const generatedSubject = draftSubject(this.name, masterClaimantLabel(vars));
@@ -2561,11 +2621,11 @@ export default function EmailEngine() {
         : null;
       const pageVisible = Boolean(pageField && fieldIsVisible(pageField, variables));
       const pageSoft = pageVisible && pageConfirmKeys.has(pageField.key);
-      const sourceChrome = blockingKeys.includes(field.key)
+      const sourceChrome = `${blockingKeys.includes(field.key)
         ? CHROME_BLOCKING_CLASS
         : pageSoft
           ? 'flex items-stretch rounded-xl border border-amber-300/80 dark:border-amber-500/50 bg-white dark:bg-slate-800 overflow-hidden focus-within:border-amber-500 dark:[color-scheme:dark] transition-all'
-          : CHROME_CLASS;
+          : CHROME_CLASS} min-w-0 w-full`;
 
       if (isOther) {
         return (
@@ -2587,7 +2647,7 @@ export default function EmailEngine() {
               value={known ? '' : value}
               onChange={(e) => handleVarChange(field.key, e.target.value)}
               placeholder="Type the document name"
-              className={`${CHROME_INNER} min-w-0 flex-1 px-3 py-3`}
+              className={`${CHROME_INNER} min-w-0 w-0 basis-0 flex-1 px-3 py-3`}
             />
             {pageVisible ? renderPageSlot(pageField) : null}
           </div>
@@ -2608,7 +2668,8 @@ export default function EmailEngine() {
                 handleVarChange(field.key, next);
               }
             }}
-            className={`${CHROME_INNER} min-w-0 flex-1 px-3 py-3 appearance-none cursor-pointer`}
+            className={`${CHROME_INNER} min-w-0 w-0 basis-0 flex-1 px-2 py-3 appearance-none cursor-pointer`}
+            style={{ width: 0, minWidth: 0, flex: '1 1 0%' }}
           >
             {!value ? <option value="" className={NATIVE_OPTION_CLASS}>Select a document</option> : null}
             {options.map((opt) => (
