@@ -1,8 +1,15 @@
-export const APP_VERSION = '1.3.36';
+export const APP_VERSION = '1.3.37';
 export const APP_RELEASE_DATE = '27 November 2026';
 
 /** Newest first. Shown when SYSTEM ONLINE is clicked. */
 export const APP_CHANGELOG = [
+  {
+    version: '1.3.37',
+    date: '27 Nov 2026',
+    items: [
+      'Holding a block’s drag handle lifts a copy that follows the cursor. An amber line shows where it will land.',
+    ],
+  },
   {
     version: '1.3.36',
     date: '27 Nov 2026',

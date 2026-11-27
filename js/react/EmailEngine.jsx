@@ -420,13 +420,29 @@ function releaseTickedBlock(order, keys, variables, key) {
   return [...selected, ...parked];
 }
 
-function moveBlockBefore(order, keys, fromId, toId) {
+function moveBlockBefore(order, keys, fromId, toId, placeAfter = false) {
   const list = normalizeBlockOrder(order, keys);
   const from = list.indexOf(fromId);
   if (from < 0 || !list.includes(toId) || fromId === toId) return list;
   const next = list.filter((id) => id !== fromId);
-  next.splice(next.indexOf(toId), 0, fromId);
+  let index = next.indexOf(toId);
+  if (index < 0) return list;
+  if (placeAfter) index += 1;
+  next.splice(index, 0, fromId);
   return next;
+}
+
+function blockDropAt(clientY, fromId) {
+  const cards = [...document.querySelectorAll('#email-root [data-block-id]')];
+  if (!cards.length) return { over: fromId, after: false };
+  for (const card of cards) {
+    const rect = card.getBoundingClientRect();
+    if (clientY < rect.top + rect.height / 2) {
+      return { over: card.dataset.blockId, after: false };
+    }
+  }
+  const last = cards[cards.length - 1];
+  return { over: last.dataset.blockId, after: last.dataset.blockId !== fromId };
 }
 
 function groupFieldRows(fields) {
@@ -2087,7 +2103,10 @@ export default function EmailEngine() {
   const [templateMenuOpen, setTemplateMenuOpen] = useState(false);
   const [blockPreview, setBlockPreview] = useState(null);
   const [dragOverId, setDragOverId] = useState('');
-  const dragRef = useRef({ from: '', over: '' });
+  const [dragAfter, setDragAfter] = useState(false);
+  const [dragGhost, setDragGhost] = useState(null);
+  const dragRef = useRef({ from: '', over: '', after: false });
+  const ghostElRef = useRef(null);
   const templateMenuRef = useRef(null);
   const [recipientConfirm, setRecipientConfirm] = useState('');
   const [pageConfirm, setPageConfirm] = useState(null);
@@ -2600,44 +2619,67 @@ export default function EmailEngine() {
   };
 
   const finishBlockDrag = () => {
-    const { from, over } = dragRef.current;
-    dragRef.current = { from: '', over: '' };
+    const { from, over, after } = dragRef.current;
+    dragRef.current = { from: '', over: '', after: false };
     setDragOverId('');
+    setDragAfter(false);
+    setDragGhost(null);
+    document.body.style.cursor = '';
     if (!from || !over || from === over) return;
     const blockKeys = templateBlockKeys(selectedTemplate);
     setVariables((prev) => ({
       ...prev,
-      blockOrder: moveBlockBefore(prev.blockOrder, blockKeys, from, over),
+      blockOrder: moveBlockBefore(prev.blockOrder, blockKeys, from, over, after),
     }));
   };
 
-  const startBlockDrag = (event, blockId) => {
+  const startBlockDrag = (event, blockId, label) => {
     if (event.button != null && event.button !== 0) return;
     event.preventDefault();
-    dragRef.current = { from: blockId, over: blockId };
+    const card = event.currentTarget.closest('[data-block-id]');
+    const rect = card?.getBoundingClientRect();
+    const offsetX = rect ? event.clientX - rect.left : 16;
+    const offsetY = rect ? event.clientY - rect.top : 16;
+    dragRef.current = { from: blockId, over: blockId, after: false, offsetX, offsetY };
     setDragOverId(blockId);
+    setDragAfter(false);
+    setDragGhost({
+      id: blockId,
+      label,
+      x: rect ? rect.left : event.clientX - offsetX,
+      y: rect ? rect.top : event.clientY - offsetY,
+      width: rect ? rect.width : 280,
+    });
+    document.body.style.cursor = 'grabbing';
     const scroller = event.currentTarget.closest('.overflow-y-auto');
     const move = (ev) => {
+      const ghost = ghostElRef.current;
+      if (ghost) {
+        ghost.style.left = `${ev.clientX - offsetX}px`;
+        ghost.style.top = `${ev.clientY - offsetY}px`;
+      }
       if (scroller) {
         const bounds = scroller.getBoundingClientRect();
-        if (ev.clientY < bounds.top + 36) scroller.scrollTop -= 14;
-        else if (ev.clientY > bounds.bottom - 36) scroller.scrollTop += 14;
+        if (ev.clientY < bounds.top + 36) scroller.scrollTop -= 16;
+        else if (ev.clientY > bounds.bottom - 36) scroller.scrollTop += 16;
       }
-      const el = document.elementFromPoint(ev.clientX, ev.clientY);
-      const card = el?.closest?.('[data-block-id]');
-      const over = card?.dataset.blockId || '';
-      if (over && over !== dragRef.current.over) {
-        dragRef.current.over = over;
-        setDragOverId(over);
+      const drop = blockDropAt(ev.clientY, blockId);
+      if (drop.over !== dragRef.current.over || drop.after !== dragRef.current.after) {
+        dragRef.current.over = drop.over;
+        dragRef.current.after = drop.after;
+        setDragOverId(drop.over);
+        setDragAfter(drop.after);
       }
     };
     const up = () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
       finishBlockDrag();
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
   };
 
   const openBlockPreview = (field) => {
@@ -2995,20 +3037,23 @@ export default function EmailEngine() {
   const renderBlock = (block) => {
     const header = block.fields[0];
     const rest = block.fields.slice(1).filter((field) => fieldIsVisible(field, variables) && !field.embedded);
-    const dropping = dragOverId === block.id && dragRef.current.from && dragRef.current.from !== block.id;
+    const lifted = dragGhost?.id === block.id;
+    const showBefore = dragGhost && dragGhost.id !== block.id && dragOverId === block.id && !dragAfter;
+    const showAfter = dragGhost && dragGhost.id !== block.id && dragOverId === block.id && dragAfter;
     return (
       <div
         key={block.id}
         data-block-id={block.id}
-        className={`rounded-xl ${dropping ? 'ring-2 ring-amber-400' : ''}`}
+        className={`rounded-xl ${lifted ? 'opacity-40' : ''}`}
       >
+        {showBefore ? <div className="h-1.5 mb-2 rounded-full bg-amber-400 shadow-[0_0_0_1px_rgba(245,158,11,0.35)]" aria-hidden="true" /> : null}
         <div className="flex items-start gap-1.5">
           <button
             type="button"
             aria-label={`Drag ${header.label}`}
             title="Drag to move this block"
-            onPointerDown={(event) => startBlockDrag(event, block.id)}
-            className="mt-2.5 shrink-0 p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-grab active:cursor-grabbing touch-none"
+            onPointerDown={(event) => startBlockDrag(event, block.id, header.label)}
+            className="mt-1.5 shrink-0 w-7 self-stretch flex items-center justify-center rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:text-slate-200 dark:hover:bg-slate-700/60 cursor-grab active:cursor-grabbing touch-none"
           >
             <GripVertical className="w-4 h-4" />
           </button>
@@ -3036,6 +3081,7 @@ export default function EmailEngine() {
         {rest.length ? (
           <div className="mt-2 pl-7 space-y-3">{renderRows(groupFieldRows(rest))}</div>
         ) : null}
+        {showAfter ? <div className="h-1.5 mt-2 rounded-full bg-amber-400 shadow-[0_0_0_1px_rgba(245,158,11,0.35)]" aria-hidden="true" /> : null}
       </div>
     );
   };
@@ -3327,6 +3373,17 @@ export default function EmailEngine() {
           </div>
         </div>
       </div>
+      {dragGhost ? (
+        <div
+          ref={ghostElRef}
+          data-drag-ghost="1"
+          className="fixed z-[70] pointer-events-none rounded-xl border border-amber-400/90 bg-white dark:bg-slate-800 shadow-2xl px-3 py-2.5 flex items-center gap-2"
+          style={{ left: dragGhost.x, top: dragGhost.y, width: dragGhost.width }}
+        >
+          <GripVertical className="w-4 h-4 shrink-0 text-slate-400" />
+          <span className="min-w-0 truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{dragGhost.label}</span>
+        </div>
+      ) : null}
       {blockPreview ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/45"
